@@ -16,6 +16,7 @@ import {transitionInstructionLoopAssets} from './instruction-loop-assets.mjs';
 import {verifyRetainedInstructionLayout} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry} from './asset-registry.mjs';
 import {bindMeasuredNormalOwnerSource} from './instruction-loop-source-binding.mjs';
+import {bindNativePublicInputs} from './instruction-loop-native-public-inputs.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 const pause=()=>new Promise(r=>setTimeout(r,500));
 const checked=r=>{assert.equal(hash(readStableBytes(r.path,'pinned native host input',16*1024*1024)),r.digest,'native host input drift');return readJsonFileStrict(r.path,'pinned native host input',16*1024*1024);};
@@ -78,15 +79,16 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     const fixedCriteria=checked(p.report.criteria);
     for(const id of selected.case_ids)assert.ok(fixedCriteria.some(f=>f.fixture_id===id&&Array.isArray(f.requirements)&&f.requirements.length>0),'selected case lacks its fixed reporting criteria');
     const template=checked({path:p.native.templateConfig,digest:p.native.templateConfigDigest});
-    for(const id of selected.case_ids){const c=job.input.catalog.find(c=>c.id===id),r=template.rows.find(r=>r.fixture_id===id);assert.ok(r);assert.equal(c.public_input_digest,canonicalDigest(r.public_inventory),'selected public input differs from approved catalog');}
+    const publicBinding=p.native.publicInputBindings?bindNativePublicInputs({input:checked(p.native.publicInputBindings),catalog:job.input.catalog,selectedCaseIds:selected.case_ids,template}):null;
+    for(const id of selected.case_ids){const c=job.input.catalog.find(c=>c.id===id),r=template.rows.find(r=>r.fixture_id===id);assert.ok(r);assert.equal(publicBinding?.bindings.find(b=>b.case_id===id)?.delivered_public_input_digest??c.public_input_digest,canonicalDigest(r.public_inventory),'selected public input differs from approved catalog');}
     const request=join(p.stateRoot,'native-preparation-request.json');
-    save(request,{profile:p.native,selection:selected,candidate:job.input.candidate,policy:p.policy});
+    save(request,{profile:p.native,selection:selected,...(publicBinding?{delivery_sources:publicBinding.delivery_sources}:{}),candidate:job.input.candidate,policy:p.policy});
     const result=spawnSync(p.native.python,['-B',join(import.meta.dirname,'instruction-loop-native-prepare.py'),request],{encoding:'utf8',maxBuffer:4*1024*1024});
     assert.equal(result.status,0,'existing-native preparation failed; inspect allocated inputs, do not retry');
     const preparation=JSON.parse(result.stdout);
     const retained=prepareRetainedInstructionComparison({storeRoot:p.storeRoot,configPath:preparation.config_path,preparationManifestDigest:preparation.manifest_digest,trustedAssetAuthorityContexts:p.generator.trustedAuthorityContexts??[],
       environments:{baseline:p.baselineEnvironmentObjectDigest,challenger:job.input.candidate.environment_object_digest}});
-    const value={...selected,full_context_comparison:fairness,quality_plan:{criteria:p.report.criteria,
+    const value={...selected,...(publicBinding?{public_input_bindings:publicBinding.bindings,public_input_bindings_digest:canonicalDigest(publicBinding.bindings)}:{}),full_context_comparison:fairness,quality_plan:{criteria:p.report.criteria,
       policy:'Read fixed reference judgments; missing judgments remain unknown. No automatic new model judge is implied.',available_judgments:p.report.assessments?.length??0},
       execution_binding:{...preparation,plan_object_digest:retained.object_digest,model:retained.plan.model,effort:retained.plan.effort,runner:retained.plan.runner,
       model_autonomy:'existing wrapper unchanged except path rebasing; child/history choices remain model decisions'}};

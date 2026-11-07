@@ -1,5 +1,5 @@
 """Rebase prepared inputs around the existing runner/control; never launch a model."""
-import ast,copy,hashlib,json,os,sys
+import ast,copy,hashlib,json,os,stat,sys
 from pathlib import Path
 def sha(p):return 'sha256:'+hashlib.sha256(p.read_bytes()).hexdigest()
 def read(p):return json.loads(Path(p).read_text())
@@ -16,6 +16,21 @@ def clone(source,target,digest):
     target.parent.mkdir(parents=True,exist_ok=True)
     with target.open('xb') as f:f.write(source.read_bytes())
     target.chmod(source.stat().st_mode&511)
+def clone_bound_public(pin,target,entry):
+    source=Path(pin['source']);assert source.is_absolute() and source.resolve()==source
+    fd=os.open(source,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
+    try:
+      before=os.fstat(fd);assert stat.S_ISREG(before.st_mode) and before.st_size==entry['bytes'] and before.st_size<=16*1024*1024
+      with os.fdopen(fd,'rb',closefd=False) as stream:data=stream.read(16*1024*1024+1)
+      after=os.fstat(fd);current=source.stat(follow_symlinks=False)
+      for key in ['st_dev','st_ino','st_size','st_mode','st_mtime_ns','st_ctime_ns']:
+        assert getattr(before,key)==getattr(after,key)==getattr(current,key),'public source changed during copy'
+      assert source.resolve()==source and len(data)==entry['bytes']
+      assert 'sha256:'+hashlib.sha256(data).hexdigest()==entry['sha256']==pin['digest']
+      target.parent.mkdir(parents=True,exist_ok=True)
+      with target.open('xb') as out:out.write(data)
+      target.chmod(entry['mode'])
+    finally:os.close(fd)
 def compatible_native_host_root(native_root,template_config):
     n=Path(native_root);template=Path(template_config).parent
     return len(n.parents)>=3 and len(template.parents)>=3 and n.parents[2]==template.parents[2]
@@ -49,7 +64,12 @@ def prepare(request):
       for f in inv(templates[row['variant']]):clone(templates[row['variant']]/f['path'],work/f['path'],f['sha256'])
       for f in row['public_inventory']:
         assert f['path']=='task.md' or f['path'].startswith('workspace/');assert '..' not in Path(f['path']).parts
-        clone(Path(base['public_source_snapshot'])/row['fixture_id']/f['path'],work/f['path'],f['sha256'])
+        resolved=request.get('delivery_sources',{}).get(row['fixture_id'])
+        if resolved is None:clone(Path(base['public_source_snapshot'])/row['fixture_id']/f['path'],work/f['path'],f['sha256'])
+        else:
+          pin=next(x for x in resolved if x['target']==f['path'])
+          assert pin['digest']==f['sha256'] and pin['bytes']==f['bytes'] and pin['mode']==f['mode']
+          clone_bound_public(pin,work/f['path'],f)
       (work/'.tmp/npm-cache').mkdir(parents=True);(work/'.runtime').mkdir()
       for name in ['npm-user.npmrc','npm-global.npmrc']:(work/'.runtime'/name).write_bytes(b'');(work/'.runtime'/name).chmod(0o444)
       profile='ask_loop_'+row['trial_id'].replace('-','_');over=[]

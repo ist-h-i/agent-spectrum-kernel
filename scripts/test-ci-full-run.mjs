@@ -18,7 +18,7 @@ const environmentCommands = [
   'node --test scripts/test-instruction-environment.mjs scripts/test-skill-usage-evidence.mjs scripts/test-environment-evolution.mjs scripts/test-environment-target.mjs scripts/test-environment-materialization.mjs scripts/test-instruction-environment-compiler.mjs scripts/test-environment-membership-adoption.mjs scripts/test-environment-owner-transfer.mjs scripts/test-environment-runtime-contract.mjs scripts/test-claude-native-runtime.mjs',
   'node --experimental-test-module-mocks --test scripts/test-environment-evaluation.mjs scripts/test-environment-saved-results.mjs',
   'node --experimental-test-module-mocks --test scripts/test-retained-instruction-bridge.mjs scripts/test-supervised-instruction-loop.mjs scripts/test-instruction-loop-generation-worker.mjs',
-  'node --experimental-test-module-mocks --test scripts/test-instruction-loop-native-bindings.mjs scripts/test-instruction-loop-reference-report.mjs scripts/test-instruction-loop-native-host.mjs scripts/test-instruction-loop-native-input-bound.mjs scripts/test-instruction-loop-source-binding.mjs',
+  'node --experimental-test-module-mocks --test scripts/test-instruction-loop-native-bindings.mjs scripts/test-instruction-loop-reference-report.mjs scripts/test-instruction-loop-native-host.mjs scripts/test-instruction-loop-native-input-bound.mjs scripts/test-instruction-loop-native-public-inputs.mjs scripts/test-instruction-loop-source-binding.mjs',
 ];
 const nativePrepareCommand = 'python3 -B scripts/test-instruction-loop-native-prepare.py';
 const commands = text => text.split('\n').map(line => line.trim().replace(/^run: /, '')).filter(line => /^node (?:--\S+ )*scripts\//.test(line)).sort();
