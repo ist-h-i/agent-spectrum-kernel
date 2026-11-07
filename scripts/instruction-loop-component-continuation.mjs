@@ -7,7 +7,7 @@ import {instructionBytesDigest as hash,verifyInstructionEnvironment} from './ins
 import {verifyAssetRegistry} from './asset-registry.mjs';
 import {readCompletedInstructionLoopContinuation,prepareNextSupervisedInstructionLoop} from './supervised-instruction-loop.mjs';
 import {createComponentInstructionLoopConfiguration} from './instruction-loop-component-runtime.mjs';
-export function buildNextComponentInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null}){
+export function buildNextComponentInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null,reportRevision=null}){
   root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);outputRoot=resolve(outputRoot);
   const history=readCompletedInstructionLoopContinuation(root),old=readJsonFileStrict(profilePath,'previous component profile'),config=readJsonFileStrict(configPath);
   assert.equal(old.kind,'component_practical_instruction_loop_profile_v1');assert.equal(config.runtime.profile_path,profilePath);
@@ -43,7 +43,7 @@ export function buildNextComponentInstructionLoopProfile({root,profilePath,confi
   for(const attempt of history.report?.all_attempts??[]){const duration=attempt.observation?.metrics?.duration_ms;
     if(Number.isFinite(duration)&&duration>=0)p.selection.observedCosts[attempt.row.case_id]=Math.max(p.selection.observedCosts[attempt.row.case_id]??0,duration);}
   const fresh=feedback??(old.policy.observation.kind==='instruction_loop_continuation_v1'?old.policy.observation.feedback:old.policy.observation);
-  const prepared=prepareNextSupervisedInstructionLoop({root,nextPolicy:{...history.policy,id,observation:fresh,
+  const prepared=prepareNextSupervisedInstructionLoop({root,reportRevision,nextPolicy:{...history.policy,id,observation:fresh,
     application_anchor:p.previousAppliedRun?{run_root:p.previousAppliedRun,journal_digest:p.previousAppliedJournalDigest}:null},
     resultSummary:`Previous outcome ${history.outcome}. All-attempt resources: ${JSON.stringify(history.report?.resources_all_attempts??null)}. Missing measurements remain Unknown.`});
   p.policy=prepared.policy;delete p.policy.runtime_digest;

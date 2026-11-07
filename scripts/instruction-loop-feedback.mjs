@@ -73,7 +73,7 @@ export function summarizeInstructionLoopEvaluation(report){
     if(selected){
       assert.equal(c.selected_result_digest,null,'multiple selected attempts for one case/condition');
       c.outcome=practical?outcome(a.observation.outcome):a.state!=='completed'?'unknown':a.unmet_points>0||a.mandatory_final_validation===false?'fail':a.unknown_points>0||a.mandatory_final_validation!==true?'unknown':a.confirmed_points===a.maximum_points?'pass':'unknown';
-      c.selected_result_digest=practical?a.result_digest:canonicalDigest(a);
+      c.selected_result_digest=practical?(a.effective_result_digest??a.result_digest):canonicalDigest(a);
       c.metrics=Object.fromEntries(evaluationMetrics.map(k=>[k,numberOrNull(practical?a.observation.metrics[k]:k==='duration_ms'?(a.cli_seconds==null?null:a.cli_seconds*1000):a[k==='input_tokens'?'root_input_tokens':'root_output_tokens'])]));
       if(!practical&&a.fixed_reference)c.fixed_reference=fixedPointReferenceSummary(a.fixed_reference);
       if(practical&&a.quality_observation?.fixed_reference)try{c.fixed_reference=validateFixedPointReferenceSummary(structuredClone(a.quality_observation.fixed_reference));}catch{c.outcome='unknown';}
@@ -179,14 +179,17 @@ export function projectInstructionLoopObservation(observation) {
     assert.deepEqual(Object.keys(observation).sort(), ['feedback', 'kind', 'previous']);
     const feedback = projectInstructionLoopObservation(observation.feedback);
     const p = observation.previous;
-    assert.deepEqual(Object.keys(p).sort(), ['candidate_digest', 'decisions', 'failure_count', 'journal_digest', 'outcome', 'policy_digest', 'report_digest', 'result_summary', 'run_id', 'unknown_quality', ...(p.evaluation_summary===undefined?[]:['evaluation_summary'])].sort());
+    assert.deepEqual(Object.keys(p).sort(), ['candidate_digest', 'decisions', 'failure_count', 'journal_digest', 'outcome', 'policy_digest', 'report_digest', 'result_summary', 'run_id', 'unknown_quality', ...(p.evaluation_summary===undefined?[]:['evaluation_summary']),...(p.report_revision===undefined?[]:['report_revision'])].sort());
     for (const k of ['journal_digest', 'policy_digest', 'candidate_digest']) assert.match(p[k], /^sha256:[a-f0-9]{64}$/u);
     assert.ok(p.report_digest === null || /^sha256:[a-f0-9]{64}$/u.test(p.report_digest));
     assert.match(p.run_id, /^[a-zA-Z0-9._-]{1,100}$/u); assert.match(p.outcome, /^[a-z_]{1,80}$/u);
     assert.ok(Number.isSafeInteger(p.failure_count) && p.failure_count >= 0);
     assert.equal(typeof p.unknown_quality, 'boolean');
     assertPublicInstructionSummary(p.result_summary);
-    if(p.evaluation_summary!==undefined)validateInstructionEvaluationSummary(p.evaluation_summary,p.report_digest);
+    if(p.report_revision!==undefined){const r=p.report_revision;assert.deepEqual(Object.keys(r).sort(),['original_report_digest','effective_report_digest','readout_digest','ledger_digest','selection_digest','human_decision_scope','approval_carried_forward'].sort());
+      for(const k of ['original_report_digest','effective_report_digest','readout_digest','ledger_digest','selection_digest'])assert.match(r[k],/^sha256:[a-f0-9]{64}$/u);
+      assert.equal(r.original_report_digest,p.report_digest);assert.equal(r.human_decision_scope,'original_packet_only');assert.equal(r.approval_carried_forward,false);}
+    if(p.evaluation_summary!==undefined)validateInstructionEvaluationSummary(p.evaluation_summary,p.report_revision?.effective_report_digest??p.report_digest);
     assert.ok(Array.isArray(p.decisions) && p.decisions.length <= 4);
     for (const d of p.decisions) {
       assert.deepEqual(Object.keys(d).sort(), ['digest', 'disposition', 'kind', 'reason_summary']);
