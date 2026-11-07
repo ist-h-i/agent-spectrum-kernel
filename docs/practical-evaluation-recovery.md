@@ -339,3 +339,23 @@ observations and produce a limited report while further trial launches suspend.
 All-attempt resource totals include original failures and replacement runs, with
 observed/missing counts. Assessor execution observations are separate; uncollected
 token/cost/hierarchy values remain unknown, never free or included in trial savings.
+
+Automatic Codex recovery assessment saves `assessment-session/stdout.jsonl`,
+`stderr.log` and `execution-observation.json` before checking success or parsing
+the final answer. The observation binds the exact request, settings, prompt
+digest and retained output digests. It records local spawn/termination/exit,
+interruption, timeout, output limits and elapsed time, including failed calls.
+Successful results reference this observation; existing model-free fixtures keep
+their prior shape. Output files are private, fresh and never overwritten.
+The final answer is captured once into `captured-answer.json`. Its same bytes
+bind the observation, strict parsing and any shape-repair receipt, preserving the
+existing 1 MiB assessment limit and duplicate-key rejection. Later changes to
+the provider's answer file cannot replace the captured judgment.
+
+These observations grant no replay. A failed spawned CLI, an empty session or an
+initialization diagnostic leaves provider closure unknown. Positive no-spawn and
+clean synchronous CLI completion are distinct from that unknown state. Response
+validation may still fail after a closed CLI; the original answer bytes remain
+available. Model calls and token usage that the executor cannot observe remain
+unknown. This evidence does not reconstruct logs lost by an older assessor, add
+an after-the-fact closure-admission port or authorize changing a frozen run.
