@@ -125,3 +125,30 @@ or `operate` at the new case gate and obtain the normal result/change judgment.
 It refuses model uncertainty, after-case/owner effects, overlap and altered
 prepared authority. Use the existing practical runner for individual trial
 recovery. See `docs/instruction-loop-failed-preparation.md` for the bounded scope.
+
+For native reference scoring, the host AI can select
+`report.scoringProvider:{kind:'external_host'}` instead of a custom command.
+`configure` pins the shipped worker and inline settings; `readiness` writes
+nothing. This provider is native-only; practical/component profiles must use
+their existing evaluation ports. Keep fixedScoring calculator/dependency pins
+when importing partial-credit source judgments. No private grader is bundled.
+
+When a native report is pending, use supervised `scoring-request`,
+`scoring-claim --claim FILE --allow-model-calls`, and `scoring-complete
+--submission FILE`, each with the exact `--root`, `--profile` and `--config`.
+The AI host owns these routine steps, not a third human judgment. Claim only the
+existing execution. A repeated claim with claim_created:false requires inspection
+of that execution; it never permits a second judge run or takeover. Request
+creation grants no model permission. Do not start real grading before the case
+approval and original runtime model grant.
+
+The controller request is private mediator input. Prepare isolated anonymous
+source packets from retained closed answers; do not send condition labels, trial
+order, previous scores or peer judgments to blind judges. Use the existing fixed
+calculator, source-bound assessments and independent review receipts. Preserve
+all failed judgments/corrections and their reasons. Completion can return both
+fixed_point_assessments and reference_assessments for mixed fixed/binary cases.
+Report missing judgments as Unknown; do not invent runtime acceptance or formal
+admission. Positive host-reported closure is required and does not authenticate
+a provider or prove reviewer independence/evidence truth. Resume the existing
+report by inspection, with no scoring dispatch replay.
