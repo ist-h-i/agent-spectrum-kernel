@@ -30,6 +30,13 @@ test('no instruction destination cannot accidentally start instruction generatio
   const feedback = buildInstructionLoopFeedback({ findings: [finding(1, 'one_off')] });
   assert.equal(feedback.selected_id, null); assert.throws(() => projectInstructionLoopObservation(feedback), /no instruction candidate/);
 });
+test('invalid optional practical fixed summaries do not stop learning or disclose grading bodies',()=>{
+ const report={kind:'practical_evaluation_run_report_v1',comparison_limits:[],all_attempts:[{row:{case_id:'case',repetition:1,condition:'candidate'},included_in_comparison:true,
+  result_digest:canonicalDigest('result'),observation:{outcome:'pass',execution_state:'completed',metrics:{duration_ms:10,input_tokens:null,output_tokens:2}},
+  quality_observation:{fixed_reference:{private_grading_body:'PRIVATE ANSWER'}}}]};
+ const value=feedbackModule.summarizeInstructionLoopEvaluation(report),c=value.cases[0].conditions[0];
+ assert.equal(c.outcome,'unknown');assert.equal(c.fixed_reference,undefined);assert.equal(c.metrics.duration_ms,10);assert.equal(JSON.stringify(value).includes('PRIVATE'),false);
+});
 test('duplicate/tampered/private observations and arbitrary data refuse', () => {
   assert.throws(() => buildInstructionLoopFeedback({ findings: [finding(1), finding(1)] }), /duplicate/);
   const f = finding(1); f.observation = { ...f.observation, correction: 'changed' };

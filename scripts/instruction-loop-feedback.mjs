@@ -76,6 +76,7 @@ export function summarizeInstructionLoopEvaluation(report){
       c.selected_result_digest=practical?a.result_digest:canonicalDigest(a);
       c.metrics=Object.fromEntries(evaluationMetrics.map(k=>[k,numberOrNull(practical?a.observation.metrics[k]:k==='duration_ms'?(a.cli_seconds==null?null:a.cli_seconds*1000):a[k==='input_tokens'?'root_input_tokens':'root_output_tokens'])]));
       if(!practical&&a.fixed_reference)c.fixed_reference=fixedPointReferenceSummary(a.fixed_reference);
+      if(practical&&a.quality_observation?.fixed_reference)try{c.fixed_reference=validateFixedPointReferenceSummary(structuredClone(a.quality_observation.fixed_reference));}catch{c.outcome='unknown';}
       if(!practical)c.reference_points=Object.fromEntries(['confirmed','unknown','unmet','maximum'].map(k=>[k,numberOrNull(a[k+'_points'])]));
     }
   }

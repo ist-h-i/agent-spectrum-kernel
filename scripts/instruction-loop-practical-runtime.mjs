@@ -20,7 +20,7 @@ const stages=['generate','register','select','plan','apply','version','cleanup',
 const sourceNames=['instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
   'instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
-  'practical-evaluation-runner.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
+  'practical-evaluation-runner.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
   'instruction-loop-command-runtime.mjs','instruction-run-journal.mjs','ask-pragmatic-evaluation-report.mjs','content-addressed-store.mjs','asset-registry.mjs','codex-exec-runner.mjs'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'practical runtime input',16*1024*1024))});
 function validateProfilePaths(p){
@@ -77,7 +77,7 @@ export function prepareFullPracticalInstructionSelection(p,job){
     ...(p.practical.observation_path===undefined?{}:{observation_path:p.practical.observation_path})};
   save(settingsPath,settings);const settingsPin=pin(settingsPath);
   const runtime={commands:{trial:{argv:[process.execPath,worker,settingsPath,settingsPin.digest,'execute'],inspect_argv:[process.execPath,worker,settingsPath,settingsPin.digest,'inspect'],
-    pins:[settingsPin,pin(worker)],model_calls:conditions.some(c=>c.command.model_calls)||cases.some(c=>c.grader?.model_calls)}}};
+    pins:[settingsPin,pin(worker),pin(join(import.meta.dirname,'practical-quality-observation.mjs')),pin(join(import.meta.dirname,'instruction-loop-fixed-scoring.mjs'))],model_calls:conditions.some(c=>c.command.model_calls)||cases.some(c=>c.grader?.model_calls)}}};
   if(p.practical.assessor){const settings=join(p.stateRoot,'practical-assessor-settings.json');save(settings,p.practical.assessor);
     const assessor=join(import.meta.dirname,'practical-evaluation-assessor.mjs'),settingsPin=pin(settings);
     runtime.commands.assess={argv:[process.execPath,assessor,settings,settingsPin.digest],pins:[settingsPin,pin(assessor)],model_calls:p.practical.assessor.kind!=='fixture'};}
