@@ -67,6 +67,7 @@ export function fullGenerationInput(p){
 }
 export async function codexFullInstructionProvider(p,input){
   assert.equal(p.modelCallsAuthorized,true,'new Full generation model call is not authorized');
+  if(p.executableDigest!==undefined){assert.equal(resolve(p.executable),p.executable,'absolute pinned Full authoring executable required');assert.match(p.executableDigest,/^sha256:[a-f0-9]{64}$/u);assert.equal(hash(readStableBytes(p.executable,'pinned Full authoring executable',16*1024*1024)),p.executableDigest,'Full authoring executable drift');}
   assertNoSymlinkPathSegments(p.sessionRoot,'generation session',{allowMissingLeaf:true});mkdirSync(p.sessionRoot,{mode:0o700});
   const final=join(p.sessionRoot,'last-message.json');
   const prompt='Revise the supplied public Skill source for the stated goal. Return only JSON {"changes":[{"operation":"write","path":"...","text":"..."}]} (or operation delete for an existing reference). Preserve essential safety and capability boundaries. Do not edit executable code, test cases, scoring, owner state or mirrors.\n'+JSON.stringify(input);
