@@ -12,6 +12,7 @@ import { canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNo
 import { instructionPath } from './instruction-projection-paths.mjs';
 import { instructionBytesDigest as hash } from './instruction-environment.mjs';
 import {readStableFile} from './ask-benchmark-stable-file.mjs';
+import {validatePracticalQualityObservation} from './practical-quality-observation.mjs';
 
 function providerObservation(receipt,controlRoot){
  const o=receipt.observation;if(o===undefined)return null;
@@ -24,7 +25,9 @@ function providerObservation(receipt,controlRoot){
  if(metrics.cached_tokens!==null&&metrics.input_tokens!==null&&metrics.cached_tokens>metrics.input_tokens){metrics.cached_tokens=null;invalid_fields.push('cached_tokens');}
  assert.ok(Array.isArray(o.artifacts)&&o.artifacts.length<=16);
  for(const a of o.artifacts){instructionPath(a.path);assert.equal(hash(readStableFile(join(controlRoot,a.path),'provider observation artifact',10*1024*1024).bytes),a.digest,'provider observation artifact changed');}
- return {...o,metrics,invalid_fields};
+ let quality=null,quality_issue=null;
+ if(Object.hasOwn(o,'quality'))try{quality=validatePracticalQualityObservation(o.quality,o.artifacts);}catch(error){quality_issue=String(error.message).slice(0,512);}
+ return {...o,metrics,invalid_fields,quality,quality_issue};
 }
 
 function instructionDiscovery(root){
@@ -131,7 +134,11 @@ export async function executePracticalEvaluationWorker(settings,job,resultPath){
   const closed=task.ready_for_next_root&&(!grade||grade.ready_for_next_root);
   const executed=(task.exit_code===0||condition.command_role==='check'&&task.exit_code===1)&&!task.timed_out&&!task.signal;
   const check=grade??(condition.command_role==='check'?task:null);
-  const outcome=executed&&check&&!check.timed_out&&!check.signal&&[0,1].includes(check.exit_code)?(check.exit_code===0?'pass':'fail'):'unknown';
+  let outcome=executed&&check&&!check.timed_out&&!check.signal&&[0,1].includes(check.exit_code)?(check.exit_code===0?'pass':'fail'):'unknown';
+  let quality=grade?.provider_observation?.quality??null,qualityIssue=grade?.provider_observation?.quality_issue??null;
+  if(quality&&(!closed||!executed||!check||check.timed_out||check.signal||![0,1].includes(check.exit_code))){quality=null;qualityIssue='quality_from_unconfirmed_grade';}
+  if(qualityIssue)outcome='unknown';
+  else if(quality)outcome=quality.scope==='source_reference'&&quality.outcome==='pass'?'unknown':quality.outcome;
   let workspaceObservation=null,workspaceObservationIssue=null;
   if(!task.provider_observation&&!task.provider_observation_issue&&settings.observation_path&&existsSync(join(workspace,settings.observation_path))){
     try{workspaceObservation=readJsonFileStrict(join(workspace,instructionPath(settings.observation_path)));}
@@ -145,6 +152,7 @@ export async function executePracticalEvaluationWorker(settings,job,resultPath){
     context_integrity:!contextIntact||discoveryChanged?'changed':discoveryBefore.complete&&discoveryAfter.complete?'preserved':'unverified',
     context_integrity_scope:'Declared condition files bytes/modes and bounded AGENTS/CLAUDE plus .agents/.claude instruction/settings inventory; runtime logs, .git/node_modules/.tmp and ambient/global inputs excluded.',
     grading_execution_state:grade?'completed':'not_started',
+    quality_observation:quality,quality_observation_issue:qualityIssue,
     evidence_root:dirname(resultPath),workspace_observation_issue:workspaceObservationIssue,metrics_source:task.provider_observation?'provider_closure_receipt':task.provider_observation_issue?'provider_observation_unusable':workspaceObservation?'caller_workspace_observation':workspaceObservationIssue?'caller_workspace_observation_unusable':'not_collected',
     cli_seconds:task.duration_ms/1000,root_usage:task.provider_observation?{input_tokens:observation.input_tokens,output_tokens:observation.output_tokens,cached_input_tokens:observation.cached_tokens}:null,task,grade,
     notes:{outcome,evidence_refs:[task.stdout_ref,task.stderr_ref,...(task.provider_observation?.artifacts??[]).map(a=>a.path),...(grade?[grade.stdout_ref,grade.stderr_ref,...(grade.provider_observation?.artifacts??[]).map(a=>a.path)]:[])],

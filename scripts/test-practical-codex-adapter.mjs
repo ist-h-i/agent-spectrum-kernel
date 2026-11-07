@@ -114,3 +114,37 @@ for(const bad of ['artifact','binding'])test(`invalid provider ${bad} cannot don
   assert.equal(result.output.metrics_source,'provider_observation_unusable');assert.equal(result.output.notes.metrics.input_tokens,null);
  }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
 });
+
+const qualitySummary=()=>({kind:'fixed_point_reference_summary_v1',exact_lower:'21/2',exact_upper:'21',scale_maximum:'100',mandatory_compliance:null,
+ observation_completeness_reported:false,runtime_acceptance_verified:null,critical_status:'undetermined',partial_items:1,undetermined_items:1,formal_admission:false,evidence_truth_checked:false,capture_complete:false});
+const judgmentBody='{"synthetic":"retained source judgment"}';
+const declaredQuality=(outcome='unknown')=>({kind:'practical_quality_observation_v1',scope:'source_reference',outcome,
+ evidence_refs:[{path:'judgment.json',digest:hash(Buffer.from(judgmentBody))}],fixed_reference:qualitySummary()});
+async function gradedFixture(t,quality,{terminal=true,gradeExit=0}={}){
+ const root=temp(t),task=join(root,'task.mjs'),grader=join(root,'grader.mjs');writeFileSync(task,"import{writeFileSync}from'node:fs';writeFileSync('answer.txt','synthetic answer');");
+ writeFileSync(grader,`import{writeFileSync}from'node:fs';import{join}from'node:path';const [control,request,command,invocation]=process.argv.slice(2);
+ writeFileSync(join(control,'judgment.json'),${JSON.stringify(judgmentBody)});writeFileSync(join(control,'grade-provider.json'),JSON.stringify({request_digest:request,command_digest:command,invocation_digest:invocation,terminal:${terminal},provider_ref:'synthetic-grader',
+ observation:{kind:'provider_observation_v1',scope:'synthetic_grading_only',metrics:{input_tokens:7,output_tokens:3,cached_tokens:2},artifacts:[{path:'judgment.json',digest:${JSON.stringify(hash(Buffer.from(judgmentBody)))}}],...${JSON.stringify(quality===undefined?{}:{quality})}}}));process.exitCode=${gradeExit};`);
+ const files=[{source:task,target:'task.mjs',digest:hash(readFileSync(task))}],command={argv:[process.execPath,'task.mjs'],pins:[{path:task,digest:files[0].digest}],timeout_ms:5000,model_calls:false};
+ const grade={argv:[process.execPath,grader,'{evaluation_control_root}','{evaluation_request_digest}','{evaluation_command_digest}','{evaluation_invocation_digest}'],pins:[{path:grader,digest:hash(readFileSync(grader))}],timeout_ms:5000,model_calls:false,provider_closure_path:'grade-provider.json'};
+ const settings={cases:{c:{files,grader:grade}},conditions:{baseline:{command,command_role:'task'}}};
+ return executePracticalEvaluationWorker(settings,{input:{row:{case_id:'c',condition:'baseline',public_input_digest:canonicalDigest(files.map(({target,digest})=>({target,digest})))}}},join(root,'result.json'));
+}
+for(const outcome of ['unknown','fail'])test(`typed ${outcome} source quality is not turned into pass by a normal grader exit`,async t=>{
+ const quality=declaredQuality(outcome),r=await gradedFixture(t,quality);assert.equal(r.status,'completed');assert.equal(r.output.notes.outcome,outcome);
+ assert.deepEqual(r.output.quality_observation,quality);assert.equal(r.output.ready_for_next_root,true);assert.equal(r.output.grade.provider_observation.metrics.input_tokens,7);
+});
+test('even a complete positive source judgment does not certify runtime acceptance',async t=>{
+ const q=declaredQuality('pass');Object.assign(q.fixed_reference,{exact_lower:'100',exact_upper:'100',mandatory_compliance:true,critical_status:'none_observed',partial_items:0,undetermined_items:0});
+ const r=await gradedFixture(t,q);assert.equal(r.output.notes.outcome,'unknown');assert.deepEqual(r.output.quality_observation,q);
+});
+for(const bad of ['range','evidence','mandatory','runtime'])test(`invalid optional ${bad} quality becomes Unknown without erasing execution or grading usage`,async t=>{
+ const q=declaredQuality();if(bad==='range')q.fixed_reference.exact_upper='1';if(bad==='evidence')q.evidence_refs[0].digest=canonicalDigest('different');
+ if(bad==='mandatory'){q.outcome='pass';q.fixed_reference.mandatory_compliance=false;}if(bad==='runtime')q.fixed_reference.runtime_acceptance_verified=true;
+ const r=await gradedFixture(t,q);assert.equal(r.status,'completed');assert.equal(r.output.ready_for_next_root,true);assert.equal(r.output.notes.outcome,'unknown');
+ assert.equal(r.output.quality_observation,null);assert.ok(r.output.quality_observation_issue);assert.equal(r.output.grade.provider_observation.metrics.input_tokens,7);
+});
+test('a nonterminal grade cannot donate typed quality and legacy grades retain their exit semantics',async t=>{
+ const uncertain=await gradedFixture(t,declaredQuality('fail'),{terminal:false});assert.equal(uncertain.output.ready_for_next_root,false);assert.equal(uncertain.output.notes.outcome,'unknown');assert.equal(uncertain.output.quality_observation,null);
+ const legacy=await gradedFixture(t,undefined);assert.equal(legacy.output.notes.outcome,'pass');assert.equal(legacy.output.quality_observation,null);
+});

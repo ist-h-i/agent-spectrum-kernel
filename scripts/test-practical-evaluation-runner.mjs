@@ -49,6 +49,39 @@ test('partial usage remains null while AI uses known time/outcomes and proceeds 
   assert.ok(end.report.pragmatic.summaries.every(s=>s.metrics.input_tokens.observed_count===0&&s.metrics.input_tokens.unknown_count===1));
   assert.ok(end.report.pragmatic.summaries.every(s=>s.metrics.duration_ms.known_values[0]===1000));
 });
+test('practical report retains typed per-attempt source quality and separates partially known grader usage',async t=>{
+ const f=fixture(t),original=f.runtime.trial,summary={kind:'fixed_point_reference_summary_v1',exact_lower:'1',exact_upper:'2',scale_maximum:'10',mandatory_compliance:null,
+  observation_completeness_reported:false,runtime_acceptance_verified:null,critical_status:'undetermined',partial_items:1,undetermined_items:1,formal_admission:false,evidence_truth_checked:false,capture_complete:false};
+ f.runtime.trial=async job=>{const r=await original(job);r.output.quality_observation={kind:'practical_quality_observation_v1',scope:'source_reference',outcome:'unknown',evidence_refs:[{path:'judgment.json',digest:canonicalDigest('judgment')}],fixed_reference:summary};
+  r.output.grading_execution_state='completed';r.output.grade={exit_code:0,duration_ms:20,provider_observation:{artifacts:r.output.quality_observation.evidence_refs,metrics:{input_tokens:job.input.row.condition==='baseline'?7:null,output_tokens:2,cached_tokens:null}}};return r;};
+ const s=await f.run(),end=await f.run({decision:approve(s)});assert.equal(end.report.all_attempts.length,2);
+ assert.equal(end.report.all_attempts[0].quality_observation.fixed_reference.exact_lower,'1');
+ assert.deepEqual(end.report.grading_overhead.resources.input_tokens,{known_total:7,observed_count:1,unknown_count:1});
+ assert.equal(end.report.grading_overhead.resources.cached_tokens.known_total,null);assert.equal(end.report.grading_overhead.remote_cost,null);
+ assert.equal(end.report.resources_all_attempts.input_tokens.known_total,null,'grading input is not task input');
+ const {summarizeInstructionLoopEvaluation}=await import('./instruction-loop-feedback.mjs'),projection=summarizeInstructionLoopEvaluation(end.report);
+ assert.equal(projection.cases[0].conditions[0].fixed_reference.exact_upper,'2');assert.equal(projection.raw_logs_included,false);
+});
+test('valid partial source quality is available evidence without forcing a task retry for runtime Unknown',async t=>{
+ const f=fixture(t),original=f.runtime.trial;f.plan.recovery.required_dimensions.push('quality');
+ f.runtime.trial=async job=>{const r=await original(job),refs=[{path:'judgment.json',digest:canonicalDigest('judgment')}];
+  r.output.notes.outcome='unknown';r.output.quality_observation={kind:'practical_quality_observation_v1',scope:'source_reference',outcome:'unknown',evidence_refs:refs,fixed_reference:null};
+  r.output.grade={exit_code:0,provider_observation:{artifacts:refs}};return r;};
+ f.runtime.assess=async()=>{throw Error('usable scoped evidence is not missing quality');};
+ const s=await f.run(),end=await f.run({decision:approve(s)});assert.equal(end.status,'completed');assert.equal(f.calls.length,2);assert.equal(end.report.recovery_decisions.length,0);
+});
+test('AI can reference a closed grading-only incident without rerunning an expensive task',async t=>{
+ const f=fixture(t),original=f.runtime.trial;f.runtime.trial=async job=>{const r=await original(job);r.output.quality_observation_issue='invalid optional grading reference';return r;};
+ f.runtime.assess=async job=>{assert.ok(job.input.packet.issues.includes('grading_quality_unusable'));assert.ok(!job.input.packet.available_dimensions.includes('quality'));return {request_digest:canonicalDigest(job),status:'completed',output:choice(job.input.packet,'reference')};};
+ const s=await f.run(),end=await f.run({decision:approve(s)});assert.equal(end.status,'completed');assert.equal(f.calls.length,2);assert.equal(end.report.extra_trials,0);
+ assert.ok(end.report.all_attempts.every(a=>a.observation.outcome==='unknown'));assert.equal(end.report.recovery_decisions.length,2);
+});
+test('an empty Unknown quality envelope is missing evidence, not usable partial quality',async t=>{
+ const f=fixture(t),original=f.runtime.trial;f.plan.recovery.required_dimensions.push('quality');
+ f.runtime.trial=async job=>{const r=await original(job);r.output.notes.outcome='unknown';r.output.quality_observation={kind:'practical_quality_observation_v1',scope:'source_reference',outcome:'unknown',evidence_refs:[],fixed_reference:null};r.output.grade={exit_code:0,provider_observation:{artifacts:[]}};return r;};
+ f.runtime.assess=async job=>{assert.ok(job.input.packet.missing_dimensions.includes('quality'));return {request_digest:canonicalDigest(job),status:'completed',output:choice(job.input.packet,'reference')};};
+ const s=await f.run(),end=await f.run({decision:approve(s)});assert.equal(end.report.recovery_decisions.length,2);assert.equal(f.calls.length,2);
+});
 test('uncertain processes cannot be retried or followed by another root; AI can finish a useful partial report',async t=>{
   const f=fixture(t);f.runtime.trial=async job=>{f.calls.push(job);return {status:'running'};};
   const start=await f.run();let state=await f.run({decision:approve(start)});
