@@ -1,6 +1,7 @@
 // Component authoring, incoming packages and composition use the same two-gate
 // practical evaluator, with the existing exact environment file lifecycle.
 import assert from 'node:assert/strict';
+import {inspectInstructionLoopProviderSelection} from './instruction-loop-provider-policy.mjs';
 import {existsSync,readdirSync,lstatSync,rmSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {canonicalDigest,readStableBytes,readJsonFileStrict,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -12,7 +13,7 @@ import {createPracticalLifecycleRuntime,prepareFullPracticalInstructionSelection
 import {generateComponentInstructionCandidate,componentEnvironmentOptions} from './instruction-loop-component-candidate.mjs';
 import {supervisedEnvironmentReceipt} from './instruction-loop-environment-approval.mjs';
 import {planEnvironmentTargetApply,applyEnvironmentTargetPlan,restoreEnvironmentTarget,inspectSupervisedEnvironmentTarget} from './environment-target.mjs';
-const sourceNames=['instruction-loop-component-runtime.mjs','instruction-loop-component-candidate.mjs','instruction-loop-environment-approval.mjs',
+const sourceNames=['instruction-loop-provider-policy.mjs','instruction-loop-component-runtime.mjs','instruction-loop-component-candidate.mjs','instruction-loop-environment-approval.mjs',
   'instruction-loop-practical-runtime.mjs','instruction-environment-authoring.mjs','instruction-composition.mjs','instruction-asset-package.mjs',
   'instruction-environment.mjs','instruction-environment-compiler.mjs','environment-target.mjs','environment-target-owner.mjs',
   'instruction-source-version.mjs','instruction-loop-assets.mjs','instruction-run-journal.mjs','supervised-instruction-loop.mjs',
@@ -22,6 +23,7 @@ const sourceNames=['instruction-loop-component-runtime.mjs','instruction-loop-co
   'instruction-projection-paths.mjs','codex-exec-runner.mjs','execution-envelope.mjs','../schemas/instruction-asset-package.schema.json'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'component runtime source',16*1024*1024))});
 function checkedPaths(p){
+  inspectInstructionLoopProviderSelection(p);
   componentEnvironmentOptions(p);
   assert.equal(p.kind,'component_practical_instruction_loop_profile_v1');assert.equal(p.policy.evaluation_mode,'practical_v1');
   assert.equal(p.normal.target,p.policy.normal_target);assert.ok(['codex','claude_code'].includes(p.adapter));

@@ -217,14 +217,18 @@ The adapter-neutral authoring handoff and component/portable/composition flows
 accept `claude_code` environments and `.claude` mappings. This prepares exact
 candidate requests and imports for an authenticated Claude host without changing
 its app configuration or obtaining credentials. The existing restricted Claude
-evaluation/runtime and saved-result verification remain the evaluation path.
+evaluation/runtime and saved-result verification remain separate contracts.
 The component pipeline supports Claude-shaped authoring requests, composition,
 packages, local evaluation/application and normal-owner leases. Its subprocess
 authoring and automatic-assessor model ports are currently Codex ports; an
-authenticated Claude host can use the adapter-neutral request/import handoff.
+authenticated Claude host can use the standalone adapter-neutral request/import
+handoff, which is not connected to automatic component generation.
 No authenticated Claude-app dispatch or real-model cycle is claimed here.
 The retained Full/native reference runner remains Codex-specific; a Claude
-handoff is not mislabeled as a completed Full/native Claude run. Fully unattended
-Claude host dispatch and authenticated end-to-end acceptance remain unverified
-until the owner supplies that environment. No live comparison or installation
+handoff is not mislabeled as a completed Full/native Claude run. Automatic Claude
+app dispatch, external-host authoring completion inside the supervised loop and
+app-specific closure capture are not implemented. Authenticated end-to-end
+acceptance is separately unperformed until the owner supplies that environment.
+See [the implementation/acceptance audit](instruction-improvement-readiness.md).
+No live comparison or installation
 was performed by these commands' implementation tests.

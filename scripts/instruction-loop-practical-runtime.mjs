@@ -1,6 +1,7 @@
 // Existing Full generation/Registry/normal-owner lifecycle, with the practical
 // Eval engine in place of a private fixed-catalog grading dependency.
 import assert from 'node:assert/strict';
+import {inspectInstructionLoopProviderSelection} from './instruction-loop-provider-policy.mjs';
 import {existsSync,mkdirSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -14,13 +15,14 @@ import {advancePracticalEvaluation,inspectPracticalEvaluation} from './practical
 import {readRunJournal} from './instruction-run-journal.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
-const sourceNames=['instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
+const sourceNames=['instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs',
   'instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
   'instruction-loop-command-runtime.mjs','instruction-run-journal.mjs','ask-pragmatic-evaluation-report.mjs','content-addressed-store.mjs','asset-registry.mjs','codex-exec-runner.mjs'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'practical runtime input',16*1024*1024))});
 function validateProfilePaths(p){
+  inspectInstructionLoopProviderSelection(p);
   instructionEnvironmentTrustOptions(p.practical.environmentTrust);
   const evaluation=resolve(p.practical.root);assert.equal(evaluation,p.practical.root,'absolute evaluation root required');
   assertNoSymlinkPathSegments(evaluation,'practical evaluation root',{allowMissingLeaf:true});

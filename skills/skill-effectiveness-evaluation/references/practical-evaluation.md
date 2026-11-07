@@ -36,6 +36,15 @@ instruction changes. Confirmed package imports remain inert until their local
 Eval cases are approved. Imported helpers are copied as text, not automatically
 executed or granted foreign authority.
 
+Before configuring, inspect selected ports without starting models/cases/auth
+probes: `node <ASK_RUNTIME>/scripts/supervised-instruction-loop-cli.mjs readiness
+--profile PROFILE`. Its `not_probed` result is a configuration summary, not proof
+of executable availability, authentication or actual instruction use. Automatic
+authoring and recovery model ports currently support Codex; Claude-format assets
+and standalone prepare/import do not supply a Claude application dispatcher.
+Use host-AI assessments when no automatic assessor is configured. Do not infer
+permission to invoke an unavailable app from a compatible instruction format.
+
 Prepare the pinned configuration with supervised `configure --profile PROFILE
 --root CONFIG_DIRECTORY`. Start/resume `operate --profile PROFILE --config CONFIG
 --root OPERATION --cycles N` with an explicit budget of 1..10 cycles. Submit the
