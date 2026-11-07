@@ -13,6 +13,14 @@ export { instructionPath };
 
 export const exactInstructionAsset = a => Object.fromEntries(['asset_type', 'stable_id', 'version', 'record_digest', 'content_digest'].map(k => [k, a[k]]));
 export const instructionBytesDigest = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex');
+export function instructionEnvironmentTrustOptions(value={}){
+  assert.ok(value&&typeof value==='object'&&!Array.isArray(value),'environment trust options object required');
+  for(const [key,entries] of Object.entries(value)){
+    assert.ok(['trustedAssetAuthorityContexts','trustedPortfolioAuthorityContexts','trustedHighImpactApprovalGrants'].includes(key),'unsupported environment trust option');
+    assert.ok(Array.isArray(entries),'environment trust entries must be arrays');
+  }
+  return structuredClone(value);
+}
 export function matchesInstructionCliVersion(adapter, version, pin) {
   if (!['codex', 'claude'].includes(adapter) || typeof version !== 'string' || typeof pin !== 'string') return false;
   if (version === pin || version.endsWith(' ' + pin)) return true;

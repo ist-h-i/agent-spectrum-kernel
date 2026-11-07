@@ -1,10 +1,12 @@
 // Composition of existing generation, Registry, runner, reporting and setup
 // operations. Human decisions enter through the host, never through a worker.
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readdirSync, rmdirSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { canonicalDigest, assertNoSymlinkPathSegments, readJsonFileStrict,
   writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
+import { readRunJournal as journal, appendRunJournal as append, lockRunJournal as lock } from './instruction-run-journal.mjs';
+import { projectInstructionLoopObservation, assertPublicInstructionSummary, summarizeInstructionLoopEvaluation } from './instruction-loop-feedback.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
 const digest=/^sha256:[a-f0-9]{64}$/u;
@@ -23,49 +25,19 @@ function checkedPolicy(p){
   assert.ok(Number.isSafeInteger(p.repetitions)&&p.repetitions>0&&p.repetitions<=10);
   assert.ok(Number.isSafeInteger(p.max_trials)&&p.max_trials>0&&p.max_trials<=256);
   assert.equal(p.formal_admission_implied,false);
+  if(p.evaluation_mode!==undefined)assert.equal(p.evaluation_mode,'practical_v1');
+  if(p.application_anchor!=null){
+    assert.deepEqual(Object.keys(p.application_anchor).sort(),['journal_digest','run_root']);
+    assert.equal(resolve(p.application_anchor.run_root),p.application_anchor.run_root);assert.match(p.application_anchor.journal_digest,digest);
+  }
   assert.ok(p.normal_target===null||typeof p.normal_target==='string'&&resolve(p.normal_target)===p.normal_target,
     'normal_target must be an absolute path or explicit null for result review');
   return p;
 }
-function journal(root){
-  const names=readdirSync(root).filter(n=>/^\d{6}\.json$/u.test(n)).sort();
-  let previous=null,state=null;
-  const events=names.map((name,i)=>{
-    assert.equal(name,`${String(i).padStart(6,'0')}.json`,'journal gap');
-    const record=readJsonFileStrict(join(root,name)),{record_digest,...body}=record;
-    assert.equal(record_digest,canonicalDigest(body),'journal content drift');
-    assert.equal(body.previous,previous,'journal chain drift');
-    previous=record_digest;state=body.state;return record;
-  });
-  return {events,state,previous};
-}
-function append(root,kind,state,detail={}){
-  const old=journal(root),body={previous:old.previous,kind,detail,state:copy(state)};
-  writeCanonicalJsonNoReplace({outputPath:join(root,`${String(old.events.length).padStart(6,'0')}.json`),
-    artifact:{...body,record_digest:canonicalDigest(body)},label:'supervised loop event'});
-}
-function lock(root){
-  const path=join(root,'.advance-lock');
-  try {mkdirSync(path,{mode:0o700});}
-  catch(error){
-    if(error.code!=='EEXIST')throw error;
-    assertNoSymlinkPathSegments(path,'loop lock');
-    if(!existsSync(join(path,'pid')))throw new Error('lock owner uncertain; inspect before recovery');
-    const pid=Number(readFileSync(join(path,'pid'),'utf8'));
-    assert.ok(Number.isSafeInteger(pid)&&pid>0,'invalid lock owner');
-    try {process.kill(pid,0);throw new Error('loop already running or lock PID reused');}
-    catch(e){if(e.code!=='ESRCH')throw e;}
-    // Only remove the exact two objects that this module creates; never recurse.
-    assert.deepEqual(readdirSync(path),['pid']);
-    // A dead coordinator is not evidence that its worker has stopped. The
-    // persisted job below is inspected, never re-launched, after this unlock.
-    unlinkSync(join(path,'pid'));rmdirSync(path);mkdirSync(path,{mode:0o700});
-  }
-  writeFileSync(join(path,'pid'),String(process.pid),{flag:'wx',mode:0o600});
-  return ()=>{unlinkSync(join(path,'pid'));rmdirSync(path);};
-}
 function summary(state){
   return {status:state.status,run_id:state.policy.id,pending_gate:state.gate??null,
+    pending_recovery:state.evaluation_progress?.pending_recovery??null,
+    pending_recovery_digest:state.evaluation_progress?.pending_recovery_digest??null,
     active_job:state.pending??null,completed_trials:state.trials.length,
     report:state.outputs.report??null,application:state.outputs.apply??null,
     restoration:state.outputs.restore??null,final:state.outputs.final??null,
@@ -91,6 +63,10 @@ function next(s){
   const p=s.policy,o=s.outputs;
   if(!o.generate)return schedule(s,'generate','generate',{observation:p.observation});
   if(!o.register)return schedule(s,'register','register',{candidate:o.generate});
+  if(o.register.no_change===true){
+    if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'unchanged',candidate:o.register});
+    return 'no_change';
+  }
   if(!o.select)return schedule(s,'select','select',{observation:p.observation,candidate:o.register,catalog:p.catalog});
   if(!s.evaluation_decision){
     s.gate={kind:'evaluation',packet:{candidate:o.register,selection:o.select,rows:s.rows,runtime_digest:p.runtime_digest,
@@ -102,7 +78,10 @@ function next(s){
     if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'rejected',candidate:o.register,retirement:o.retire});
     return 'evaluation_rejected';
   }
-  if(s.trials.length<s.rows.length){
+  if(p.evaluation_mode==='practical_v1'){
+    if(!o.evaluate)return schedule(s,'evaluate','evaluate',{candidate:o.register,selection:o.select,rows:s.rows,evaluation_decision:s.evaluation_decision});
+    if(!o.report)o.report=o.evaluate.report;
+  }else if(s.trials.length<s.rows.length){
     const row=s.rows[s.trials.length];
     return schedule(s,'trial',`trial-${row.id}`,{row,candidate:o.register,selection:o.select,evaluation_decision:s.evaluation_decision});
   }
@@ -131,11 +110,11 @@ function next(s){
     decision:s.change_decision});
   if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'applied',candidate:o.register});
   if(s.restore_requested){
-    if(!s.restore_decision){s.gate={kind:'change',packet:{action:'restore',application:o.apply,plan:o.plan,
+    if(!s.restore_decision){s.gate={kind:'change',packet:{action:'restore',request_index:s.restore_request_index??1,application:o.apply,plan:o.plan,
       version:o.activate,normal_target:p.normal_target,formal_admission_implied:false}};return null;}
     if(s.restore_decision.disposition==='rejected')return 'restoration_declined';
     if(!o.restore)return schedule(s,'restore','restore',{plan:o.plan,application:o.apply,decision:s.restore_decision});
-    if(!o.switch_back)return schedule(s,'version','switch_back',{action:'restore',restoration:o.restore,candidate:o.register,previous_version:o.activate});
+    if(!o.switch_back)return schedule(s,'version','switch_back',{action:'restore',restoration:o.restore,candidate:o.register,previous_version:o.cleanup?.registry??o.activate});
     return 'restored';
   }
   return 'applied';
@@ -149,7 +128,10 @@ function accept(s,job,result){
   }
   const out=copy(result.output);assert.ok(out&&typeof out==='object');
   if(job.kind==='select')s.rows=selectedTrials(s,out);
-  if(job.kind==='trial'){
+  if(job.kind==='evaluate'){
+    assert.equal(out.practical_status,'completed');assert.ok(out.report&&Array.isArray(out.trials));s.trials=copy(out.trials);
+    s.outputs[job.key]=out;delete s.evaluation_progress;
+  }else if(job.kind==='trial'){
     assert.equal(out.ready_for_next_root,true,'trial process/descendant closure is uncertain');
     // Null usage is valid. These fields are observations, never a completeness
     // guarantee, a reason to change model autonomy, or a formal quality score.
@@ -160,13 +142,15 @@ function accept(s,job,result){
 /** runtime is a host-owned capability, not data loaded from model output/CAS.
  * Every operation must have durable inspect(job) evidence. An unknown consumed
  * operation is a safety stop, not permission to repeat it. */
-export async function advanceSupervisedInstructionLoop({root,policy,runtime,decision=null,requestRestore=false,completedImport=null}){
-  root=resolve(root);assertNoSymlinkPathSegments(root,'loop root',{allowMissingLeaf:true});
+export async function advanceSupervisedInstructionLoop({root,policy,runtime,decision=null,requestRestore=false,completedImport=null,assessment=null}){
+  root=resolve(root);if(runtime.validateCoordinatorRoot)await runtime.validateCoordinatorRoot(root);
+  assertNoSymlinkPathSegments(root,'loop root',{allowMissingLeaf:true});
   if(!existsSync(root))mkdirSync(root,{mode:0o700});
   const unlock=lock(root);
   try{
     checkedPolicy(policy);assert.equal(runtime.digest,policy.runtime_digest,'trusted runtime drift');
-    for(const m of [...methods,'inspect'])assert.equal(typeof runtime[m],'function',`runtime ${m} required`);
+    const required=policy.evaluation_mode==='practical_v1'?[...methods.filter(m=>!['trial','report'].includes(m)),'evaluate','resumeEvaluation']:methods;
+    for(const m of [...required,'inspect'])assert.equal(typeof runtime[m],'function',`runtime ${m} required`);
     let s=journal(root).state;
     if(!s){
       s={policy:copy(policy),status:'advancing',outputs:{},trials:[],rows:[],pending:null,gate:null};
@@ -184,9 +168,14 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       append(root,completedImport?'historical_import':'created',s);
     }else assert.equal(completedImport,null,'historical import is initialization only');
     assert.ok(same(s.policy,policy),'resume cannot change policy');
+    if(assessment)assert.equal(s.pending?.kind,'evaluate','AI assessment requires an active practical evaluation');
     if(requestRestore){
-      assert.equal(s.status,'completed');assert.equal(s.outputs.final.outcome,'applied');
-      assert.equal(s.restore_requested,undefined);s.restore_requested=true;s.status='advancing';delete s.outputs.final;
+      assert.equal(s.status,'completed');assert.ok(completedInstructionLoopApplicationIsActive(s),'restoration requires a still-active application');
+      if(s.restore_requested){
+        assert.equal(s.restore_decision?.disposition,'rejected');s.restore_history??=[];assert.ok(s.restore_history.length<16,'bounded restore request history');
+        s.restore_history.push({request_index:s.restore_request_index??1,decision:copy(s.restore_decision)});delete s.restore_decision;
+      }
+      s.restore_request_index=(s.restore_request_index??0)+1;s.restore_requested=true;s.status='advancing';delete s.outputs.final;
       append(root,'restoration_requested',s);
     }
     if(decision){
@@ -208,6 +197,12 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       let job=s.pending,result;
       if(job){
         result=await runtime.inspect(job,{root});
+        if(job.kind==='evaluate'&&result?.status!=='completed'&&(assessment||result?.status==='resumable')){
+          result=await runtime.resumeEvaluation(job,{root,assessment});assessment=null;
+        }
+        if(job.kind==='evaluate'&&result?.status==='awaiting_ai_recovery'){
+          assert.equal(result.request_digest,canonicalDigest(job));s.evaluation_progress=copy(result.output);s.status='awaiting_ai_recovery';append(root,'evaluation_ai_stop',s);return summary(s);
+        }
         if(!result||!terminal.has(result.status)){
           s.status='operation_uncertain';append(root,'inspection_pending',s);
           return summary(s);
@@ -228,6 +223,9 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         job=n;s.pending=job;s.status='advancing';append(root,'operation_reserved',s);
         try{result=await runtime[job.kind](job,{root});}
         catch(error){s.status='operation_uncertain';append(root,'operation_uncertain',s,{reason:String(error.message).slice(0,512)});return summary(s);}
+        if(job.kind==='evaluate'&&result?.status==='awaiting_ai_recovery'){
+          assert.equal(result.request_digest,canonicalDigest(job));s.evaluation_progress=copy(result.output);s.status='awaiting_ai_recovery';append(root,'evaluation_ai_stop',s);return summary(s);
+        }
         if(!result||!terminal.has(result.status)){s.status='operation_uncertain';append(root,'operation_uncertain',s);return summary(s);}
       }
       try{accept(s,job,result);}
@@ -241,4 +239,40 @@ export function inspectSupervisedInstructionLoop(root){
   assertNoSymlinkPathSegments(resolve(root),'loop root');
   const {state,events}=journal(resolve(root));assert.ok(state,'loop not initialized');
   return {...summary(state),journal_records:events.length,policy_digest:canonicalDigest(state.policy)};
+}
+
+export function completedInstructionLoopApplicationIsActive(s){
+  if(s?.status!=='completed'||!s.outputs.apply||s.outputs.restore||s.outputs.switch_back)return false;
+  return s.outputs.final?.outcome==='applied'||s.outputs.final?.outcome==='restoration_declined'&&s.restore_decision?.disposition==='rejected';
+}
+export function readCompletedInstructionLoopContinuation(root){
+  assertNoSymlinkPathSegments(resolve(root),'previous loop root');
+  const {state:s,previous}=journal(resolve(root));
+  assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'previous cycle must be completed, with no uncertain operation');
+  return copy({policy:s.policy,journal_digest:previous,candidate:s.outputs.register,report:s.outputs.report??null,outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),
+    registry:s.outputs.switch_back??s.outputs.cleanup?.registry??s.outputs.activate??s.outputs.retire??s.outputs.register.registry});
+}
+
+// Preparation is read-only. The host must allocate fresh worker destinations
+// and explicitly advance the returned policy in a different run directory.
+export function prepareNextSupervisedInstructionLoop({root,nextPolicy,resultSummary=null,decisionSummaries={}}){
+  assertNoSymlinkPathSegments(resolve(root),'previous loop root');
+  const {state:s,previous}=journal(resolve(root));
+  assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'previous cycle must be completed, with no uncertain operation');
+  checkedPolicy(nextPolicy);assert.notEqual(nextPolicy.id,s.policy.id,'next cycle needs a fresh run ID');
+  projectInstructionLoopObservation(nextPolicy.observation);
+  assert.notEqual(nextPolicy.observation.kind,'instruction_loop_continuation_v1','provide fresh feedback; previous history is derived from the journal');
+  const decisions=['evaluation_decision','result_decision','change_decision','restore_decision'].filter(k=>s[k]).map(k=>({
+    kind:k,disposition:s[k].disposition,digest:canonicalDigest(s[k]),
+    reason_summary:assertPublicInstructionSummary(decisionSummaries[canonicalDigest(s[k])]??s[k].reason??'Historical prior approval; original public reason unavailable.')}));
+  const evaluationSummary=summarizeInstructionLoopEvaluation(s.outputs.report);
+  const observation={kind:'instruction_loop_continuation_v1',feedback:copy(nextPolicy.observation),previous:{
+    run_id:s.policy.id,journal_digest:previous,policy_digest:canonicalDigest(s.policy),outcome:s.outputs.final.outcome,
+    candidate_digest:canonicalDigest(s.outputs.register),report_digest:s.outputs.report?canonicalDigest(s.outputs.report):null,
+    ...(evaluationSummary===null?{}:{evaluation_summary:evaluationSummary}),
+    decisions,failure_count:s.trials.filter(t=>t.status!=='completed'||t.state==='failed_or_interrupted').length,
+    unknown_quality:s.outputs.report?.formal_score==null,
+    result_summary:assertPublicInstructionSummary(resultSummary??`Previous cycle outcome: ${s.outputs.final.outcome}. Completed ${s.trials.length} trial records; ${s.trials.filter(t=>t.status!=='completed'||t.state==='failed_or_interrupted').length} failed or interrupted. Formal quality is not established by this reference loop.`)}};
+  projectInstructionLoopObservation(observation);
+  return {status:'prepared',policy:{...copy(nextPolicy),observation},models_started:false,approval_carried_forward:false};
 }

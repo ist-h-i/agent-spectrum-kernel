@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
 import {spawnSync} from 'node:child_process';
 import { canonicalDigest,putContentAddressedJson } from './content-addressed-store.mjs';
-import { advanceSupervisedInstructionLoop,inspectSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
+import { advanceSupervisedInstructionLoop,inspectSupervisedInstructionLoop,prepareNextSupervisedInstructionLoop,readCompletedInstructionLoopContinuation } from './supervised-instruction-loop.mjs';
 import { createInstructionLoopCommandRuntime } from './instruction-loop-command-runtime.mjs';
 import { selectInstructionLoopCases } from './instruction-loop-case-selection.mjs';
 import { transitionInstructionLoopAssets } from './instruction-loop-assets.mjs';
@@ -37,6 +37,36 @@ function fixture(t){
   return {dir,calls,receipts,policy,runtime,run,root:join(dir,'run')};
 }
 const decision=(state,disposition='approved')=>({disposition,packet_digest:canonicalDigest(state.pending_gate),reason:'Synthetic owner decision, fixture only'});
+test('declining restoration preserves the adopted baseline, and a later restore needs a new distinct judgment',async t=>{
+  const f=fixture(t);let s=await f.run();s=await f.run({decision:decision(s)});s=await f.run({decision:decision(s)});
+  s=await f.run({requestRestore:true});const refused=s.pending_gate;s=await f.run({decision:decision(s,'rejected')});
+  assert.equal(s.final.outcome,'restoration_declined');assert.equal(readCompletedInstructionLoopContinuation(f.root).application_active,true);
+  assert.equal(f.calls.filter(c=>c.kind==='apply').length,1);assert.equal(f.calls.filter(c=>c.kind==='restore').length,0);
+  s=await f.run({requestRestore:true});assert.notEqual(canonicalDigest(s.pending_gate),canonicalDigest(refused));
+  await assert.rejects(f.run({decision:{...decision(s),packet_digest:canonicalDigest(refused)}}),/different packet/);
+  s=await f.run({decision:decision(s)});assert.equal(s.final.outcome,'restored');assert.equal(readCompletedInstructionLoopContinuation(f.root).application_active,false);
+  assert.equal(f.calls.filter(c=>c.kind==='apply').length,1);assert.equal(f.calls.filter(c=>c.kind==='restore').length,1);
+});
+test('completed result feeds a fresh second cycle without inherited approvals or repeated trials',async t=>{
+  const f=fixture(t);f.policy.normal_target=null;let s=await f.run();
+  assert.throws(()=>prepareNextSupervisedInstructionLoop({root:f.root,nextPolicy:{...f.policy,id:'next'}}),/completed/);
+  s=await f.run({decision:decision(s)});s=await f.run({decision:decision(s,'rejected')});
+  const original=inspectSupervisedInstructionLoop(f.root);
+  const next=prepareNextSupervisedInstructionLoop({root:f.root,nextPolicy:{...f.policy,id:'next'}});
+  assert.equal(next.models_started,false);assert.equal(next.approval_carried_forward,false);
+  assert.equal(next.policy.observation.previous.outcome,'result_rejected_retained');
+  assert.equal(next.policy.observation.previous.unknown_quality,true);
+  assert.equal(next.policy.observation.previous.decisions[1].disposition,'rejected');
+  assert.deepEqual(inspectSupervisedInstructionLoop(f.root),original);
+  const run=extra=>advanceSupervisedInstructionLoop({root:join(f.dir,'next'),policy:next.policy,runtime:f.runtime,...extra});
+  let second=await run();assert.equal(second.status,'awaiting_evaluation_approval');
+  await assert.rejects(run({decision:decision(s)}),/different packet/);
+  second=await run({decision:decision(second)});assert.equal(second.status,'awaiting_result_review');
+  second=await run({decision:decision(second)});assert.equal(second.final.outcome,'result_approved_retained');
+  const trialIds=f.calls.filter(j=>j.kind==='trial').map(j=>j.input.row.id);
+  assert.equal(trialIds.length,16);assert.equal(new Set(trialIds).size,16);
+  assert.equal(f.calls.filter(j=>j.kind==='generate').at(-1).input.observation.previous.outcome,'result_rejected_retained');
+});
 test('automatic stages stop at exactly the two human judgments; approval applies, cleans and reports',async t=>{
   const f=fixture(t),a=await f.run();assert.equal(a.status,'awaiting_evaluation_approval');
   assert.deepEqual(f.calls.map(j=>j.kind),['generate','register','select']);
@@ -176,4 +206,27 @@ test('shipped public selector and Registry worker CLI consume exact requests wit
   const selected=invoke([resolve(import.meta.dirname,'instruction-loop-case-selection.mjs'),settings,hash(readFileSync(settings))],
     {kind:'select',input:{catalog:[{id:'public-a',tags:['routing'],domain:'local'}]}},3);
   assert.deepEqual(selected.case_ids,['public-a']);
+});
+
+test('long case ID in a completed native reference cycle prepares the next cycle without inherited approval',async t=>{
+  const f=fixture(t),id='a'.repeat(101);f.policy.catalog[0].id=id;f.policy.normal_target=null;
+  const report=f.runtime.report;
+  f.runtime.report=async(job,context)=>{
+    const result=await report(job,context);
+    result.output={kind:'supervised_instruction_reference_report_v1',formal_score:null,limits:['Synthetic reference only.'],
+      rows:job.input.rows.map(row=>({fixture_id:row.case.id,role:row.condition==='baseline'?'baseline':'challenger',repetition:row.repetition,
+        state:'completed',confirmed_points:1,unknown_points:0,unmet_points:0,maximum_points:1,mandatory_final_validation:true,cli_seconds:1}))};
+    f.receipts.set(canonicalDigest(job),result);return result;
+  };
+  let state=await f.run();state=await f.run({decision:decision(state)});state=await f.run({decision:decision(state)});
+  assert.equal(state.status,'completed');const before=readCompletedInstructionLoopContinuation(f.root);
+  const next=prepareNextSupervisedInstructionLoop({root:f.root,nextPolicy:{...f.policy,id:'next-long-case'}});
+  assert.equal(next.approval_carried_forward,false);
+  assert.equal(next.policy.observation.previous.evaluation_summary.cases.filter(c=>c.case_id===id).length,2);
+  assert.equal(next.policy.observation.previous.evaluation_summary.report_digest,canonicalDigest(before.report));
+  assert.deepEqual(readCompletedInstructionLoopContinuation(f.root),before,'preparation does not mutate the completed source journal');
+  const nextState=await advanceSupervisedInstructionLoop({root:join(f.dir,'next-long-case'),policy:next.policy,runtime:f.runtime});
+  assert.equal(nextState.status,'awaiting_evaluation_approval');assert.equal(f.calls.filter(j=>j.kind==='trial').length,8);
+  const input=f.calls.filter(j=>j.kind==='generate').at(-1).input.observation;
+  assert.equal(input.previous.evaluation_summary.cases.find(c=>c.case_id===id).case_id,id);
 });

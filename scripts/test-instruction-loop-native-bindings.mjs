@@ -8,7 +8,8 @@ import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
 import {fullGenerationInput,generateFullInstructionCandidate,codexFullInstructionProvider,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
 import {createInstructionLoopCommandRuntime} from './instruction-loop-command-runtime.mjs';
-import {createNativeInstructionLoopConfiguration} from './instruction-loop-native-configuration.mjs';
+import {createNativeInstructionLoopConfiguration,prepareNextNativeInstructionLoopConfiguration} from './instruction-loop-native-configuration.mjs';
+import {advanceSupervisedInstructionLoop} from './supervised-instruction-loop.mjs';
 function fixture(t){const root=realpathSync(mkdtempSync(join(tmpdir(),'ask-full-loop-')));t.after(()=>rmSync(root,{recursive:true,force:true}));return root;}
 function generation(t){
   const root=fixture(t),base=join(root,'base');mkdirSync(base);mkdirSync(join(base,'skills/demo/references'),{recursive:true});
@@ -21,6 +22,44 @@ test('Full generation input contains only public canonical Skill Markdown, not t
   const {p}=generation(t),input=fullGenerationInput(p),text=JSON.stringify(input);
   assert.deepEqual(input.files.map(f=>f.path),['skills/demo/SKILL.md','skills/demo/references/detail.md']);
   assert.ok(!text.includes('FAKE_PRIVATE_SENTINEL')&&!text.includes('FAKE_AUTH_SENTINEL')&&!text.includes(p.baselineSourceRoot));
+});
+test('controller public feedback is actually present in provider input and unsafe data is refused',t=>{
+  const {p}=generation(t),goal='Verify the applicable boundary before proposing a changed Skill.';
+  const input=fullGenerationInput({...p,observation:{goal}});
+  assert.equal(input.work_feedback.goal,goal);
+  assert.throws(()=>fullGenerationInput({...p,observation:{goal,raw_log:'private'}}),/arbitrary/);
+});
+test('next native profile pins the actual continuation and allocates fresh destinations without model dispatch',async t=>{
+  const {p,root}=generation(t),profilePath=join(root,'profile.json'),run=join(root,'old-run');
+  const policy={kind:'reference_instruction_loop_v1',id:'old',runtime_digest:canonicalDigest('fixture'),observation:{goal:'Improve public instruction efficiency'},
+    catalog:[{id:'public',public_input_digest:canonicalDigest('task'),tags:[],domain:'local'}],conditions:['baseline','candidate'],repetitions:1,max_trials:2,normal_target:null,formal_admission_implied:false};
+  const profile={kind:'full_native_reference_loop_profile_v1',protectedRoot:root,stateRoot:join(root,'state'),storeRoot:p.storeRoot,
+    generator:{...p,provider:{kind:'fixture'},environmentId:'local'},normal:{target:null},policy,
+    native:{root:join(root,'native'),workRoot:join(root,'work'),protectedRoot:root,executionKind:'real_codex'},selection:{},report:{assessments:[{old:true}]}};
+  writeFileSync(profilePath,JSON.stringify(profile));
+  const initialConfig=createNativeInstructionLoopConfiguration(profilePath),configPath=join(root,'old-config.json');
+  writeFileSync(configPath,JSON.stringify(initialConfig));
+  policy.runtime_digest=initialConfig.policy.runtime_digest;
+  const runtime={digest:policy.runtime_digest,inspect:async()=>null};
+  for(const kind of ['generate','register','select','trial','report','plan','apply','version','cleanup','restore'])runtime[kind]=async job=>({
+    request_digest:canonicalDigest(job),status:'completed',output:kind==='select'?{case_ids:['public']}:kind==='register'?
+      {registry:{snapshot_digest:canonicalDigest('local registry'),trusted_authority_contexts:[]}}:{}});
+  const start=await advanceSupervisedInstructionLoop({root:run,policy,runtime});
+  await advanceSupervisedInstructionLoop({root:run,policy,runtime,decision:{disposition:'rejected',packet_digest:canonicalDigest(start.pending_gate),reason:'The proposed cases do not cover the observed boundary.'}});
+  const next=prepareNextNativeInstructionLoopConfiguration({root:run,profilePath,configPath,outputRoot:join(root,'cycle-two'),id:'two'});
+  assert.equal(next.models_started,false);const config=JSON.parse(readFileSync(next.config_path)),nextProfile=JSON.parse(readFileSync(next.profile_path));
+  assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
+  assert.deepEqual(config.policy.observation,nextProfile.policy.observation);
+  assert.equal(fullGenerationInput({...nextProfile.generator,observation:config.policy.observation}).work_feedback.previous_cycle.decisions[0].reason_summary,
+    'The proposed cases do not cover the observed boundary.');
+  assert.deepEqual(nextProfile.report.assessments,[]);
+  assert.notEqual(nextProfile.generator.candidateRoot,p.candidateRoot);assert.equal(existsSync(nextProfile.generator.candidateRoot),false);
+  assert.equal(nextProfile.generator.registrySnapshotDigest,canonicalDigest('local registry'));
+  assert.ok(nextProfile.native.workRoot.startsWith(join(root,'ask-work-cycle-')));
+  assert.ok(nextProfile.generator.environmentId.length<=128);
+  assert.throws(()=>prepareNextNativeInstructionLoopConfiguration({root:run,profilePath,configPath,outputRoot:join(root,'cycle-two'),id:'two'}),/fresh/);
+  const changed=join(root,'different-profile.json');writeFileSync(changed,JSON.stringify({...profile,generator:{...profile.generator,goal:'Different'}}));
+  assert.throws(()=>prepareNextNativeInstructionLoopConfiguration({root:run,profilePath:changed,configPath,outputRoot:join(root,'blocked'),id:'blocked'}),/not pinned/);
 });
 for(const path of ['scripts/install-kernel.mjs','skills/demo/../../scripts/evil.md','skills/other/SKILL.md','skills/demo/references/.git/config.md','.agent-spectrum-kernel/install-state.json'])
 test('Full generator rejects out-of-scope model file '+path,async t=>{

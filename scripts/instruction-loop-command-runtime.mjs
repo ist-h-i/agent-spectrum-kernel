@@ -10,8 +10,8 @@ import { canonicalDigest, assertNoSymlinkPathSegments, readStableBytes,
 import { instructionBytesDigest } from './instruction-environment.mjs';
 
 const kinds=['generate','register','select','trial','report','plan','apply','version','cleanup','restore'];
-function checkedDefinition(definition){
-  assert.deepEqual(Object.keys(definition.commands).sort(),[...kinds].sort());
+function checkedDefinition(definition,requiredKinds){
+  assert.deepEqual(Object.keys(definition.commands).sort(),[...requiredKinds].sort());
   for(const c of Object.values(definition.commands)){
     assert.ok(Array.isArray(c.argv)&&c.argv.length>=2&&c.argv.every(x=>typeof x==='string'&&!x.includes('\0')));
     assert.equal(resolve(c.argv[0]),c.argv[0]);
@@ -22,7 +22,14 @@ function checkedDefinition(definition){
   }
 }
 export function createInstructionLoopCommandRuntime({definition,modelCallsAuthorized=false}){
-  definition=JSON.parse(JSON.stringify(definition));checkedDefinition(definition);
+  return createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds:kinds});
+}
+export function createPracticalEvaluationCommandRuntime({definition,modelCallsAuthorized=false}){
+  const requiredKinds=definition.commands.assess?['trial','assess']:['trial'];
+  return createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds});
+}
+function createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKinds}){
+  definition=JSON.parse(JSON.stringify(definition));checkedDefinition(definition,requiredKinds);
   const digest=canonicalDigest(definition);
   const folder=(job,root)=>join(root,'jobs',canonicalDigest(job).slice(7));
   function verifyPins(command){
@@ -82,5 +89,5 @@ export function createInstructionLoopCommandRuntime({definition,modelCallsAuthor
     }finally{closeSync(out);closeSync(err);}
     return inspect(job,{root});
   }
-  return {digest,inspect,preflight,...Object.fromEntries(kinds.map(k=>[k,execute]))};
+  return {digest,inspect,preflight,...Object.fromEntries(requiredKinds.map(k=>[k,execute]))};
 }

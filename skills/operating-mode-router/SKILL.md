@@ -52,7 +52,7 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 |---|---|---|
 | `delivery_quality` | Implement, review, verify, refactor, investigate, document, decide, define requirements, compile work packages, apply relevant approved domain rules, run release-readiness checks, or hand off a concrete development task | `skill-router`; `review-router` when review |
 | `adoption_bootstrap` | Introduce the skill set into a new repository, project, team, or client context | `project-adoption-pack-generation`; `repository-orientation`; `implementation-context-generation`; `review-context-generation` |
-| `observability_metrics` | Evaluate skill effectiveness, routing quality, instruction maturity, adoption impact, full-layer capability growth, or skill usage over time | `skill-effectiveness-evaluation`; `skill-adoption-metrics`; `engineering-capability-evaluation` |
+| `observability_metrics` | Compare instruction environments on bounded practical cases, recover that Eval, or evaluate skill effectiveness, routing quality, instruction maturity, adoption impact, full-layer capability growth or usage over time | `skill-effectiveness-evaluation`; `skill-adoption-metrics`; `engineering-capability-evaluation` |
 | `operation_automation` | Run or plan a periodic cadence such as weekly/monthly summaries, scheduler setup, or team routine | External operation layer; manual routine; ChatGPT automation; GitHub Actions; cron |
 
 3. Select the user-facing work mode.
@@ -73,6 +73,7 @@ User-facing route text should explain the work path in these terms. Skill names 
 4. Distinguish close signals.
    - Executable-spec method setup for a concrete project (test writing conventions, specification index, AI context retrieval, or verification selection): classify as `delivery_quality`, then route through `skill-router` to `spec-driven-development`, including for a new project. A method setup request alone does not request rollout of the ASK skill set or an adoption pack. If ASK rollout is also requested, keep that rollout in `adoption_bootstrap` and delegate only the requested method setup after checking its capability.
    - One completed task effectiveness question: route to `skill-effectiveness-evaluation`.
+   - An explicit practical ASK/Skill/instruction-environment comparison or its failure recovery: route to `skill-effectiveness-evaluation` practical mode. Ordinary application tests still belong to delivery verification; this signal does not route every test run into observability.
    - Multiple tasks or a period-over-period adoption question: route to `skill-adoption-metrics`.
    - Evidence-backed full-layer engineering capability or reusable intelligence maturity question: route to `engineering-capability-evaluation`.
    - First-time rollout of the ASK skill set into a repository: route to `project-adoption-pack-generation`.

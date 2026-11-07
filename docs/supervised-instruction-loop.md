@@ -242,3 +242,11 @@ Authoring-generation usage is separate from implementation-trial usage. The
 ordinary generation transport currently records duration, requested model and
 scope limits, with token/hierarchy totals explicitly unknown; it is not counted
 as zero or folded into the implementation savings.
+
+The optional [continuity commands](instruction-improvement-continuity.md) connect
+reviewed work summaries to actual native generation/selection, prepare a fresh
+next native configuration from the completed journal, and carry public reasons
+and results without inheriting approval. Adapter-neutral authoring supports
+individual Skill/Prompt revisions, declared root additions and environment-only
+exclusion through the existing compiler. Offline packages and local composition
+locks enter the receiver's candidate/Portfolio workflow and never grant admission.

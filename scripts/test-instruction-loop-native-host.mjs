@@ -7,7 +7,9 @@ import {createNativeInstructionLoopConfiguration} from './instruction-loop-nativ
 test('report settings cannot replace the actual approved retained-plan or execution identity',async t=>{
   const root=realpathSync(mkdtempSync(join(tmpdir(),'ask-native-host-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
   t.mock.module('./instruction-loop-reference-report.mjs',{namedExports:{buildInstructionLoopReferenceReport:input=>({received:input})}});
-  const {executeNativeInstructionLoopStage}=await import('./instruction-loop-native-host.mjs');
+  // Configuration imports may preload the host; instantiate this test's host
+  // after its mock is installed, independently of that preparation import.
+  const {executeNativeInstructionLoopStage}=await import('./instruction-loop-native-host.mjs?report-settings');
   const profile={kind:'full_native_reference_loop_profile_v1',stateRoot:join(root,'state'),protectedRoot:root,storeRoot:join(root,'store'),
     generator:{storeRoot:join(root,'store'),candidateRoot:join(root,'candidate'),fullRoot:join(root,'full'),stagingRoot:join(root,'staging')},normal:{target:join(root,'owner')},
     native:{protectedRoot:root,root:join(root,'native'),workRoot:join(root,'work'),executionKind:'real_codex'},

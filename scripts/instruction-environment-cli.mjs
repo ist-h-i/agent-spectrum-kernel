@@ -11,6 +11,12 @@ import { importSkillUsageEvidence } from './skill-usage-evidence.mjs';
 import { registerInstructionEnvironmentBundle } from './instruction-environment-compiler.mjs';
 import { verifyEnvironmentSavedResults } from './environment-saved-results.mjs';
 import { inspectPortfolioRuntimeContract } from './ask-benchmark-execution.mjs';
+import { buildInstructionLoopFeedback } from './instruction-loop-feedback.mjs';
+import { previewInstructionAssetPackage, exportInstructionAssetPackage, receiveInstructionAssetPackage,
+  planInstructionAssetImport, applyInstructionAssetImport } from './instruction-asset-package.mjs';
+import { planInstructionComposition, publishInstructionComposition, verifyInstructionComposition,
+  registerInstructionComposition, compareInstructionCompositions } from './instruction-composition.mjs';
+import { prepareInstructionEnvironmentAuthoring, importInstructionEnvironmentAuthoring } from './instruction-environment-authoring.mjs';
 import { buildEnvironmentEvolutionProjection } from './environment-evolution-binding.mjs';
 import { planEnvironmentTargetApply, applyEnvironmentTargetPlan, restoreEnvironmentTarget } from './environment-target.mjs';
 import { preparePersonalEvolutionGenerationRequest, importPersonalEvolutionGenerationResult } from './ask-personal-evolution-generation.mjs';
@@ -24,6 +30,19 @@ import { buildEvolutionExperiment, publishEvolutionExperiment, verifyEvolutionEx
 
 export function runInstructionEnvironmentCommand(command, input) {
   switch (command) {
+    case 'feedback': return buildInstructionLoopFeedback(input);
+    case 'authoring-prepare': return prepareInstructionEnvironmentAuthoring(input);
+    case 'authoring-import': return importInstructionEnvironmentAuthoring(input);
+    case 'package-preview': return previewInstructionAssetPackage(input);
+    case 'package-export': return exportInstructionAssetPackage(input);
+    case 'package-receive': return receiveInstructionAssetPackage(input);
+    case 'package-plan': return planInstructionAssetImport(input);
+    case 'package-apply': return applyInstructionAssetImport(input);
+    case 'composition-plan': return planInstructionComposition(input);
+    case 'composition-lock': return publishInstructionComposition(input);
+    case 'composition-inspect': return verifyInstructionComposition(input);
+    case 'composition-register': return registerInstructionComposition(input);
+    case 'composition-diff': return compareInstructionCompositions(input);
     case 'retained-prepare': return prepareRetainedInstructionComparison(input);
     case 'retained-verify': { const {plan}=verifyRetainedInstructionComparison(input); return {plan,models_started:false}; }
     case 'retained-results': return readRetainedInstructionResults(input);

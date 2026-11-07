@@ -1,6 +1,6 @@
 ---
 name: skill-effectiveness-evaluation
-description: Evaluate whether selected skills improved a task outcome, identify missing or excessive workflow steps, and produce evidence-backed skill improvement recommendations.
+description: Plan practical instruction-environment comparisons with AI recovery, then evaluate Skill effectiveness from recorded task outcomes and workflow evidence.
 ---
 
 # Skill Effectiveness Evaluation
@@ -9,12 +9,13 @@ description: Evaluate whether selected skills improved a task outcome, identify 
 
 Evaluate whether selected skills and workflow gates improved a concrete task outcome, and identify missing or excessive workflow steps from evidence.
 
-This skill is a retrospective evaluator for one task, PR, review, implementation, refactor, investigation, or adoption run. It does not replace PR review, final merge gate, benchmark scoring, external-outcome evaluation, adoption metrics, capability maturity, or evidence ledger.
+This skill supports a bounded practical Eval and the retrospective evaluation of one task, PR, review, implementation, refactor, investigation, or adoption run. It does not replace PR review, final merge gate, formal benchmark scoring, external-outcome evaluation, adoption metrics, capability maturity, or evidence ledger.
 
 Use `docs/skill-effectiveness-evaluation-contract.md`, `schemas/skill-effectiveness-outcome.schema.json`, the shared labels in `schemas/effectiveness-decision-vocabulary.schema.json`, and the semantic CLI in `scripts/skill-effectiveness-outcome.mjs`. These assets define `ask.skill-effectiveness-outcome@1.0.0`.
 
 ## Use when
 
+- A user wants to select and run practical environment/Skill comparisons on their own tasks, or an ongoing Eval needs an AI decision about incomplete/failed evidence.
 - The user asks whether selected skills were effective.
 - A completed task, PR, review, implementation, refactor, investigation, or adoption run needs retrospective evaluation.
 - The team wants to understand whether `operating-mode-router`, `skill-router`, or `review-router` routing was appropriate.
@@ -24,7 +25,7 @@ Use `docs/skill-effectiveness-evaluation-contract.md`, `schemas/skill-effectiven
 
 ## Do not use when
 
-- The task is still in progress and no output exists to evaluate.
+- The task is still in progress and no output exists to evaluate, unless the request is the practical Eval mode below.
 - The user only wants a normal implementation, review, refactor, or adoption pack.
 - There is no evidence of selected skills, outputs, decisions, checks, residual risks, or outcome quality.
 - The question spans many tasks or adoption over time; use `skill-adoption-metrics`.
@@ -38,6 +39,74 @@ Use `docs/skill-effectiveness-evaluation-contract.md`, `schemas/skill-effectiven
 - Output artifacts, diff, PR, review result, tests, CI, validation report, handoff, or adoption pack.
 - Evidence of outcome quality, defects caught, defects missed, rework, blocked merge, validation result, or residual risk.
 - Applicable project overlay, implementation context, review context, or improvement ledger entries.
+
+## Practical Eval mode
+
+Use [the practical Eval workflow](references/practical-evaluation.md)
+and the existing pragmatic reporter. Do not create a second universal scoring
+skill or apply the seven-dimension retrospective contract to each trial.
+
+The AI owns purpose, case selection, interpretation and recovery judgments. The
+runner owns exact approved inputs, execution/evidence, fresh attempt identities,
+budgets and duplicate prevention. The human approves the Eval cases before
+execution and the exact eventual application through the existing change gate.
+An AI recovery decision is not a third human approval or permission to install.
+
+1. Identify the real-work decision: which errors/rework matter, what benefit
+   would justify a change, and which safety boundaries must remain. Pick a small
+   useful set of representative positive/negative tasks, using actual feedback
+   and observed cost where available. Explain omissions. Do not require a perfect
+   dataset, a fixed ASK/private catalog, complete token telemetry or full-tree
+   usage merely to begin a practical comparison.
+2. Freeze case/input/criterion identities, condition context, repeat count,
+   execution and retry budget in a practical plan. A user-owned executable check,
+   supplied rubric/AI grader or explicitly unknown quality is allowed. Resource
+   observations alone do not establish quality. Present the exact case packet to
+   the human before dispatch.
+3. For a standalone comparison, advance `scripts/practical-evaluation-cli.mjs`.
+   For an improvement including individual asset authoring, composition or
+   reviewed imports, use the component profile and supervised `operate` workflow
+   in the linked reference. Set an explicit cycle budget; routine completion
+   prepares the next cycle, with fresh case/change judgments. At `awaiting_ai_recovery`,
+   read the packet and available evidence, choose an action and submit the
+   structured assessment yourself; do not ask the human to perform routine
+   recovery. A configured automatic assessor can perform this step as a worker.
+   Use known data despite absent unrelated metrics. Prefer useful partial data,
+   exclusion or reference use when more execution has little value.
+4. A retry may target the affected trial or all conditions for that case. Choose
+   according to fairness, the failure and practical purpose. Do not retry solely
+   to obtain a better score or cherry-pick favorable outcomes. Keep original
+   outcomes, reason, conditions, all attempts and comparison selection. A valid
+   low-quality result is evidence, not by itself an execution failure.
+5. Record comparison limits and the data actually used. If a prior process might
+   still be active, do not authorize a duplicate or another trial root. Use
+   read-only inspection; reference/exclude what is usable and publish a partial
+   report while unresolved execution is explicitly recorded. A lost response is
+   not permission to replay a consumed command.
+6. Review the pragmatic report, including failures, Unknowns, retry/assessment
+   overhead and possible selection bias. Relate benefits to the intended work.
+   The formal retrospective below remains available when its evidence and
+   catalog fit; `insufficient_evidence` for that contract is not an instruction
+   to stop collecting or using useful practical evidence. Bring the resulting
+   report to the existing human change/application decision.
+
+Before that change judgment, resolve the exact baseline/candidate environments
+and show the added, revised and excluded files, layer/version differences and
+declared permissions/effects. Use the existing composition diff and Registry
+inspection; do not ask the human to approve an opaque digest without its actual
+content and consequences. Include received helper files in this review.
+
+Keep the latest improvement result separate from the currently applied owner
+anchor: a rejected candidate or a declined restoration does not change the
+installed baseline. For lost final responses use the runtime's owned completion
+inspection. Never infer completion from matching bytes alone, repeat an owner
+write, or overwrite a local edit to make a saved plan fit. A no-op is a valid
+outcome; do not manufacture a revision or an Eval simply to consume the budget.
+
+Frozen historical `single_shot_v1` primary plans retain their contract and
+original evidence. For a new practical evaluation use the new execution lane;
+never remove old consumption records, rewrite a saved result, or pretend a fresh
+attempt was the original primary execution.
 
 ## Process
 
