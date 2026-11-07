@@ -371,6 +371,14 @@ unchanged approved inputs, no owner target, and a live local process observation
 Generic remote timeouts and returned assessor evidence require ordinary
 inspection instead.
 
+Two assessor evidence forms are supported: the legacy empty session, and the
+exact three failed-observation files retained by the current assessor. The
+latter must bind the original request, settings and unchanged prompt, empty
+stdout, the same initialization EPERM, observed local termination, unknown
+provider closure and no answer. Extra files, partial output, timeout, changed
+bindings or a returned judgment are refused. Preserved diagnostic evidence
+therefore remains usable after upgrading the assessor without granting replay.
+
 ```sh
 node scripts/practical-initialization-recovery-cli.mjs prepare \
   --operation /absolute/original-operation --reason "Recorded initialization failure; retain unknowns and retry only its isolated row." \

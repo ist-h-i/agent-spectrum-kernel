@@ -60,6 +60,10 @@ workspace; the original assessor is retired without replay. Generic timeouts,
 returned assessor evidence, owner targets and incomplete local observations
 remain outside this exception. Supplement quiescence recognizes the same
 validated exception for these exact retired jobs, retaining all uncertainty.
+Retained assessor initialization diagnostics are admitted only through their
+exact request/settings/prompt and output bindings, with no answer and unchanged
+unknown provider state. They are the evidence-preserving successor of the empty
+legacy session; arbitrary saved sessions do not expand the exception.
 
 ## Alternatives and consequences
 

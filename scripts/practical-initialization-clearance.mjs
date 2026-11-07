@@ -8,11 +8,12 @@ import {canonicalDigest,readJsonFileStrict,assertNoSymlinkPathSegments} from './
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {readRunJournal} from './instruction-run-journal.mjs';
 import {readStableFile} from './ask-benchmark-stable-file.mjs';
+import {buildPracticalEvaluationAssessmentPrompt} from './practical-evaluation-assessor.mjs';
 const json=p=>readJsonFileStrict(p,'initialization recovery evidence',16*1024*1024);
 const bytes=p=>readStableFile(p,'initialization recovery evidence',16*1024*1024).bytes;
 const ref=p=>({path:p,digest:hash(bytes(p))});
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
-const controlNames=['practical-initialization-clearance.mjs','practical-initialization-recovery-cli.mjs','practical-evaluation-runner.mjs','practical-grade-supplement.mjs'];
+const controlNames=['practical-initialization-clearance.mjs','practical-initialization-recovery-cli.mjs','practical-evaluation-runner.mjs','practical-grade-supplement.mjs','practical-evaluation-assessor.mjs'];
 const initDiagnostic=/^(?:WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted \(os error 1\)\n)?Error: failed to initialize in-process app-server client: Operation not permitted \(os error 1\)\n?$/u;
 function rootPath(p){assert.equal(resolve(p),p);assertNoSymlinkPathSegments(p,'initialization recovery root');return p;}
 export function inspectInitializationRecoveryOperation(operationRoot){
@@ -34,7 +35,7 @@ export function inspectInitializationRecoveryOperation(operationRoot){
  for(const p of [...config.runtime.source_pins,...Object.values(selection.practical_runtime.commands).flatMap(c=>c.pins)])assert.equal(ref(p.path).digest,p.digest,'original execution input drift');
  return {o,cycleRoot,cycle,config,profile,root,state:s,selection};
 }
-function originalEvidence(root,attempt,assessorJob){
+function originalEvidence(root,attempt,assessorJob,assessorCommand){
  const sources=[],keep=p=>{sources.push(ref(p));return json(p);};
  const taskRoot=join(root,'jobs',canonicalDigest(attempt.job).slice(7)),assessRoot=join(root,'jobs',canonicalDigest(assessorJob).slice(7));
  const request=keep(join(taskRoot,'request.json')),result=keep(join(taskRoot,'result.json')),transport=keep(join(taskRoot,'transport.json'));
@@ -61,9 +62,25 @@ function originalEvidence(root,attempt,assessorJob){
  for(const [name,expected]of [['stdout.log',''],['stderr.log','assessment incomplete; inspect saved session, do not replay automatically\n']]){
   const p=join(assessRoot,name);assert.equal(bytes(p).toString('utf8'),expected);sources.push(ref(p));
  }
- assert.deepEqual(readdirSync(join(assessRoot,'assessment-session')),[],'assessor has additional evidence; inspect it first');
+ const session=join(assessRoot,'assessment-session'),entries=readdirSync(session).sort();let assessorVariant='legacy_empty_session',assessorPid=null;
+ if(entries.length){
+  assert.deepEqual(entries,['execution-observation.json','stderr.log','stdout.jsonl'],'assessor has additional evidence; inspect it first');
+  const observation=keep(join(session,'execution-observation.json'));assert.equal(observation.kind,'practical_assessor_execution_observation_v1');assert.equal(observation.request_digest,canonicalDigest(assess));
+  const settings=keep(assessorCommand.argv[2]);assert.equal(ref(assessorCommand.argv[2]).digest,assessorCommand.argv[3]);assert.equal(settings.kind,'codex');
+  assert.equal(observation.settings_digest,canonicalDigest(settings));assert.equal(observation.prompt_digest,hash(Buffer.from(buildPracticalEvaluationAssessmentPrompt(assess))));
+  assert.equal(observation.provider_terminal_confirmed,null);assert.equal(observation.closure_scope,'unconfirmed');assert.equal(observation.replay_authorized,false);assert.equal(observation.answer_observation_issue,null);
+  assert.equal(observation.model_calls,null);assert.equal(observation.usage,null);
+  assert.equal(observation.local.spawn_observed,true);assert.equal(observation.local.termination_confirmed,true);assert.equal(observation.local.exit_code,1);
+  for(const key of ['signal','error','cleanup_error'])assert.equal(observation.local[key],null);
+  for(const key of ['timed_out','interrupted','output_limited'])assert.equal(observation.local[key],false);
+  assert.ok(Number.isSafeInteger(observation.local.pid)&&observation.local.pid>0);assessorPid=observation.local.pid;
+  assert.ok(Number.isFinite(observation.duration_ms)&&observation.duration_ms>=0);
+  assert.deepEqual(observation.artifacts.map(a=>a.path).sort(),['stderr.log','stdout.jsonl']);
+  for(const a of observation.artifacts){const p=join(session,a.path),raw=bytes(p);assert.equal(hash(raw),a.digest);sources.push(ref(p));if(a.path==='stdout.jsonl')assert.equal(raw.length,0);else assert.match(raw.toString('utf8'),initDiagnostic);}
+  assessorVariant='retained_initialization_failure';
+ }
  const taskProcess=keep(join(taskRoot,'process.json')),assessProcess=keep(join(assessRoot,'process.json'));
- return {sources,taskRoot,assessRoot,provider,workerPids:[taskProcess.pid,assessProcess.pid]};
+ return {sources,taskRoot,assessRoot,provider,assessorVariant,workerPids:[taskProcess.pid,assessProcess.pid,...(assessorPid===null?[]:[assessorPid])]};
 }
 export function observeInitializationRecoveryProcesses({taskRoot,assessRoot,workerPids},inspect=spawnSync){
  for(const pid of workerPids){assert.ok(Number.isSafeInteger(pid)&&pid>0);try{process.kill(pid,0);assert.fail('original local worker is still present');}catch(error){if(error.code!=='ESRCH')throw error;}}
@@ -86,8 +103,8 @@ export function preparePracticalInitializationClearance({operationRoot,reason},o
  const attempt=s.attempts.find(a=>a.id===s.recovery.entry_id);assert.ok(attempt&&same(attempt.job,s.recovery.job));assert.equal(attempt.job.input.attempt,1,'only first-attempt initialization failure');
  assert.ok(same(s.active.input.packet,s.recovery.packet));
  for(const p of [operationRoot,cycleRoot,root])assert.equal(existsSync(join(p,'.advance-lock')),false,'an original coordinator is active');
- const evidence=originalEvidence(root,attempt,s.active),observation=observe(evidence);
  const command=selection.practical_runtime.commands.assess;
+ const evidence=originalEvidence(root,attempt,s.active,command),observation=observe(evidence);
  assert.ok(command?.model_calls&&command.pins.some(p=>p.path.endsWith('/practical-evaluation-assessor.mjs')),'standard read-only assessor required');
  for(const p of [...config.runtime.source_pins,...selection.practical_runtime.commands.trial.pins,...command.pins])assert.equal(ref(p.path).digest,p.digest,'original execution input drift');
  const clearance={kind:'practical_initialization_continuation_clearance_v1',run_root:root,operation_root:operationRoot,cycle_root:cycleRoot,
@@ -99,7 +116,7 @@ export function preparePracticalInitializationClearance({operationRoot,reason},o
   limits:['This is a host operational exception, not positive provider closure or quality evidence.','Original failure, provider terminal false and assessor Unknown remain recorded.','Only the failed first Task may use its original one-row retry budget in a fresh workspace. No owner write or extra approval is granted.'],
   parent_binding:{config_path:o.current.config_path,config_digest:o.current.config_digest,profile_path:o.current.profile_path,profile_digest:o.current.profile_digest,cycle_policy_digest:canonicalDigest(cycle.policy),selection_digest:canonicalDigest(selection)},
   control_implementation:controlNames.map(n=>ref(join(import.meta.dirname,n))),
-  local_observation:observation,sources:evidence.sources};
+  local_observation:observation,assessor_evidence_variant:evidence.assessorVariant,sources:evidence.sources};
  validatePracticalInitializationClearance(clearance,{root,state:s});return clearance;
 }
 export function validatePracticalInitializationClearance(clearance,{root,state,checkProcesses=false}={}){
@@ -111,7 +128,7 @@ export function validatePracticalInitializationClearance(clearance,{root,state,c
  assert.equal(attempt.job.input.attempt,1,'only first-attempt initialization failure');
  const assessor=parent.selection.practical_runtime.commands.assess;assert.ok(assessor?.model_calls&&assessor.argv[1].endsWith('/practical-evaluation-assessor.mjs')&&assessor.pins.some(p=>p.path===assessor.argv[1]),'standard read-only assessor required');
  assert.equal(clearance.original_assessor_job_digest,canonicalDigest(clearance.original_assessor_job));assert.equal(clearance.original_assessor_job.kind,'assess');
- const evidence=originalEvidence(root,attempt,clearance.original_assessor_job);assert.ok(same(clearance.sources,evidence.sources),'initialization evidence changed');
+ const evidence=originalEvidence(root,attempt,clearance.original_assessor_job,assessor);assert.ok(same(clearance.sources,evidence.sources),'initialization evidence changed');assert.equal(clearance.assessor_evidence_variant,evidence.assessorVariant);
  assert.equal(clearance.command_digest,evidence.provider.command_digest);assert.equal(clearance.invocation_digest,evidence.provider.invocation_digest);
  const worker=parent.selection.practical_runtime.commands.trial;assert.ok(worker.argv[1].endsWith('/practical-evaluation-worker.mjs'));
  const settings=json(worker.argv[2]);assert.equal(ref(worker.argv[2]).digest,worker.argv[3]);

@@ -5,13 +5,15 @@ import {canonicalDigest} from './content-addressed-store.mjs';import {instructio
 import {readRunJournal,appendRunJournal} from './instruction-run-journal.mjs';
 import {advancePracticalEvaluation} from './practical-evaluation-runner.mjs';
 import {preparePracticalInitializationClearance,validatePracticalInitializationClearance,observeInitializationRecoveryProcesses} from './practical-initialization-clearance.mjs';
+import {buildPracticalEvaluationAssessmentPrompt} from './practical-evaluation-assessor.mjs';
 const write=(p,v)=>writeFileSync(p,JSON.stringify(v)),pin=p=>({path:p,digest:hash(readFileSync(p))});
-async function fixture(t){
+async function fixture(t,{retainedAssessor=false}={}){
  const dir=realpathSync(mkdtempSync(join(tmpdir(),'ask-initialization-recovery-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));
  const root=join(dir,'evaluation'),operation=join(dir,'operation'),cycle=join(operation,'first-run');mkdirSync(root);mkdirSync(cycle,{recursive:true});
  const worker=join(dir,'practical-evaluation-worker.mjs'),assessor=join(dir,'practical-evaluation-assessor.mjs');writeFileSync(worker,'// synthetic worker, never executed');writeFileSync(assessor,'// synthetic read-only assessor, never executed');
  const taskCommand={argv:[process.execPath,worker],pins:[pin(worker)],model_calls:true,timeout_ms:1000},settings=join(dir,'worker-settings.json');write(settings,{conditions:{baseline:{command:taskCommand},candidate:{command:taskCommand}}});
- const definition={commands:{trial:{argv:[process.execPath,worker,settings,pin(settings).digest],pins:[pin(worker),pin(settings)],model_calls:true},assess:{argv:[process.execPath,assessor],pins:[pin(assessor)],model_calls:true}}};
+ const assessorSettings=join(dir,'assessor-settings.json');write(assessorSettings,{kind:'codex',executable:process.execPath,model:null,timeout_ms:1000});
+ const definition={commands:{trial:{argv:[process.execPath,worker,settings,pin(settings).digest],pins:[pin(worker),pin(settings)],model_calls:true},assess:{argv:[process.execPath,assessor,assessorSettings,pin(assessorSettings).digest],pins:[pin(assessor),pin(assessorSettings)],model_calls:true}}};
  const context={cli_version:'synthetic',model:null,reasoning:null,platform:'synthetic',global_context_ref:null},plan={kind:'practical_evaluation_plan_v1',id:'fixture',goal:'Recover one isolated initialization failure, retain every result.',runtime_digest:canonicalDigest(definition),evidence_kind:'synthetic',conditions:['baseline','candidate'].map(id=>({id,context})),cases:[{id:'case',task_ref:'task',input_ref:'input',success_criteria_ref:'check',public_input_digest:canonicalDigest('public')}],repetitions:1,recovery:{max_extra_trials:4,max_retries_per_row:1,allow_reference:true,allow_exclusion:true,required_dimensions:['execution','duration']},global_context:{ask_presence:'unknown',change_status:'unknown'}};
  const receipts=new Map(),calls=[],runtime={digest:plan.runtime_digest,inspect:async job=>receipts.get(canonicalDigest(job))??null};let assessments=0;
  runtime.trial=async job=>{
@@ -26,7 +28,10 @@ async function fixture(t){
   }
   receipts.set(canonicalDigest(job),result);return result;
  };
- runtime.assess=async job=>{assessments++;const d=join(root,'jobs',canonicalDigest(job).slice(7));mkdirSync(join(d,'assessment-session'),{recursive:true});write(join(d,'request.json'),job);write(join(d,'transport.json'),{request_digest:canonicalDigest(job),exit_code:1,signal:null});write(join(d,'process.json'),{pid:2147483001,request_digest:canonicalDigest(job)});writeFileSync(join(d,'stdout.log'),'');writeFileSync(join(d,'stderr.log'),'assessment incomplete; inspect saved session, do not replay automatically\n');return {request_digest:canonicalDigest(job),status:'unknown'};};
+ runtime.assess=async job=>{assessments++;const d=join(root,'jobs',canonicalDigest(job).slice(7));mkdirSync(join(d,'assessment-session'),{recursive:true});write(join(d,'request.json'),job);write(join(d,'transport.json'),{request_digest:canonicalDigest(job),exit_code:1,signal:null});write(join(d,'process.json'),{pid:2147483001,request_digest:canonicalDigest(job)});writeFileSync(join(d,'stdout.log'),'');writeFileSync(join(d,'stderr.log'),'assessment incomplete; inspect saved session, do not replay automatically\n');
+  if(retainedAssessor){const session=join(d,'assessment-session'),stdout=Buffer.alloc(0),stderr=Buffer.from('Error: failed to initialize in-process app-server client: Operation not permitted (os error 1)\n');writeFileSync(join(session,'stdout.jsonl'),stdout);writeFileSync(join(session,'stderr.log'),stderr);
+   write(join(session,'execution-observation.json'),{kind:'practical_assessor_execution_observation_v1',request_digest:canonicalDigest(job),settings_digest:canonicalDigest(JSON.parse(readFileSync(assessorSettings))),prompt_digest:hash(Buffer.from(buildPracticalEvaluationAssessmentPrompt(job))),local:{spawn_observed:true,termination_confirmed:true,pid:2147483002,exit_code:1,signal:null,error:null,cleanup_error:null,timed_out:false,interrupted:false,output_limited:false},duration_ms:350,provider_terminal_confirmed:null,closure_scope:'unconfirmed',model_calls:null,model_calls_status:'not_observed',usage:null,usage_status:'not_collected',replay_authorized:false,artifacts:[{path:'stdout.jsonl',digest:hash(stdout)},{path:'stderr.log',digest:hash(stderr)}],answer_observation_issue:null});}
+  return {request_digest:canonicalDigest(job),status:'unknown'};};
  const run=options=>advancePracticalEvaluation({root,plan,runtime,...options});let s=await run();s=await run({decision:{disposition:'approved',packet_digest:canonicalDigest(s.pending_gate),reason:'Synthetic human approval.'}});assert.equal(s.status,'ai_assessment_uncertain');
  const profile=join(dir,'profile.json'),config=join(dir,'config.json'),profilePolicy={id:'synthetic',normal_target:null};write(profile,{kind:'full_practical_instruction_loop_profile_v1',normal:{target:null},practical:{root},policy:profilePolicy});const parentRuntime={profile_path:profile,profile_digest:pin(profile).digest,source_pins:[pin(worker),pin(assessor)]},policy={...profilePolicy,runtime_digest:canonicalDigest(parentRuntime)};write(config,{policy,runtime:parentRuntime});
  const selection={practical_root:root,practical_plan:plan,practical_plan_digest:canonicalDigest(plan),practical_runtime:definition};
@@ -36,6 +41,18 @@ async function fixture(t){
   prepare:()=>preparePracticalInitializationClearance({operationRoot:operation,reason:'Retry one pre-session failure fairly, not a better score.'})};
 }
 const choice=p=>({packet_digest:canonicalDigest(p),action:'retry',retry_scope:'trial',selection_basis:'execution_failure',reason:'The isolated attempt failed during initialization. Retain its failed/Unknown evidence; use one original retry slot without rerunning the read-only assessor.',used_dimensions:['execution','duration'],comparison_limits:['Original provider closure and assessor remote/cost remain Unknown; this continuation exception is not quality evidence.']});
+test('retained assessor initialization observations are bound and admitted without pretending provider closure',async t=>{
+ const f=await fixture(t,{retainedAssessor:true}),c=f.prepare();assert.equal(c.assessor_evidence_variant,'retained_initialization_failure');assert.equal(c.process_closed,false);assert.equal(c.safe_to_continue,true);assert.equal(c.local_observation.worker_pids.length,3);assert.equal(c.control_implementation.length,5);
+ assert.ok(c.sources.some(p=>p.path.endsWith('/execution-observation.json')));assert.ok(c.sources.some(p=>p.path.endsWith('/assessor-settings.json')));
+ const out=await f.run({continuationClearance:c});assert.equal(out.pending_recovery.process_closed,false);assert.equal(out.pending_recovery.retry_available,true);assert.equal(f.calls.length,1);assert.equal(f.assessmentCalls(),1);assert.equal(f.state().extra_trials,0);
+});
+for(const mode of ['request','settings','prompt','stdout','diagnostic','timeout','provider-closed','replay','missing-pid','answer'])test('retained assessor evidence rejects '+mode,async t=>{
+ const f=await fixture(t,{retainedAssessor:true}),s=f.state(),session=join(f.root,'jobs',canonicalDigest(s.active).slice(7),'assessment-session'),p=join(session,'execution-observation.json'),e=JSON.parse(readFileSync(p));
+ if(['request','settings','prompt'].includes(mode))e[mode+'_digest']=canonicalDigest('foreign');
+ if(mode==='stdout'||mode==='diagnostic'){const name=mode==='stdout'?'stdout.jsonl':'stderr.log',raw=Buffer.from(mode==='stdout'?'partial provider output':'Error: remote timeout\n');writeFileSync(join(session,name),raw);e.artifacts.find(a=>a.path===name).digest=hash(raw);}
+ if(mode==='timeout')e.local.timed_out=true;if(mode==='provider-closed')e.provider_terminal_confirmed=true;if(mode==='replay')e.replay_authorized=true;if(mode==='missing-pid')e.local.pid=null;if(mode==='answer')writeFileSync(join(session,'answer.json'),'{}');
+ write(p,e);assert.throws(()=>f.prepare());assert.equal(f.calls.length,1);assert.equal(f.state().extra_trials,0);
+});
 test('one explicit operational exception retains false/Unknown evidence and retries only the failed row once',async t=>{
  const f=await fixture(t),before=structuredClone(f.state()),clearance=f.prepare();assert.equal(clearance.process_closed,false);assert.equal(clearance.safe_to_continue,true);
  const admitted=await f.run({continuationClearance:clearance});assert.equal(admitted.pending_recovery.process_closed,false);assert.equal(admitted.pending_recovery.retry_available,true);assert.equal(admitted.pending_recovery.safe_to_continue,true);assert.equal(f.calls.length,1);
