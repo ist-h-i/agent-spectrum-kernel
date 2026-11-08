@@ -7,6 +7,7 @@ import { canonicalDigest, assertNoSymlinkPathSegments, readJsonFileStrict,
   writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
 import { readRunJournal as journal, appendRunJournal as append, lockRunJournal as lock } from './instruction-run-journal.mjs';
 import { projectInstructionLoopObservation, assertPublicInstructionSummary, summarizeInstructionLoopEvaluation } from './instruction-loop-feedback.mjs';
+import {instructionResultDiscard,makeInstructionResultDiscard} from './instruction-loop-result-disposition.mjs';
 import {readPracticalGradeSupplementContinuation,readAdmittedPracticalGradeSupplement} from './practical-grade-report-revision.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
@@ -37,6 +38,7 @@ function checkedPolicy(p){
 }
 function summary(state){
   return {status:state.status,run_id:state.policy.id,pending_gate:state.gate??null,
+    ...(state.result_disposition?{result_disposition:instructionResultDiscard(state)}:{}),
     pending_authoring:state.authoring_progress??null,
     ...(state.report_revision?{report_revision:copy(state.report_revision)}:{}),
     pending_recovery:state.evaluation_progress?.pending_recovery??null,
@@ -210,7 +212,8 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       assert.ok(s.gate,'no human judgment is pending');
       assert.deepEqual(Object.keys(decision).sort(),['disposition','packet_digest','reason']);
       assert.equal(decision.packet_digest,canonicalDigest(s.gate),'human decision bound to a different packet');
-      assert.ok(['approved','rejected','deferred'].includes(decision.disposition));
+      assert.ok(['approved','rejected','deferred','discarded'].includes(decision.disposition));
+      if(decision.disposition==='discarded')assert.ok(s.gate.kind==='result'&&policy.normal_target===null,'discard requires a result-only gate');
       assert.ok(typeof decision.reason==='string'&&decision.reason.trim());
       if(decision.disposition==='deferred'){
         assert.ok(['result','change'].includes(s.gate.kind),'deferral requires a result or change gate');
@@ -218,6 +221,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       }
       const key=s.gate.kind==='evaluation'?'evaluation_decision':s.gate.kind==='result'?'result_decision':s.restore_requested?'restore_decision':'change_decision';
       assert.equal(s[key],undefined,'decision already consumed');s[key]=copy(decision);s.gate=null;s.status='advancing';
+      if(decision.disposition==='discarded'){s.result_disposition=makeInstructionResultDiscard(s,{sourceJournalDigest:journal(root).previous,reason:decision.reason});instructionResultDiscard(s);}
       append(root,'human_decision',s,{kind:key});
     }
     if(s.status==='completed')return summary(s);
@@ -284,8 +288,29 @@ export function readCompletedInstructionLoopContinuation(root){
   assertNoSymlinkPathSegments(resolve(root),'previous loop root');
   const {state:s,previous}=journal(resolve(root));
   assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'previous cycle must be completed, with no uncertain operation');
-  return copy({policy:s.policy,journal_digest:previous,candidate:s.outputs.register,report:s.outputs.report??null,outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),
+  const discarded=instructionResultDiscard(s);
+  return copy({policy:s.policy,journal_digest:previous,candidate:s.outputs.register,report:discarded?null:s.outputs.report??null,
+    ...(discarded?{result_disposition:discarded}:{}),outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),
     registry:s.outputs.switch_back??s.outputs.cleanup?.registry??s.outputs.activate??s.outputs.retire??s.outputs.register.registry});
+}
+
+// A host may record an explicit discard for an already rejected result without
+// rewriting its frozen decision, outcome, report or execution implementation.
+export function discardCompletedInstructionLoopResult({root,operationRoot,expectedJournalDigest,expectedReportDigest,expectedDecisionDigest,expectedRevisionDigest=null,reason}){
+  root=resolve(root);assertNoSymlinkPathSegments(root,'discarded result cycle');
+  assert.ok(typeof operationRoot==='string'&&operationRoot,'completed parent operation required for historical discard');operationRoot=resolve(operationRoot);assertNoSymlinkPathSegments(operationRoot,'discarded result operation');assert.notEqual(root,operationRoot);
+  const unlocks=[];try{
+    for(const path of [root,operationRoot].sort())unlocks.push(lock(path));
+    const op=journal(operationRoot).state;assert.equal(op?.current?.root,root,'foreign result operation');assert.equal(op.status,'completed','result operation is not completed');assert.equal(op.preparation,null,'result operation has a next preparation');
+    const h=journal(root),s=h.state;assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'discard requires a completed result');
+    assert.equal(s.policy.normal_target,null,'discard requires a result-only cycle');assert.ok(['result_rejected_retained','result_discarded_retained'].includes(s.outputs.final?.outcome),'only a rejected retained result can be discarded');
+    assert.ok(['rejected','discarded'].includes(s.result_decision?.disposition),'discard requires the recorded human result decision');assertPublicInstructionSummary(reason);
+    assert.equal(expectedReportDigest,canonicalDigest(s.outputs.report),'discard report drift');assert.equal(expectedDecisionDigest,canonicalDigest(s.result_decision),'discard decision drift');assert.equal(expectedRevisionDigest,s.report_revision?.reference.digest??null,'discard revision drift');
+    const existing=instructionResultDiscard(s);assert.equal(expectedJournalDigest,existing?.source_journal_digest??h.previous,'discard journal drift');
+    const value=makeInstructionResultDiscard(s,{sourceJournalDigest:expectedJournalDigest,reason});
+    if(existing){assert.ok(same(existing,value),'discard request differs from the recorded request');return summary(s);}
+    s.result_disposition=value;instructionResultDiscard(s);append(root,'evaluation_result_discarded',s);return summary(s);
+  }finally{for(const unlock of unlocks.reverse())unlock();}
 }
 
 // Preparation is read-only. The host must allocate fresh worker destinations
@@ -296,7 +321,13 @@ export function prepareNextSupervisedInstructionLoop({root,nextPolicy,resultSumm
   assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'previous cycle must be completed, with no uncertain operation');
   checkedPolicy(nextPolicy);assert.notEqual(nextPolicy.id,s.policy.id,'next cycle needs a fresh run ID');
   projectInstructionLoopObservation(nextPolicy.observation);
-  assert.notEqual(nextPolicy.observation.kind,'instruction_loop_continuation_v1','provide fresh feedback; previous history is derived from the journal');
+  assert.ok(!['instruction_loop_continuation_v1','instruction_loop_discarded_continuation_v1'].includes(nextPolicy.observation.kind),'provide fresh feedback; previous history is derived from the journal');
+  const discarded=instructionResultDiscard(s);
+  if(discarded){
+    assert.equal(reportRevision,null,'discarded evaluation cannot be revived by a report revision');assert.equal(resultSummary,null,'discarded evaluation cannot supply a result summary');
+    const observation={kind:'instruction_loop_discarded_continuation_v1',feedback:copy(nextPolicy.observation),previous:{run_id:s.policy.id,journal_digest:previous,policy_digest:canonicalDigest(s.policy),candidate_digest:canonicalDigest(s.outputs.register),outcome:s.outputs.final.outcome,result_disposition:discarded}};
+    projectInstructionLoopObservation(observation);return {status:'prepared',policy:{...copy(nextPolicy),observation},models_started:false,approval_carried_forward:false};
+  }
   const decisions=['evaluation_decision','result_decision','change_decision','restore_decision'].filter(k=>s[k]).map(k=>({
     kind:k,disposition:s[k].disposition,digest:canonicalDigest(s[k]),
     reason_summary:assertPublicInstructionSummary(decisionSummaries[canonicalDigest(s[k])]??s[k].reason??'Historical prior approval; original public reason unavailable.')}));

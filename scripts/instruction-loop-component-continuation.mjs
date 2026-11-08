@@ -10,6 +10,7 @@ import {createComponentInstructionLoopConfiguration} from './instruction-loop-co
 export function buildNextComponentInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null,reportRevision=null}){
   root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);outputRoot=resolve(outputRoot);
   const history=readCompletedInstructionLoopContinuation(root),old=readJsonFileStrict(profilePath,'previous component profile'),config=readJsonFileStrict(configPath);
+  const discarded=history.result_disposition?.disposition==='discarded';if(discarded){assert.ok(feedback!==null,'discarded result requires explicit fresh feedback');assert.equal(reportRevision,null,'discarded result cannot supply a report revision');}
   assert.equal(old.kind,'component_practical_instruction_loop_profile_v1');assert.equal(config.runtime.profile_path,profilePath);
   assert.equal(config.runtime.profile_digest,hash(readStableBytes(profilePath,'previous component profile')));
   assert.equal(canonicalDigest(config.policy),canonicalDigest(history.policy));assert.equal(canonicalDigest(config.runtime),history.policy.runtime_digest);
@@ -45,7 +46,7 @@ export function buildNextComponentInstructionLoopProfile({root,profilePath,confi
   const fresh=feedback??(old.policy.observation.kind==='instruction_loop_continuation_v1'?old.policy.observation.feedback:old.policy.observation);
   const prepared=prepareNextSupervisedInstructionLoop({root,reportRevision,nextPolicy:{...history.policy,id,observation:fresh,
     application_anchor:p.previousAppliedRun?{run_root:p.previousAppliedRun,journal_digest:p.previousAppliedJournalDigest}:null},
-    resultSummary:`Previous outcome ${history.outcome}. All-attempt resources: ${JSON.stringify(history.report?.resources_all_attempts??null)}. Missing measurements remain Unknown.`});
+    resultSummary:discarded?null:`Previous outcome ${history.outcome}. All-attempt resources: ${JSON.stringify(history.report?.resources_all_attempts??null)}. Missing measurements remain Unknown.`});
   p.policy=prepared.policy;delete p.policy.runtime_digest;
   return {profile:p,output_root:outputRoot};
 }

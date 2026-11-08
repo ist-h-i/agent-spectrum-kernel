@@ -14,6 +14,7 @@ const sourceNames=['instruction-loop-operation.mjs','instruction-loop-runtime.mj
 const filePin=path=>({path,digest:hash(readStableBytes(path,'operation source',16*1024*1024))});
 function checkedConfig(path){const c=readJsonFileStrict(path,'operation cycle configuration',16*1024*1024);assert.equal(c.policy.runtime_digest,canonicalDigest(c.runtime));return c;}
 function record(root,cycle,journalDigest){return {root,run_id:cycle.run_id,outcome:cycle.final.outcome,journal_digest:journalDigest,
+  ...(cycle.result_disposition?{result_disposition:cycle.result_disposition}:{}),
   candidate_digest:canonicalDigest(cycle.final.candidate),report_digest:cycle.report?canonicalDigest(cycle.report):null,
   resources_all_attempts:cycle.report?.resources_all_attempts??null,generation_observation:cycle.final.candidate.execution??null};}
 function summary(s,cycle){
@@ -90,7 +91,7 @@ export async function advanceInstructionLoopOperation({root,profilePath,configPa
       const cycle=await advanceSupervisedInstructionLoop({root:s.current.root,policy:config.policy,runtime,decision,assessment,requestRestore,reportRevision});
       decision=null;assessment=null;requestRestore=false;reportRevision=null;
       if(cycle.status!=='completed'){s.status=cycle.status;appendRunJournal(root,'cycle_paused',s);return summary(s,cycle);}
-      if(cycle.final.outcome==='no_change'||s.records.length+1>=maxCycles||cycle.final.outcome==='restored'){
+      if(cycle.result_disposition?.disposition==='discarded'||cycle.final.outcome==='no_change'||s.records.length+1>=maxCycles||cycle.final.outcome==='restored'){
         s.status='completed';appendRunJournal(root,'operation_completed',s);return summary(s,cycle);
       }
       const index=s.records.length+2,journal=readRunJournal(s.current.root);
