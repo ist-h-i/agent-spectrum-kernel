@@ -7,7 +7,7 @@ import { canonicalDigest, assertNoSymlinkPathSegments, readJsonFileStrict,
   writeCanonicalJsonNoReplace } from './content-addressed-store.mjs';
 import { readRunJournal as journal, appendRunJournal as append, lockRunJournal as lock } from './instruction-run-journal.mjs';
 import { projectInstructionLoopObservation, assertPublicInstructionSummary, summarizeInstructionLoopEvaluation } from './instruction-loop-feedback.mjs';
-import {readPracticalGradeSupplementContinuation,readAdmittedPracticalGradeSupplement} from './practical-grade-supplement.mjs';
+import {readPracticalGradeSupplementContinuation,readAdmittedPracticalGradeSupplement} from './practical-grade-report-revision.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
 const digest=/^sha256:[a-f0-9]{64}$/u;

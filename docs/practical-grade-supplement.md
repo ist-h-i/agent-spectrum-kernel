@@ -182,3 +182,12 @@ read the admitted report by its immutable digest and exact journal admission
 event, so moving to a subsequent cycle or cleaning owned staging does not require
 re-running old graders. This data reader cannot admit a new revision or grant
 another verification call.
+
+## A separate new grading round or evidence derivation
+
+The unused-verifier contract above remains intentionally narrow. For an explicitly
+budgeted new grading procedure on retained answers, including valid low or range
+results, use [retained grading report admission](practical-retained-grade-report.md).
+It imports a separately identified result with a pinned model-free inspector; it
+does not reopen a consumed verifier or rerun a Task. Both kinds use the existing
+fresh result/change packet and next-cycle feedback path.
