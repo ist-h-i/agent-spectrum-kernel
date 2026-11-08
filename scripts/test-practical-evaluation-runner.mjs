@@ -44,6 +44,12 @@ test('automatic recovery receives the current case decision separately from earl
   assert.deepEqual(payload.evaluation_decision,decision);
   assert.equal(payload.improvement_context,f.plan.goal);assert.equal(payload.goal,undefined);
   assert.equal(payload.packet_digest,canonicalDigest(job.input.packet));
+  const current=payload.current_context;assert.equal(current.stage,'evaluation_recovery');assert.equal(current.case_execution_approved,true);assert.equal(current.application_authorized,false);
+  assert.equal(current.evaluation_decision_digest,canonicalDigest(decision));assert.equal(current.plan_digest,canonicalDigest(f.plan));
+  assert.equal(current.extra_trial_budget.remaining,4);assert.equal(current.assessment_packet_budget.reserved_including_current,jobs.indexOf(job)+1);
+  assert.equal(current.assessment_packet_budget.physical_model_calls,'Unknown');
+  const forged=structuredClone(job);forged.input.current_context.evaluation_decision_digest=canonicalDigest('old approval');assert.throws(()=>buildPracticalEvaluationAssessmentPrompt(forged),/approval mismatch/);
+  const old=structuredClone(job);delete old.input.current_context;assert.doesNotThrow(()=>buildPracticalEvaluationAssessmentPrompt(old));
   assert.match(prompt,/previous-run observations are not facts about the current attempt/);
   assert.match(prompt,/does not grant execution or application authority/);
  }
@@ -266,4 +272,37 @@ test('task changes to a pinned workspace grader cannot produce a quality result'
   assert.match(saved.output.reason,/workspace command pin drift/);assert.equal(saved.output.notes.outcome,'unknown');
   assert.equal(saved.output.task.exit_code,0);assert.equal(saved.output.ready_for_next_root,true);assert.equal(saved.output.grading_execution_state,'not_started');
   assert.equal(readFileSync(grader,'utf8'),'process.exit(1);\n');
+});
+
+test('queued peer retries reserve the remaining budget while partial evidence can continue',async t=>{
+ const f=fixture(t),trial=f.runtime.trial,seen=[];f.plan.recovery.max_extra_trials=2;
+ f.runtime.trial=async job=>{
+  if(job.input.row.condition==='candidate'&&job.input.attempt===1||job.input.row.condition==='baseline'&&job.input.attempt===2){
+   f.calls.push(job);const r={request_digest:canonicalDigest(job),status:'failed',output:{ready_for_next_root:true,cli_seconds:0.1}};
+   f.receipts.set(canonicalDigest(job),r);return r;
+  }return trial(job);
+ };
+ f.runtime.assess=async job=>{seen.push(structuredClone(job));const p=job.input.packet;
+  return {request_digest:canonicalDigest(job),status:'completed',output:choice(p,seen.length===1?'retry':p.retry_available?'retry':'reference',seen.length===1?'case':p.retry_available?'trial':null)};};
+ const s=await f.run(),end=await f.run({decision:approve(s)});
+ assert.equal(end.status,'completed');assert.equal(end.report.extra_trials,2);assert.equal(f.calls.length,4);
+ assert.deepEqual(seen[1].input.current_context.extra_trial_budget,{maximum:2,used:1,reserved:1,remaining:0});
+ assert.equal(seen[1].input.current_context.row_retry_budget.remaining,1);
+ assert.equal(seen[1].input.packet.remaining_retry_budget,0);assert.equal(seen[1].input.packet.retry_available,false);
+ assert.equal(end.report.all_attempts.length,4);assert.equal(end.report.recovery_decisions[1].assessment.action,'reference');
+});
+test('a fresh case retry replaces its queued peer reservation within the approved cap',async t=>{
+ const f=fixture(t),trial=f.runtime.trial,seen=[];f.plan.recovery.max_extra_trials=3;
+ f.runtime.trial=async job=>{
+  if(job.input.row.condition==='candidate'&&job.input.attempt===1||job.input.row.condition==='baseline'&&job.input.attempt===2){
+   f.calls.push(job);const r={request_digest:canonicalDigest(job),status:'failed',output:{ready_for_next_root:true,cli_seconds:0.1}};
+   f.receipts.set(canonicalDigest(job),r);return r;
+  }return trial(job);
+ };
+ f.runtime.assess=async job=>{seen.push(structuredClone(job));return {request_digest:canonicalDigest(job),status:'completed',output:choice(job.input.packet,'retry','case')};};
+ const s=await f.run(),end=await f.run({decision:approve(s)});
+ assert.equal(end.status,'completed');assert.equal(end.report.extra_trials,3);assert.equal(f.calls.length,5);
+ assert.deepEqual(seen[1].input.current_context.extra_trial_budget,{maximum:3,used:1,reserved:1,remaining:1});
+ assert.deepEqual(f.calls.map(j=>[j.input.row.condition,j.input.attempt]),[['baseline',1],['candidate',1],['baseline',2],['baseline',3],['candidate',2]]);
+ assert.equal(end.report.all_attempts.filter(a=>a.included_in_comparison).length,2);
 });

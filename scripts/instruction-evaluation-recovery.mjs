@@ -14,7 +14,7 @@ export function validateInstructionRecoveryPolicy(p){
   p.required_dimensions.forEach(k=>assert.ok(dimensions.includes(k)));
   return p;
 }
-export function buildInstructionRecoveryPacket({policy,job,result,logicalRow,retriesUsed,extraTrialsUsed,retrySupported}){
+export function buildInstructionRecoveryPacket({policy,job,result,logicalRow,retriesUsed,extraTrialsUsed,extraTrialsReserved=0,retrySupported}){
   validateInstructionRecoveryPolicy(policy);
   const out=result?.output??{},closed=out.ready_for_next_root===true;
   const supplied=out.notes??out;
@@ -43,9 +43,9 @@ export function buildInstructionRecoveryPacket({policy,job,result,logicalRow,ret
         timed_out:phase.timed_out===true,local_group_closed:phase.process_group_closed===true,provider_terminal_confirmed:phase.provider_terminal_confirmed??null}:null];})),
       failure_kind:typeof out.failure_kind==='string'?out.failure_kind.slice(0,100):null},
     declared_evidence_refs:(Array.isArray(supplied.evidence_refs)?supplied.evidence_refs:[]).filter(v=>typeof v==='string'&&v.trim()&&v.length<=512).slice(0,32),
-    retry_available:closed&&issues.length>0&&retrySupported&&retriesUsed<policy.max_retries_per_row&&extraTrialsUsed<policy.max_extra_trials,
+    retry_available:closed&&issues.length>0&&retrySupported&&retriesUsed<policy.max_retries_per_row&&extraTrialsUsed+extraTrialsReserved<policy.max_extra_trials,
     allowed_actions:['use',...(policy.allow_reference?['reference']:[]),...(policy.allow_exclusion?['exclude']:[]),'stop'],
-    remaining_retry_budget:Math.max(0,policy.max_extra_trials-extraTrialsUsed),
+    remaining_retry_budget:Math.max(0,policy.max_extra_trials-extraTrialsUsed-extraTrialsReserved),
     goal:'Use the available evidence to judge practical value. Prefer reference use or exclusion over unnecessary reruns. A grading-only incident does not require repeating the task; preserve its output and useful measurements. Never treat missing data as zero or require a perfect dataset.',
     data_completeness_required:false,raw_logs_included:false};
   if(packet.retry_available)packet.allowed_actions.push('retry');
@@ -66,4 +66,21 @@ export function validateInstructionRecoveryAssessment(packet,assessment){
   if(assessment.action==='use')assert.equal(packet.process_closed,true,'unconfirmed process can only be referenced/excluded or stopped');
   if(packet.issues.length)assert.ok(assessment.comparison_limits.length,'irregular evidence needs a recorded comparison limitation');
   return assessment;
+}
+
+// A bounded snapshot for newly reserved AI assessments. Legacy immutable jobs
+// without it remain readable; this context is never an execution grant.
+export function validateInstructionRecoveryContext(c,{packet,evaluation_decision}){
+ assert.equal(c.kind,'instruction_evaluation_recovery_context_v1');assert.equal(c.stage,'evaluation_recovery');
+ assert.match(c.plan_digest,/^sha256:[a-f0-9]{64}$/u);
+ assert.equal(c.packet_digest,canonicalDigest(packet),'recovery context packet mismatch');
+ assert.equal(c.evaluation_decision_digest,canonicalDigest(evaluation_decision),'recovery context approval mismatch');
+ assert.equal(c.case_execution_approved,evaluation_decision?.disposition==='approved');assert.equal(c.application_authorized,false);
+ for(const [key,fields] of [['extra_trial_budget',['used','reserved']],['row_retry_budget',['used']],['assessment_packet_budget',['reserved_including_current']]]){
+  const b=c[key];for(const f of ['maximum','remaining',...fields])assert.ok(Number.isSafeInteger(b[f])&&b[f]>=0,'invalid recovery budget');
+  assert.equal(b.remaining,Math.max(0,b.maximum-fields.reduce((n,f)=>n+b[f],0)),'inconsistent recovery budget');
+  assert.ok(fields.reduce((n,f)=>n+b[f],0)<=b.maximum,'recovery budget overcommitted');
+ }
+ assert.equal(c.assessment_packet_budget.physical_model_calls,'Unknown');
+ return c;
 }
