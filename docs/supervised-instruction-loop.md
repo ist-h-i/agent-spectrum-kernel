@@ -329,3 +329,34 @@ source pins and multi-cycle stopping in
 continuation, feedback and practical recovery suites remain regression checks.
 This is a result-use decision, not evidence that a candidate is good or bad.
 See [ADR 0025](adr/0025-discarded-evaluation-result-use.md).
+
+### A local authoring initialization failure before case approval
+
+For the Full practical inline authoring port, a recognized pre-session Codex
+initialization EPERM can prepare one new read-only authoring job:
+
+```sh
+node scripts/supervised-instruction-loop-cli.mjs recover-authoring-initialization \
+  --root OPERATION --output-root FRESH --id FRESH_ID --reason PUBLIC_REASON
+```
+
+This command prepares configuration only. Advance the returned fresh operation
+with the ordinary model-call grant and stop at its fresh case approval gate.
+The original consumed generate job, failed session and journals remain unchanged.
+The new job preserves the exact authoring input, baseline, provider and grading
+settings. Its run/session/materializations are fresh. Failure diagnostics are
+provenance, not candidate-generation inputs or evaluation evidence.
+
+Admission requires no case judgment, trial or owner effect; exact pinned original
+configuration and request-bound receipt; a closed local child with exit1, empty
+stdout, no saved answer, no timeout/interruption/truncation, and only the known
+app-server initialization EPERM diagnostic. An owned same-user cwd inspection
+must find no remaining local writer. Its scope excludes remote computation and
+open descriptors from another cwd. Remote closure stays **Unknown**.
+
+A canonical slot in the original cycle reserves at most one additional authoring
+job, including across different output roots. The same preparation is idempotent;
+changed intent, chained retries, drift, unknown executions and other diagnostics
+are refused. A partial reservation remains consumed/preserved for inspection.
+This is not a general retry policy or permission to replay Task/Eval/owner work.
+If a saved authoring answer exists, use `recover-authoring` to retain it instead.

@@ -124,3 +124,43 @@ test('advancing the old pre-case gate invalidates the v2 retained origin without
  const h=readRunJournal(f.root);h.state.evaluation_decision={disposition:'approved'};h.state.status='advancing';h.state.gate=null;appendRunJournal(f.root,'later_case_approval',h.state);
  assert.throws(()=>readRetainedFullAuthoring(p.generator.provider.retainedAuthoring));
 });
+
+function initializationFixture(t){
+ const f=fixture(t,{bound:true});rmSync(f.responsePath);f.execution.exit_code=1;delete f.execution.response_ref;
+ f.execution.stdout={text:'',total_bytes:0,truncated:false};const diagnostic='Error: failed to initialize in-process app-server client: Operation not permitted (os error 1)\n';
+ f.execution.stderr={text:diagnostic,total_bytes:Buffer.byteLength(diagnostic),truncated:false};writeFileSync(f.executionPath,JSON.stringify(f.execution));
+ const operationRoot=f.base;const current={root:f.root,profile_path:f.profilePath,profile_digest:hash(readFileSync(f.profilePath)),config_path:f.configPath,config_digest:canonicalDigest(JSON.parse(readFileSync(f.configPath)))};
+ appendRunJournal(operationRoot,'operation_uncertain',{status:'operation_uncertain',current,preparation:null});
+ return {...f,operationRoot,reason:'One fresh read-only authoring retry after observed local initialization failure.'};
+}
+const noWriters=({taskRoot,assessRoot})=>({same_uid_cwd_observation:true,observer_visible:true,matching_writers:[],workers_absent:true,provider_closure_inferred:false,owned_roots:[taskRoot,assessRoot]});
+test('one initialization retry prepares fresh exact-input authoring, preserves consumed work and prevents forks',async t=>{
+ const f=initializationFixture(t),api=await import('./instruction-loop-failed-preparation.mjs');
+ assert.equal(typeof api.prepareFullAuthoringInitializationRetry,'function');
+ const before=readRunJournal(f.root).previous,opBefore=readRunJournal(f.operationRoot).previous;
+ const result=api.prepareFullAuthoringInitializationRetry(f,noWriters),p=JSON.parse(readFileSync(result.profile_path));
+ assert.equal(result.models_started,false);assert.equal(result.approval_carried_forward,false);assert.equal(result.remote_closure,'Unknown');
+ assert.equal(existsSync(result.run_root),false);assert.equal(existsSync(p.generator.provider.sessionRoot),false);
+ assert.equal(canonicalDigest(fullGenerationInput({...p.generator,observation:p.policy.observation})),f.execution.input_digest);
+ assert.equal(readRunJournal(f.root).previous,before);assert.equal(readRunJournal(f.operationRoot).previous,opBefore);
+ assert.deepEqual(api.prepareFullAuthoringInitializationRetry(f,noWriters),result);
+ assert.throws(()=>api.prepareFullAuthoringInitializationRetry({...f,outputRoot:join(f.base,'fork'),id:'fork'},noWriters),/different|reserved/);
+ assert.equal(existsSync(join(f.base,'fork')),false);
+});
+for(const [name,mutate]of [
+ ['stdout activity',f=>f.execution.stdout={text:'{}\n',total_bytes:3,truncated:false}],
+ ['timeout',f=>f.execution.timed_out=true],['truncated stderr',f=>f.execution.stderr.truncated=true],
+ ['other failure',f=>f.execution.stderr.text='unrecognized failure'],['missing input',f=>delete f.execution.input_digest],
+ ['saved answer',f=>writeFileSync(f.responsePath,'{}')],['active writer',f=>f.writers=true],
+ ['parent advancing',f=>{let h=readRunJournal(f.operationRoot);h.state.status='advancing';appendRunJournal(f.operationRoot,'changed',h.state);}]
+])test(`initialization retry rejects ${name} without allocating a new run`,async t=>{
+ const f=initializationFixture(t);mutate(f);writeFileSync(f.executionPath,JSON.stringify(f.execution));const {prepareFullAuthoringInitializationRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
+ assert.equal(typeof prepare,'function');assert.throws(()=>prepare(f,args=>({...noWriters(args),matching_writers:f.writers?[{pid:123}]:[]})));assert.equal(existsSync(f.outputRoot),false);
+});
+
+test('initialization retry refuses a foreign output directory before reserving its slot',async t=>{
+ const f=initializationFixture(t);mkdirSync(f.outputRoot);writeFileSync(join(f.outputRoot,'foreign'),'keep');
+ const {prepareFullAuthoringInitializationRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
+ assert.throws(()=>prepare(f,noWriters),/fresh.*output/);assert.equal(readFileSync(join(f.outputRoot,'foreign'),'utf8'),'keep');
+ assert.equal(existsSync(join(f.root,'.authoring-initialization-retry')),false);
+});
