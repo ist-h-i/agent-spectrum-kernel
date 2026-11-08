@@ -172,3 +172,10 @@ Report missing judgments as Unknown; do not invent runtime acceptance or formal
 admission. Positive host-reported closure is required and does not authenticate
 a provider or prove reviewer independence/evidence truth. Resume the existing
 report by inspection, with no scoring dispatch replay.
+
+
+Before the first case judgment, a completed Full candidate can use supervised
+`reconfigure-evaluation` to repair trusted task commands or per-case graders
+without another authoring call. Keep public cases/criteria and the authoring
+request fixed. The old gate/journal remains unchanged and the fresh packet needs
+human case approval. See `docs/instruction-loop-retained-authoring.md`.

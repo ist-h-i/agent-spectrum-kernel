@@ -84,3 +84,43 @@ test('replacement accepts only pre-case task commands and binds the fresh approv
  const prepared=prepareRetainedFullAuthoringConfiguration(f);assert.equal(JSON.parse(readFileSync(prepared.profile_path)).practical.conditions.baseline.context.cli_version,'fresh host adapter');
  const g=fixture(t),bad=structuredClone(g.p);bad.generator.goal='A different authoring request';g.replacementProfilePath=join(g.base,'bad.json');writeFileSync(g.replacementProfilePath,JSON.stringify(bad));assert.throws(()=>prepareRetainedFullAuthoringConfiguration(g),/replacement may change only/);assert.equal(existsSync(g.outputRoot),false);
 });
+
+function preparedCase(t){
+ const f=fixture(t,{bound:true}),h=readRunJournal(f.root),candidate={source_revision:'synthetic-closed-source',generated_by_this_loop:true};
+ h.state.pending=null;h.state.status='awaiting_evaluation_approval';h.state.gate={kind:'evaluation',packet:{candidate}};
+ h.state.outputs={generate:candidate,register:candidate,select:{case_ids:['public']}};
+ appendRunJournal(f.root,'human_gate',h.state);return f;
+}
+test('pre-evaluation reconfiguration retains the exact closed answer with fresh grader and no approval/model replay',t=>{
+ const f=preparedCase(t),replacement=structuredClone(f.p);replacement.practical.cases=[{id:'public',grader:{argv:['old']}}];
+ // Cases remain identical except for the trusted grader definition.
+ f.p.practical.cases=structuredClone(replacement.practical.cases);writeFileSync(f.profilePath,JSON.stringify(f.p));
+ const config=createNativeInstructionLoopConfiguration(f.profilePath);writeFileSync(f.configPath,JSON.stringify(config));
+ const h=readRunJournal(f.root);h.state.policy=config.policy;appendRunJournal(f.root,'profile_fixture_binding',h.state);
+ replacement.practical.cases[0].grader={argv:['new'],model_calls:false};const path=join(f.base,'replacement.json');writeFileSync(path,JSON.stringify(replacement));
+ const before=readRunJournal(f.root).previous,prepared=prepareRetainedFullAuthoringConfiguration({...f,replacementProfilePath:path,preEvaluation:true}),p=JSON.parse(readFileSync(prepared.profile_path));
+ assert.equal(prepared.models_started,false);assert.equal(prepared.approval_carried_forward,false);assert.equal(prepared.pre_evaluation_reconfiguration,true);
+ assert.equal(readRunJournal(f.root).previous,before);assert.equal(p.practical.cases[0].grader.argv[0],'new');
+ const retained=readRetainedFullAuthoring(p.generator.provider.retainedAuthoring);assert.equal(retained.origin.kind,'retained_full_authoring_origin_v2');assert.equal(retained.origin.source_status,'awaiting_evaluation_approval');
+ assert.deepEqual(retainedFullAuthoringProvider(p.generator.provider,fullGenerationInput({...p.generator,observation:p.policy.observation})).response,f.response);
+ assert.equal(existsSync(prepared.run_root),false);
+});
+for(const [label,mutate] of [
+ ['case approval',s=>s.evaluation_decision={disposition:'approved'}],['pending work',s=>s.pending={kind:'evaluate'}],
+ ['owner plan',s=>s.outputs.plan={}],['wrong gate',s=>s.gate.kind='result'],['trial',s=>s.trials.push({})],
+])test(`pre-evaluation reconfiguration refuses ${label}`,t=>{
+ const f=preparedCase(t),h=readRunJournal(f.root);mutate(h.state);appendRunJournal(f.root,'changed',h.state);
+ assert.throws(()=>prepareRetainedFullAuthoringConfiguration({...f,preEvaluation:true}));assert.equal(existsSync(f.outputRoot),false);
+});
+test('pre-evaluation replacement cannot change public cases or the authoring request',t=>{
+ const f=preparedCase(t),replacement=structuredClone(f.p);replacement.practical.cases=[{id:'different',files:[]}];
+ const path=join(f.base,'replacement.json');writeFileSync(path,JSON.stringify(replacement));
+ assert.throws(()=>prepareRetainedFullAuthoringConfiguration({...f,preEvaluation:true,replacementProfilePath:path}),/replacement may change only/);
+ assert.equal(existsSync(f.outputRoot),false);
+});
+
+test('advancing the old pre-case gate invalidates the v2 retained origin without carrying its approval',t=>{
+ const f=preparedCase(t),prepared=prepareRetainedFullAuthoringConfiguration({...f,preEvaluation:true}),p=JSON.parse(readFileSync(prepared.profile_path));
+ const h=readRunJournal(f.root);h.state.evaluation_decision={disposition:'approved'};h.state.status='advancing';h.state.gate=null;appendRunJournal(f.root,'later_case_approval',h.state);
+ assert.throws(()=>readRetainedFullAuthoring(p.generator.provider.retainedAuthoring));
+});
