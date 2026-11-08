@@ -187,7 +187,7 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
         const assessmentPacketDigest=canonicalDigest(s.recovery.packet);
         const assessmentBudget=s.rows.length+s.plan.recovery.max_extra_trials;
         if(typeof runtime.assess!=='function'||s.assessed_packets.includes(assessmentPacketDigest)||s.assessed_packets.length>=assessmentBudget){s.status='awaiting_ai_recovery';save(s,'ai_recovery_requested');return view(s);}
-        const input={packet:s.recovery.packet,goal:s.plan.goal};
+        const input={packet:s.recovery.packet,goal:s.plan.goal,evaluation_decision:copy(s.evaluation_decision)};
         s.active={kind:'assess',key:'assess-'+s.recovery.entry_id+'-'+assessmentPacketDigest.slice(7,23),input,input_digest:canonicalDigest(input)};
         if(runtime.preflight)await runtime.preflight(s.active,{root});s.assessed_packets.push(assessmentPacketDigest);save(s,'assessment_reserved');
       }
