@@ -68,12 +68,13 @@ export function prepareFailedInstructionLoopConfiguration({root,profilePath,conf
 
 // A distinct admission path: local provider completion is positive, but its
 // already saved answer failed trusted source materialization. No model replay.
-export function prepareRetainedFullAuthoringConfiguration({root,profilePath,configPath,replacementProfilePath=profilePath,outputRoot,id}){
+export function prepareRetainedFullAuthoringConfiguration({root,profilePath,configPath,replacementProfilePath=profilePath,outputRoot,id,preEvaluation=false}){
  root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);replacementProfilePath=resolve(replacementProfilePath);outputRoot=resolve(outputRoot);
  for(const path of [root,profilePath,configPath,replacementProfilePath,outputRoot])assertNoSymlinkPathSegments(path,'retained authoring preparation',{allowMissingLeaf:true});
- const inspected=inspectClosedFullAuthoring({root,profilePath,configPath}),old=inspected.profile,p=json(replacementProfilePath);
- const withoutCommands=v=>{const q=structuredClone(v);delete q.practical.conditions;return q;};
- assert.equal(canonicalDigest(withoutCommands(p)),canonicalDigest(withoutCommands(old)),'replacement may change only pre-case task command conditions; authoring request and baseline remain fixed');
+ const inspected=inspectClosedFullAuthoring({root,profilePath,configPath,preEvaluation}),old=inspected.profile,p=json(replacementProfilePath);
+ const withoutCommands=v=>{const q=structuredClone(v);delete q.practical.conditions;
+  if(preEvaluation&&q.practical.cases)for(const c of q.practical.cases)delete c.grader;return q;};
+ assert.equal(canonicalDigest(withoutCommands(p)),canonicalDigest(withoutCommands(old)),'replacement may change only pre-case task commands and, in reconfiguration mode, graders; authoring request, public cases and baseline remain fixed');
  assert.match(id,/^[A-Za-z0-9._-]{1,100}$/u);assert.notEqual(id,old.policy.id);assert.ok(outputRoot.startsWith(old.protectedRoot+'/'));
  const protectedPaths=[root,old.storeRoot,old.stateRoot,old.generator.baselineSourceRoot,old.generator.candidateRoot,old.generator.fullRoot,
   old.generator.stagingRoot,old.generator.provider.sessionRoot,old.practical.root,old.practical.baselineRoot,old.normal.target,profilePath,configPath,replacementProfilePath].filter(Boolean);
@@ -92,7 +93,7 @@ export function prepareRetainedFullAuthoringConfiguration({root,profilePath,conf
  }
  const nextProfile=join(outputRoot,'profile.json'),nextConfig=join(outputRoot,'config.json');
  const prepared={status:'prepared',profile_path:nextProfile,config_path:nextConfig,run_root:join(outputRoot,'run'),
-  previous_journal_digest:inspected.origin.journal_digest,previous_state_completed:false,models_started:false,retained_authoring:true,approval_carried_forward:false};
+  previous_journal_digest:inspected.origin.journal_digest,previous_state_completed:false,models_started:false,retained_authoring:true,approval_carried_forward:false,...(preEvaluation?{pre_evaluation_reconfiguration:true}:{})};
  if(existsSync(outputRoot)){
   assert.ok(existsSync(receiptPath),'partial recovery preparation preserved; select a fresh output root');
   const receipt=json(receiptPath);assert.equal(receipt.intent_digest,canonicalDigest(intent),'different retained recovery intent');

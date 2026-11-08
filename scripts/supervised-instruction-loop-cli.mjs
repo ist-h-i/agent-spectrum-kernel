@@ -108,10 +108,10 @@ try{
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     console.log(JSON.stringify(prepareNextSupervisedInstructionLoop({root,nextPolicy:config.policy,reportRevision:options['--report-revision']?readInstructionLoopJson(resolve(options['--report-revision'])):null}),null,2));
   }
-  else if(command==='recover-authoring'){
+  else if(['recover-authoring','reconfigure-evaluation'].includes(command)){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));
     assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
-    console.log(JSON.stringify(prepareRetainedFullAuthoringConfiguration({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),replacementProfilePath:options['--replacement-profile']?resolve(options['--replacement-profile']):resolve(options['--profile']),outputRoot:resolve(options['--output-root']),id:options['--id']}),null,2));
+    console.log(JSON.stringify(prepareRetainedFullAuthoringConfiguration({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),replacementProfilePath:options['--replacement-profile']?resolve(options['--replacement-profile']):resolve(options['--profile']),outputRoot:resolve(options['--output-root']),id:options['--id'],preEvaluation:command==='reconfigure-evaluation'}),null,2));
   }
   else if(command==='recover-preparation'){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));

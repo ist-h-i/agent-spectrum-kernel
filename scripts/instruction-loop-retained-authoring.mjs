@@ -9,14 +9,17 @@ import {fullGenerationInput} from './instruction-loop-full-candidate.mjs';
 const json=path=>readJsonFileStrict(path,'retained Full authoring evidence',16*1024*1024);
 export const retainedAuthoringPin=path=>({path:resolve(path),digest:hash(readStableBytes(resolve(path),'retained Full authoring evidence',16*1024*1024))});
 const checked=ref=>{assert.deepEqual(Object.keys(ref).sort(),['digest','path']);assert.equal(resolve(ref.path),ref.path);assert.deepEqual(retainedAuthoringPin(ref.path),ref,'retained authoring evidence drift');return json(ref.path);};
-export function inspectClosedFullAuthoring({root,profilePath,configPath}){
+export function inspectClosedFullAuthoring({root,profilePath,configPath,preEvaluation=false}){
  root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);
  assert.ok(!existsSync(join(root,'.advance-lock')),'original coordinator lock requires inspection');
  for(const path of [root,profilePath,configPath])assertNoSymlinkPathSegments(path,'original retained authoring evidence');
  const history=readRunJournal(root),s=history.state,p=json(profilePath),config=json(configPath);
  assert.equal(p.kind,'full_practical_instruction_loop_profile_v1','retained authoring recovery requires the inline Full practical port');
- assert.ok(s?.status==='operation_uncertain'&&s.pending?.kind==='generate','only consumed Full generation failure can be recovered');
- assert.ok(!s.evaluation_decision&&!s.trials.length&&Object.keys(s.outputs).length===0,'case or lifecycle effects require their original recovery path');
+ if(preEvaluation){
+  assert.ok(s?.status==='awaiting_evaluation_approval'&&s.pending===null&&s.gate?.kind==='evaluation','only a pending first case judgment can be reconfigured');
+  assert.deepEqual(Object.keys(s.outputs).sort(),['generate','register','select']);
+ }else assert.ok(s?.status==='operation_uncertain'&&s.pending?.kind==='generate','only consumed Full generation failure can be recovered');
+ assert.ok(!s.evaluation_decision&&!s.trials.length&&(preEvaluation||Object.keys(s.outputs).length===0),'case or lifecycle effects require their original recovery path');
  assert.equal(canonicalDigest(config.policy),canonicalDigest(s.policy),'original policy drift');
  assert.equal(canonicalDigest(config.runtime),s.policy.runtime_digest,'original runtime drift');
  assert.equal(config.runtime.kind,'full_practical_instruction_loop_runtime_v1');assert.equal(config.runtime.profile_path,profilePath);
@@ -24,7 +27,9 @@ export function inspectClosedFullAuthoring({root,profilePath,configPath}){
  assert.equal(canonicalDigest({...p.policy,runtime_digest:s.policy.runtime_digest}),canonicalDigest(s.policy));
  for(const ref of config.runtime.source_pins)assert.deepEqual(retainedAuthoringPin(ref.path),ref,'original runtime source drift');
  assert.equal(p.generator.provider.kind,'codex');
- assert.equal(canonicalDigest(s.pending.input.observation),canonicalDigest(p.policy.observation));
+ const jobs=preEvaluation?history.events.map(e=>e.state.pending).filter(j=>j?.kind==='generate'):[s.pending];
+ const uniqueJobs=new Map(jobs.map(j=>[canonicalDigest(j),j]));assert.equal(uniqueJobs.size,1,'one exact authoring job required');
+ const job=[...uniqueJobs.values()][0];assert.equal(canonicalDigest(job.input.observation),canonicalDigest(p.policy.observation));
  const session=p.generator.provider.sessionRoot,executionPath=join(session,'provider-execution.json'),responsePath=join(session,'last-message.json');
  const execution=json(executionPath),response=json(responsePath);
  assert.equal(execution.kind,'full_authoring_execution_v1');
@@ -48,15 +53,15 @@ export function inspectClosedFullAuthoring({root,profilePath,configPath}){
  if(execution.input_digest!==undefined)assert.equal(execution.input_digest,canonicalDigest(input),'recorded authoring input differs');
  if(execution.response_ref!==undefined)assert.deepEqual(execution.response_ref,retainedAuthoringPin(responsePath));
  assert.equal(readRunJournal(root).previous,history.previous,'original run changed during inspection');
- return {profile:p,input,response,origin:{kind:'retained_full_authoring_origin_v1',root,journal_digest:history.previous,
+ return {profile:p,input,response,origin:{kind:preEvaluation?'retained_full_authoring_origin_v2':'retained_full_authoring_origin_v1',root,journal_digest:history.previous,
   profile:retainedAuthoringPin(profilePath),config:retainedAuthoringPin(configPath),execution:retainedAuthoringPin(executionPath),response:retainedAuthoringPin(responsePath),
-  failed_job_digest:canonicalDigest(s.pending),input_digest:canonicalDigest(input),input_evidence:execution.input_digest?'recorded_request_digest':'reconstructed_from_pinned_profile_and_source',
+  ...(preEvaluation?{authoring_job_digest:canonicalDigest(job),source_status:s.status,source_candidate_digest:canonicalDigest(s.outputs.register)}:{failed_job_digest:canonicalDigest(job)}),input_digest:canonicalDigest(input),input_evidence:execution.input_digest?'recorded_request_digest':'reconstructed_from_pinned_profile_and_source',
   closure_scope:execution.closure_scope,previous_state_completed:false,approval_carried_forward:false}};
 }
 export function readRetainedFullAuthoring(ref){
- const origin=checked(ref);assert.equal(origin.kind,'retained_full_authoring_origin_v1');
+ const origin=checked(ref);assert.ok(['retained_full_authoring_origin_v1','retained_full_authoring_origin_v2'].includes(origin.kind));
  checked(origin.profile);checked(origin.config);checked(origin.execution);checked(origin.response);
- const inspected=inspectClosedFullAuthoring({root:origin.root,profilePath:origin.profile.path,configPath:origin.config.path});
+ const inspected=inspectClosedFullAuthoring({root:origin.root,profilePath:origin.profile.path,configPath:origin.config.path,preEvaluation:origin.kind==='retained_full_authoring_origin_v2'});
  assert.equal(canonicalDigest(inspected.origin),canonicalDigest(origin),'retained authoring origin changed');
  return inspected;
 }

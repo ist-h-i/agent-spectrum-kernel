@@ -42,3 +42,16 @@ No new sharing, Registry, dependency or model authority is introduced.
 Review before admitting after-case or owner effects, uncertain provider work,
 multiple responses, changed requests or additional provider kinds. Formal
 R01..R07 in `docs/instruction-loop-retained-authoring.md` cover this boundary.
+
+
+## Pre-case grader refresh (2026-11-08)
+
+The same retained answer can also be prepared from an unfinished first case
+gate, before any case approval/trial or lifecycle effects. A distinct CLI
+`reconfigure-evaluation` and v2 origin name the successful source status and
+candidate instead of claiming a failed job. The original journal stays fixed.
+Only task commands and per-case grader definitions may change, with the public
+case inputs, criteria references, authoring request, baseline and owner unchanged.
+Normal source validation and a fresh human case packet remain mandatory; no
+authoring provider replay is possible. Advancing the old source gate invalidates
+reuse rather than silently transferring authority. See the pre-evaluation spec.

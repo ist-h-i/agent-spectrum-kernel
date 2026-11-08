@@ -64,3 +64,28 @@ Implementation Contract:
 - Proof: Formal R01..R07; software tests imply no improvement effectiveness.
 - Handoff: actual retained candidate preparation and static checks only; new Eval
   cases and actual target application still require the user's separate judgments.
+
+
+## Repair a grader before the first Eval approval
+
+Use `reconfigure-evaluation --root OLD_RUN --profile OLD_PROFILE --config OLD_CONFIG
+--replacement-profile REPAIRED_PROFILE --output-root FRESH --id NEW_ID` only while
+the original run is awaiting its first evaluation judgment. It requires no pending
+work, trials or case decision and exactly generate/register/select outputs. The
+retained positive provider receipt and exact request/response remain authoritative.
+Only task command definitions and per-case graders may change; public case files,
+criteria references, policy, authoring request, baseline and owner stay fixed.
+
+The CLI prepares files only. Advance the fresh config (or use `operate` with an
+explicit cycle budget for standard report-recovery parent binding) to validate,
+register and select the retained candidate with zero authoring calls. Review the
+exact new case packet before authorizing any Eval. The previous packet does not
+approve the repaired runtime, and this port cannot import completed trials.
+
+Caller-owned fixed graders can use `instruction-loop-grade-response.mjs` to
+project the full assessment schema to model-owned five-part judgments. A finite
+compatibility correction may remove only exactly matching fixed coverage while
+retaining raw replies and original/normalized digests. Conflicting coverage or
+other metadata remains invalid. This helper neither grades source nor grants
+model permission. Keep projected packet/capsule inventories identical for the
+existing retained-source binding; never exempt a schema file from that binding.
