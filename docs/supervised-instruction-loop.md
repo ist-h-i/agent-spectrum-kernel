@@ -264,3 +264,25 @@ and results without inheriting approval. Adapter-neutral authoring supports
 individual Skill/Prompt revisions, declared root additions and environment-only
 exclusion through the existing compiler. Offline packages and local composition
 locks enter the receiver's candidate/Portfolio workflow and never grant admission.
+
+### Current recovery authority and retry reservations
+
+For newly reserved practical recovery assessments, `current_context` records the
+current stage, exact plan/packet/approved case decision digests, Task retry budget,
+current-row retry budget, and assessment packet slots. The Task budget subtracts
+both dispatched retries and queued peer retries. A whole-case retry replaces its
+own queued targets before calculating reservations; it cannot spend another
+pending retry's slot. The runner checks the budget again before dispatch.
+
+The persisted human case decision and packet constrain evaluation recovery.
+Earlier preparation text remains historical improvement context and does not
+cancel a later case approval. Neither the snapshot nor an AI judgment grants owner
+application permission, declares an unresolved process closed, widens the approved
+cases, or changes the plan's budgets. Assessment packet slots are not measured
+physical model calls; provider usage can remain Unknown. Existing consumed jobs
+retain their immutable inputs, and older jobs without the snapshot remain valid.
+
+When no retry slot remains, AI can still choose permitted use, reference, exclusion,
+or stop with a recorded reason and comparison limits. Original attempts and their
+costs remain in the report. A grading-only incident should reuse the retained
+answer and available measurements rather than automatically repeat the Task.

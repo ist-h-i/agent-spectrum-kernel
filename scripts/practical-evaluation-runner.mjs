@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { canonicalDigest, assertNoSymlinkPathSegments } from './content-addressed-store.mjs';
 import { readRunJournal, appendRunJournal, lockRunJournal } from './instruction-run-journal.mjs';
 import { buildPragmaticEvaluationReport } from './ask-pragmatic-evaluation-report.mjs';
-import { buildInstructionRecoveryPacket, validateInstructionRecoveryPolicy, validateInstructionRecoveryAssessment } from './instruction-evaluation-recovery.mjs';
+import { buildInstructionRecoveryPacket, validateInstructionRecoveryPolicy, validateInstructionRecoveryAssessment, validateInstructionRecoveryContext } from './instruction-evaluation-recovery.mjs';
 import {inspectPracticalQualityObservation} from './practical-quality-observation.mjs';
 import {validatePracticalInitializationClearance} from './practical-initialization-clearance.mjs';
 import {assertIsolatedEvaluationJob,activeIsolatedPracticalRows} from './practical-isolated-grade-continuation.mjs';
@@ -42,13 +42,26 @@ function view(s){return {status:s.status,pending_gate:s.gate??null,pending_recov
   assessment_rejections:s.rejected_assessments??[],last_ai_stop:s.last_stop??null,
   attempts:s.attempts.length,recovery_decisions:s.decisions,report:s.report??null,change_approval_required:true,application_performed:false};}
 function clearanceFor(s,attemptId){return(s.continuation_clearances??[]).find(c=>c.original_attempt_id===attemptId);}
+const queuedExtraTrials=(s,exclude=new Set())=>s.queue.filter(q=>!exclude.has(rowKey(q.row))&&(s.counts[rowKey(q.row)]??0)>0).length;
 function packet(s,runtime){const r=s.recovery,p=buildInstructionRecoveryPacket({policy:s.plan.recovery,job:r.job,result:r.result,
-  logicalRow:r.row,retriesUsed:(s.counts[rowKey(r.row)]??1)-1,extraTrialsUsed:s.extra_trials,retrySupported:runtime.retrySupported!==false});
+  logicalRow:r.row,retriesUsed:(s.counts[rowKey(r.row)]??1)-1,extraTrialsUsed:s.extra_trials,extraTrialsReserved:queuedExtraTrials(s),retrySupported:runtime.retrySupported!==false});
  const clearance=clearanceFor(s,r.entry_id);
  if(clearance){p.continuation_clearance_digest=canonicalDigest(clearance);p.safe_to_continue=true;p.continuation_scope=clearance.scope;
   p.comparison_constraints=clearance.limits;
-  if(runtime.retrySupported!==false&&(s.counts[rowKey(r.row)]??1)<=s.plan.recovery.max_retries_per_row&&s.extra_trials<s.plan.recovery.max_extra_trials){p.retry_available=true;if(!p.allowed_actions.includes('retry'))p.allowed_actions.push('retry');}}
+  if(runtime.retrySupported!==false&&(s.counts[rowKey(r.row)]??1)<=s.plan.recovery.max_retries_per_row&&s.extra_trials+queuedExtraTrials(s)<s.plan.recovery.max_extra_trials){p.retry_available=true;if(!p.allowed_actions.includes('retry'))p.allowed_actions.push('retry');}}
  return p;}
+function recoveryContext(s){
+ const maximum=s.plan.recovery.max_extra_trials,reserved=queuedExtraTrials(s),used=s.extra_trials;
+ const rowUsed=(s.counts[rowKey(s.recovery.row)]??1)-1,rowMax=s.plan.recovery.max_retries_per_row;
+ const assessmentMax=s.rows.length+maximum,assessmentReserved=s.assessed_packets.length+1;
+ const context={kind:'instruction_evaluation_recovery_context_v1',stage:'evaluation_recovery',
+  plan_digest:canonicalDigest(s.plan),packet_digest:canonicalDigest(s.recovery.packet),
+  evaluation_decision_digest:canonicalDigest(s.evaluation_decision),case_execution_approved:s.evaluation_decision?.disposition==='approved',application_authorized:false,
+  extra_trial_budget:{maximum,used,reserved,remaining:Math.max(0,maximum-used-reserved)},
+  row_retry_budget:{maximum:rowMax,used:rowUsed,remaining:Math.max(0,rowMax-rowUsed)},
+  assessment_packet_budget:{maximum:assessmentMax,reserved_including_current:assessmentReserved,remaining:Math.max(0,assessmentMax-assessmentReserved),physical_model_calls:'Unknown'}};
+ return validateInstructionRecoveryContext(context,{packet:s.recovery.packet,evaluation_decision:s.evaluation_decision});
+}
 async function refreshRecovery(s,runtime,root,save){
   if(!s.recovery)return;
   let inspected;try{inspected=await runtime.inspect(s.recovery.job,{root});}catch{return;}
@@ -120,7 +133,7 @@ function applyAssessment(s,assessment,allowedRows=null){
     targets=assessment.retry_scope==='case'?s.rows.filter(row=>row.block_id===r.row.block_id):[r.row];
     if(allowedRows)assert.ok(targets.every(row=>allowedRows.has(row.id)),'retry target is outside the admitted unattempted rows');
     const additional=targets.filter(row=>(s.counts[rowKey(row)]??0)>0).length;
-    assert.ok(s.extra_trials+additional<=s.plan.recovery.max_extra_trials,'paired retry exceeds approved extra-trial budget');
+    assert.ok(s.extra_trials+queuedExtraTrials(s,new Set(targets.map(rowKey)))+additional<=s.plan.recovery.max_extra_trials,'paired retry exceeds approved extra-trial budget');
     assert.ok(targets.every(row=>(s.counts[rowKey(row)]??0)<=s.plan.recovery.max_retries_per_row),'per-row retry budget exhausted');
     assert.ok(targets.every(row=>!s.attempts.some(a=>rowKey(a.row)===rowKey(row)&&a.result.output?.ready_for_next_root!==true&&!clearanceFor(s,a.id))),
       'a target has an unresolved process; AI cannot authorize duplicate execution');
@@ -192,7 +205,7 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
         const assessmentPacketDigest=canonicalDigest(s.recovery.packet);
         const assessmentBudget=s.rows.length+s.plan.recovery.max_extra_trials;
         if(typeof runtime.assess!=='function'||s.assessed_packets.includes(assessmentPacketDigest)||s.assessed_packets.length>=assessmentBudget){s.status='awaiting_ai_recovery';save(s,'ai_recovery_requested');return view(s);}
-        const input={packet:s.recovery.packet,goal:s.plan.goal,evaluation_decision:copy(s.evaluation_decision)};
+        const input={packet:s.recovery.packet,goal:s.plan.goal,evaluation_decision:copy(s.evaluation_decision),current_context:recoveryContext(s)};
         s.active={kind:'assess',key:'assess-'+s.recovery.entry_id+'-'+assessmentPacketDigest.slice(7,23),input,input_digest:canonicalDigest(input)};
         if(runtime.preflight)await runtime.preflight(s.active,{root});s.assessed_packets.push(assessmentPacketDigest);save(s,'assessment_reserved');
       }
@@ -200,6 +213,7 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
         if(!s.queue.length){s.report=report(s);s.status='completed';save(s,'reported');return view(s);}
         if(allowedRows)assert.ok(allowedRows.has(s.queue[0].row.id),'queued trial is outside the admitted unattempted rows');
         const item=s.queue.shift(),count=(s.counts[rowKey(item.row)]??0)+1;
+        if(count>1)assert.ok(s.extra_trials<s.plan.recovery.max_extra_trials,'approved extra-trial budget exhausted before dispatch');
         const input={row:item.row,attempt:count,cohort:item.cohort,case:plan.cases.find(c=>c.id===item.row.case_id),
           condition_context:plan.conditions.find(c=>c.id===item.row.condition).context,
           evaluation_decision:s.evaluation_decision,retry_of:item.retry_of??null,recovery_decision_digest:item.decision_digest??null};
