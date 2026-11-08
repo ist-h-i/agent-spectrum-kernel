@@ -1,3 +1,4 @@
+import {validateInstructionResultDiscard} from './instruction-loop-result-disposition.mjs';
 // Work summaries are explicitly supplied by the host. Never scrape task logs.
 import assert from 'node:assert/strict';
 import { canonicalDigest } from './content-addressed-store.mjs';
@@ -174,6 +175,15 @@ export function projectInstructionLoopObservation(observation) {
     assert.match(p.run_id,/^[A-Za-z0-9._-]+$/u);for(const key of ['journal_digest','policy_digest','failed_job_digest','result_digest'])assert.match(p[key],/^sha256:[a-f0-9]{64}$/u);
     assert.ok(['generate','register','select'].includes(p.failed_stage));assert.equal(p.previous_state_completed,false);assert.equal(p.approval_carried_forward,false);assertPublicInstructionSummary(p.reason_summary);
     return {...feedback,previous_failed_run:structuredClone(p)};
+  }
+  if (observation.kind === 'instruction_loop_discarded_continuation_v1') {
+    assert.deepEqual(Object.keys(observation).sort(),['feedback','kind','previous']);
+    const feedback=projectInstructionLoopObservation(observation.feedback),p=observation.previous;
+    assert.deepEqual(Object.keys(p).sort(),['candidate_digest','journal_digest','outcome','policy_digest','result_disposition','run_id']);
+    for(const k of ['journal_digest','policy_digest','candidate_digest'])assert.match(p[k],/^sha256:[a-f0-9]{64}$/u);
+    assert.match(p.run_id,/^[a-zA-Z0-9._-]{1,100}$/u);assert.match(p.outcome,/^[a-z_]{1,80}$/u);
+    validateInstructionResultDiscard(p.result_disposition);assertPublicInstructionSummary(p.result_disposition.reason);
+    return {...feedback,previous_cycle:structuredClone(p)};
   }
   if (observation.kind === 'instruction_loop_continuation_v1') {
     assert.deepEqual(Object.keys(observation).sort(), ['feedback', 'kind', 'previous']);
