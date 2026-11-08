@@ -116,6 +116,26 @@ that the evidence is true. See `docs/instruction-loop-fixed-reference-scoring.md
 A consumed unknown grader is inspected; a local worker exit alone cannot close a
 provider. Missing optional judgments retain usable execution evidence as Unknown.
 
+For a closed invalid primary with its original verifier still unused, follow
+`docs/practical-grade-supplement.md`. If an identified grading/protocol problem
+requires a new grading round after roles are consumed, keep the same saved
+answers and fixed criteria, use an explicit grading budget and the same method
+for both conditions, and retain every original/new result and reason. A low
+score alone is not a reason to rerun a judge. Complete the judgment structure
+while preserving item-level unknowns; unavailable runtime evidence does not
+automatically require whole-answer abstention. Do not invent missing evidence.
+
+Import the resulting paired latest-attempt source judgments or deterministic
+evidence derivation through `scripts/practical-retained-grade-report-cli.mjs`
+and a pinned caller-owned model-free inspector. The host AI prepares this adapter,
+records the fresh use/reference/exclude assessments and publishes the report.
+This is routine AI work, not a third human judgment. The inspector grants no
+new grading model permission; it binds existing results, all consumed cost and
+missingness without changing Task measurements or claiming runtime qualification.
+Use the published reference with the normal `operate --report-revision` path.
+See `docs/practical-retained-grade-report.md`; original case/change approvals
+are never transferred to another case packet or changed application packet.
+
 After a positively closed model-free native preparation failure, the host AI can
 use `recover-preparation --root OLD_RUN --profile OLD_PROFILE --config OLD_CONFIG
 --replacement-profile CORRECTED_PROFILE --output-root FRESH --id NEW_ID` on the

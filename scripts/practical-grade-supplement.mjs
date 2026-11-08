@@ -373,8 +373,7 @@ function buildSupplementReport({runRoot,supplements,selections=[]},historicalSna
   next_improvement:'Review the original and supplemented judgments, costs and limitations before a fresh human change decision.'});
  report.original_report_digest=canonicalDigest(base.report);report.grade_supplement_ledger=ledger;
  const consumed_slots=historicalSnapshot??consumedSnapshot(root),executions=executionLedger(root,consumed_slots,options);report.supplement_execution_ledger=executions;
- report.supplemental_grading_overhead={not_in_task_metrics:true,consumed_slots:executions.length,unclosed_slots:executions.filter(v=>!v.closed).length,model_calls:sumResource(executions.map(v=>v.execution?.model_calls)),duration_ms:sumResource(executions.map(v=>v.execution?.duration_ms)),
-  resources:Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(k=>[k,sumResource(executions.map(v=>{const m=v.execution?.metrics??{},value=m[k];return Number.isSafeInteger(value)&&value>=0&&!(k==='cached_tokens'&&Number.isSafeInteger(m.input_tokens)&&value>m.input_tokens)?value:null;}))])),complete_cost:null};
+ report.supplemental_grading_overhead=supplementOverhead(executions);
  report.supplemental_assessment_overhead={kind:'host_ai',count:selections.length,model_calls:null,usage:null,usage_status:'not_collected',not_in_task_metrics:true};
  report.comparison_limits=[...(report.comparison_limits??[]),'Supplemental source judgments and fresh AI dispositions are separate from the original decisions. No runtime certification or inherited change approval.'];
  report.change_approval_required=true;report.application_performed=false;
@@ -409,4 +408,14 @@ export function readAdmittedPracticalGradeSupplement({cycleRoot,reference}){
  assert.equal(p.ledger_digest,canonicalDigest(readout.report.grade_supplement_ledger));assert.equal(p.selection_digest,canonicalDigest(readout.selections));assert.equal(p.human_decision_scope,'explicit_revised_packet');assert.equal(p.approval_carried_forward,false);
  const admission=history.events.find(e=>e.kind==='report_revision_received'&&same(e.state.report_revision,marker)&&same(e.state.outputs.original_report,state.outputs.original_report)&&same(e.state.outputs.report,readout.report));assert.ok(admission,'revision lacks its exact original admission event');
  return {report:copy(readout.report),provenance:copy(p),admission_journal_digest:admission.record_digest};
+}
+
+// Shared read-only precondition for distinct retained grading report contracts.
+export {quiescent as assertPracticalGradeQuiescence};
+export {coordinatorRoots as assertPracticalGradeCoordinators};
+function supplementOverhead(executions){return {not_in_task_metrics:true,consumed_slots:executions.length,unclosed_slots:executions.filter(v=>!v.closed).length,model_calls:sumResource(executions.map(v=>v.execution?.model_calls)),duration_ms:sumResource(executions.map(v=>v.execution?.duration_ms)),
+  resources:Object.fromEntries(['input_tokens','output_tokens','cached_tokens'].map(k=>[k,sumResource(executions.map(v=>{const m=v.execution?.metrics??{},value=m[k];return Number.isSafeInteger(value)&&value>=0&&!(k==='cached_tokens'&&Number.isSafeInteger(m.input_tokens)&&value>m.input_tokens)?value:null;}))])),complete_cost:null};}
+export function snapshotPracticalGradeSupplementExecutions({runRoot,snapshot=null,...options}){
+ const root=rootPath(runRoot),store=practicalGradeSupplementStore(root),consumed_slots=snapshot??(existsSync(store)?consumedSnapshot(root):[]);
+ const executions=executionLedger(root,consumed_slots,options);return {consumed_slots:copy(consumed_slots),executions,overhead:supplementOverhead(executions)};
 }
