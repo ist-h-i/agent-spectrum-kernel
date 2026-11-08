@@ -19,7 +19,7 @@ export function createNativeInstructionLoopConfiguration(profilePath){
   assert.equal(p.kind,'full_native_reference_loop_profile_v1');inspectInstructionLoopProviderSelection(p);assert.equal(p.normal.target,p.policy.normal_target);
   const paths=['instruction-loop-artifact.mjs','instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-host-scoring.mjs','instruction-loop-command-runtime.mjs',
     'instruction-loop-native-prepare.py','instruction-loop-assets.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
-    'retained-instruction-comparison.mjs','retained-instruction-layout.mjs','instruction-environment.mjs','codex-exec-runner.mjs','asset-registry.mjs','content-addressed-store.mjs','instruction-loop-source-binding.mjs','instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs'];
+    'retained-instruction-comparison.mjs','retained-instruction-layout.mjs','instruction-environment.mjs','codex-exec-runner.mjs','asset-registry.mjs','content-addressed-store.mjs','instruction-loop-source-binding.mjs','instruction-loop-feedback.mjs','instruction-loop-result-disposition.mjs','ask-personal-evolution-observation.mjs'];
   const pins=[{path:profilePath,digest:hash(readStableBytes(profilePath,'Full/native profile',16*1024*1024))},...paths.map(name=>({path:join(import.meta.dirname,name),digest:hash(readStableBytes(join(import.meta.dirname,name),'Full/native adapter'))}))];
   const scoringCommand=instructionReferenceScoringCommand(p);
   if(p.report?.fixedScoring)pins.push(p.report.fixedScoring.calculator,...p.report.fixedScoring.dependencies);
@@ -36,6 +36,8 @@ export function createNativeInstructionLoopConfiguration(profilePath){
 // This is preparation only: no generation, trial, grading or owner mutation.
 export function buildNextNativeInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null,decisionSummaries={},resultSummary=null,reportRevision=null}){
   const old=readJsonFileStrict(resolve(profilePath)),history=readCompletedInstructionLoopContinuation(root);
+  const discarded=history.result_disposition?.disposition==='discarded';
+  if(discarded){assert.ok(feedback!==null,'discarded result requires explicit fresh feedback');assert.equal(resultSummary,null,'discarded result cannot supply a result summary');assert.equal(reportRevision,null,'discarded result cannot supply a report revision');}
   const previousConfig=readJsonFileStrict(resolve(configPath));
   assert.equal(canonicalDigest(previousConfig.policy),canonicalDigest(history.policy),'previous configuration policy differs from completed run');
   assert.equal(canonicalDigest(previousConfig.runtime),history.policy.runtime_digest,'previous runtime configuration drift');
@@ -100,7 +102,7 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
   }
   const freshFeedback=feedback??(old.policy.observation.kind==='instruction_loop_continuation_v1'?old.policy.observation.feedback:old.policy.observation);
   const prepared=prepareNextSupervisedInstructionLoop({root,nextPolicy:{...history.policy,id,observation:freshFeedback},decisionSummaries,reportRevision,
-    resultSummary:resultSummary??`Previous observed result metrics (not formal admission): ${JSON.stringify(metrics)}. Missing components remain unknown.`});
+    resultSummary:discarded?null:resultSummary??`Previous observed result metrics (not formal admission): ${JSON.stringify(metrics)}. Missing components remain unknown.`});
   assert.equal(prepared.policy.observation.previous.journal_digest,history.journal_digest,'previous cycle changed during preparation');
   p.policy=prepared.policy;delete p.policy.runtime_digest;
   return {profile:p,output_root:outputRoot};

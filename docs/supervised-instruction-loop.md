@@ -286,3 +286,46 @@ When no retry slot remains, AI can still choose permitted use, reference, exclus
 or stop with a recorded reason and comparison limits. Original attempts and their
 costs remain in the report. A grading-only incident should reuse the retained
 answer and available measurements rather than automatically repeat the Task.
+## Discard an evaluation result without deleting its candidate
+
+At a result-only gate (`normal_target:null`), an explicit human
+`--decision discarded` completes as `result_discarded_retained`. No model, Task,
+apply, restore, retire or cleanup is dispatched. Candidate materializations,
+Registry records, original reports, revisions and costs remain audit evidence.
+Ordinary `rejected` retains its existing meaning and can still inform a later
+improvement; it is not silently upgraded to discard.
+
+A discarded cycle has a typed `result_disposition` binding the source journal,
+original/effective report, human result decision and optional report revision.
+`readCompletedInstructionLoopContinuation` returns no report for use. The
+separate `instruction_loop_discarded_continuation_v1` projection carries only
+opaque lineage and the discard reason, with explicit fresh public feedback;
+it includes no case/score/resource/failure summary. Report-revision and result-
+summary overrides cannot restore the result. Full/native and component builders
+require fresh feedback, do not update observed costs from the discarded report,
+and retain the unapplied baseline. A bounded operation stops after discard even
+when more cycles were budgeted; it does not automatically author another cycle.
+
+For a historical completed `result_rejected_retained` cycle, a host acting on an
+explicit human discard request may call
+`discardCompletedInstructionLoopResult({root,operationRoot,expectedJournalDigest,
+expectedReportDigest,expectedDecisionDigest,expectedRevisionDigest,reason})`.
+The current journal, effective report, recorded rejected result decision and
+revision digest must match. The parent operation is required for this historical API, so both
+coordinators are locked and reread; it must be completed at this cycle with no
+reserved next preparation. Historical standalone cycles are not an admitted
+target; newly prepared standalone cycles can use the result-gate decision. The API appends the marker without overwriting the
+old decision, final outcome or reports. Identical requests are idempotent;
+changed requests, applied/approved results, live gates, locks and foreign
+parents reject. An old frozen implementation is not rewritten or migrated;
+use a controller that understands the disposition for future preparation.
+
+Verification contract `discarded-result-use@1` (formal: lifecycle/persistence,
+human authority and regression) covers explicit discard with no dispatch,
+legacy append/idempotency/drift/locks, normal rejection compatibility, strict
+projection and revival refusal, native/component no-result input, fresh feedback,
+source pins and multi-cycle stopping in
+`scripts/test-instruction-loop-result-discard.mjs`. Existing supervised, operation,
+continuation, feedback and practical recovery suites remain regression checks.
+This is a result-use decision, not evidence that a candidate is good or bad.
+See [ADR 0025](adr/0025-discarded-evaluation-result-use.md).
