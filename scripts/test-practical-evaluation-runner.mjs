@@ -25,6 +25,29 @@ const approve=s=>({disposition:'approved',packet_digest:canonicalDigest(s.pendin
 const choice=(packet,action='use',retry_scope=null)=>({packet_digest:canonicalDigest(packet),action,retry_scope,
   reason:'Use the useful evidence and repair only the stated irregularity.',selection_basis:retry_scope==='case'?'fair_comparison':action==='retry'?'execution_failure':'practical_reference',
   used_dimensions:packet.available_dimensions,comparison_limits:['Original failures and any replacement selection remain visible; no formal causal claim.']});
+test('automatic recovery receives the current case decision separately from earlier authoring context',async t=>{
+ const f=fixture(t),jobs=[];
+ f.plan.goal='Prepare a candidate only; do not start Eval yet. Previous run shared a CPU load.';
+ f.plan.recovery.required_dimensions.push('quality');
+ const trial=f.runtime.trial;
+ f.runtime.trial=async job=>{const r=await trial(job);r.output.quality_observation_issue='closed grader has no valid judgment';return r;};
+ const {buildPracticalEvaluationAssessmentPrompt}=await import('./practical-evaluation-assessor.mjs');
+ f.runtime.assess=async job=>{jobs.push(structuredClone(job));return {request_digest:canonicalDigest(job),status:'completed',output:choice(job.input.packet,'reference')};};
+ const pending=await f.run();assert.equal(jobs.length,0);
+ const decision={...approve(pending),reason:'Now approve these cases. A higher score may justify reasonable resource increases. '+ 'Retain the full qualification. '.repeat(400)};
+ const end=await f.run({decision});assert.equal(end.status,'completed');assert.equal(f.calls.length,2);assert.equal(end.report.extra_trials,0);
+ assert.equal(jobs.length,2);
+ for(const job of jobs){
+  assert.deepEqual(job.input.evaluation_decision,decision,'current approved reason must not be lost behind the old plan goal');
+  assert.equal(job.input.goal,f.plan.goal,'retain original plan context in the immutable job');
+  const prompt=buildPracticalEvaluationAssessmentPrompt(job),payload=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1));
+  assert.deepEqual(payload.evaluation_decision,decision);
+  assert.equal(payload.improvement_context,f.plan.goal);assert.equal(payload.goal,undefined);
+  assert.equal(payload.packet_digest,canonicalDigest(job.input.packet));
+  assert.match(prompt,/previous-run observations are not facts about the current attempt/);
+  assert.match(prompt,/does not grant execution or application authority/);
+ }
+});
 for(const scope of ['trial','case'])test(`AI ${scope} retry uses fresh attempts, keeps every original result and records selection`,async t=>{
   const f=fixture(t),trial=f.runtime.trial;
   f.runtime.trial=async job=>{if(job.input.row.condition==='candidate'&&job.input.attempt===1){f.calls.push(job);const result={request_digest:canonicalDigest(job),status:'failed',output:{ready_for_next_root:true,cli_seconds:0.1}};f.receipts.set(canonicalDigest(job),result);return result;}return trial(job);};

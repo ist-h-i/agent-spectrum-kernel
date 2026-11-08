@@ -9,6 +9,17 @@ import {advanceSupervisedInstructionLoop} from './supervised-instruction-loop.mj
 import {inspectPracticalEvaluation} from './practical-evaluation-runner.mjs';
 import {prepareNextNativeInstructionLoopConfiguration} from './instruction-loop-native-configuration.mjs';
 
+test('legacy recovery prompts keep their objective without inventing current approval',async()=>{
+ const {buildPracticalEvaluationAssessmentPrompt}=await import('./practical-evaluation-assessor.mjs?legacy-context');
+ const packet={kind:'fixture',issues:['missing_quality']},goal='Compare useful quality and cost.';
+ const prompt=buildPracticalEvaluationAssessmentPrompt({kind:'assess',input:{packet,goal}});
+ const payload=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1));
+ assert.equal(payload.improvement_context,goal);assert.equal(payload.evaluation_decision,undefined);
+ assert.deepEqual(payload.packet,packet);assert.equal(payload.packet_digest,canonicalDigest(packet));
+ assert.match(prompt,/earlier authoring-stage instructions/);
+ assert.match(prompt,/does not grant execution or application authority/);
+});
+
 test('public practical Eval inherits exactly the case approval and returns to the existing result gate, including AI recovery',async t=>{
   const f=environmentFixture(t),baseline=captureInstructionEnvironment({...f.options,selectionObjectDigest:null});
   const candidate=captureInstructionEnvironment({...f.options,selectionObjectDigest:null,environmentId:'fixture-candidate'});

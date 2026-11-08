@@ -99,6 +99,26 @@ are separate from trial resource measurements. Uncertain/consumed assessment
 processes are not blindly replayed; the current host AI can supersede a missing
 assessment with a recorded judgment of the same exact evidence packet.
 
+New automatic assessment jobs also carry the persisted `evaluation_decision`,
+including the human's current case-approval reason. The assessor presents it and
+the current irregularity packet separately from `improvement_context`, which
+preserves the plan's original goal text. Full authoring feedback can contain
+earlier instructions to wait for case approval and previous-cycle measurements;
+those must not become current-stage restrictions or facts about this attempt.
+The human's practical quality/resource criteria remain available without a new
+threshold or approval gate. This context grants no model, retry or owner-apply
+authority: the existing journal, action and budget validators still enforce them.
+Legacy assessment jobs without this additive context remain supported. Frozen
+or consumed jobs are not rewritten, migrated or replayed.
+
+Formal recovery-context@1: RC01 forwards the exact persisted case decision into
+a newly reserved assessment; RC02 separates current attempt/decision from earlier
+authoring context in the prompt; RC03 preserves legacy calls and long valid
+approval reasons; RC04 keeps reference continuation, case gates and retry budgets
+unchanged. Model-free regressions are in `test-practical-evaluation-runner.mjs`
+and `test-instruction-loop-practical-runtime.mjs`. This repairs the existing
+recovery context within ADR-0018; no new authority or architectural boundary.
+
 The config is `{plan,runtime}`. `plan` has:
 
 - `kind: practical_evaluation_plan_v1`, bounded `id`, `goal`, `runtime_digest`
