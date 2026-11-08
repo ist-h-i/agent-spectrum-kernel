@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {existsSync,mkdirSync,readdirSync,realpathSync} from 'node:fs';
 import {basename,dirname,join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {canonicalDigest,readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {readRunJournal,lockRunJournal} from './instruction-run-journal.mjs';
@@ -154,21 +155,57 @@ function checkStoredReceipt(receipt,recipe,job,runtime){
  if(receipt.allocation_only){const allocation=json(join(receipt.directory,'allocation.json'));assert.equal(allocation.recipe_digest,receipt.recipe_digest);assert.equal(allocation.runtime_digest,runtime.digest);assert.equal(receipt.closed,false);assert.equal(receipt.quality,null);assert.equal(receipt.result.status,'unknown');return;}
  if(receipt.inspection_error){
   const previous=checkedRef(receipt.previous_receipt);assert.equal(previous.closed,false);checkStoredReceipt(previous,recipe,job,runtime);assert.equal(receipt.closed,false);assert.equal(receipt.quality,null);
+  if(receipt.rejected_observation)verifyRef(receipt.rejected_observation);if(receipt.inspection_observer_definition){const d=checkedRef(receipt.inspection_observer_definition);assert.equal(d.commands.grade.model_calls,false);}
   if(receipt.inspection_transport){const t=checkedRef(receipt.inspection_transport);assert.equal(t.request_digest,receipt.inspection_request_digest);}else assert.equal(receipt.inspection_no_dispatch,true);
   return;
  }
  if(receipt.observation){
   const recorded=checkedRef(receipt.observation),q=checkedRef(receipt.observation_request);assert.equal(recorded.request_digest,canonicalDigest(q));assert.equal(recorded.output.original_request_digest,canonicalDigest(job));
   assert.equal(recorded.output.original_receipt_digest,receipt.previous_receipt.digest);assert.ok(same(recorded.output.result,receipt.result),'closure observation result drift');
-  const previous=checkedRef(receipt.previous_receipt);assert.equal(previous.closed,false);checkStoredReceipt(previous,recipe,job,runtime);return;
+  const previous=checkedRef(receipt.previous_receipt);assert.equal(previous.closed,false);checkStoredReceipt(previous,recipe,job,runtime);
+  if(receipt.closure_observation){const witness=validateClosureOnlyObservation({recorded,request:q,previous,reference:receipt.previous_receipt,directory:receipt.directory,admissionImplementation:receipt.closure_observation.admission_implementation});assert.ok(same(receipt.closure_observation,witness));assert.equal(receipt.closed,true);assert.equal(receipt.quality,null);}return;
  }
  const directory=join(receipt.directory,'execution/jobs',canonicalDigest(job).slice(7)),raw=json(join(directory,'result.json')),transportPath=join(directory,'transport.json');let effective=raw;
  if(existsSync(transportPath)){const transport=json(transportPath);assert.equal(transport.request_digest,canonicalDigest(job));if(transport.exit_code!==0||transport.signal!==null)effective={...raw,status:'failed',output:{...raw.output,transport}};}
  assert.ok(same(effective,receipt.result),'supplement result/receipt drift');
 }
-function finishSupplement(directory,job,runtime,result,{outputPath=join(directory,'receipt.json'),observation=null}={}){
+// A separately pinned observer may establish that a failed local guard never
+// dispatched its provider. It cannot change the failed result or supply quality.
+function validateClosureOnlyObservation({recorded,request,previous,reference,directory,admissionImplementation=null}){
+ assert.equal(previous.closed,false);assert.equal(previous.quality,null);assert.equal(previous.result.status,'failed');
+ assert.equal(recorded.status,'completed');assert.equal(recorded.request_digest,canonicalDigest(request));
+ const input=request.input,out=recorded.output,witness=out.closure_observation;
+ assert.ok(Number.isSafeInteger(input.inspection_index)&&input.inspection_index>=0&&input.inspection_index<256);
+ const current=join(directory,'observations',String(input.inspection_index).padStart(6,'0')),observedJob=join(current,'execution/jobs',canonicalDigest(request).slice(7));
+ assert.equal(input.observer_definition.path,join(current,'observer-definition.json'));
+ assert.ok(same(json(join(observedJob,'request.json')),request)&&same(json(join(observedJob,'result.json')),recorded),'observer native result drift');
+ const observerTransport=ref(join(observedJob,'transport.json')),observedTransport=checkedRef(observerTransport);assert.equal(observedTransport.request_digest,canonicalDigest(request));assert.equal(observedTransport.exit_code,0);assert.equal(observedTransport.signal,null);
+ assert.equal(input.inspection_only,true);assert.equal(input.original_receipt.digest,reference.digest);assert.equal(input.original_receipt.path,reference.path);
+ const definition=checkedRef(input.observer_definition);assert.equal(definition.commands.grade.model_calls,false);assert.deepEqual(Object.keys(definition.commands),['grade']);
+ assert.equal(input.observer_runtime_digest,createReferenceScoringCommandRuntime({definition,modelCallsAuthorized:false}).digest);
+ const native=join(directory,'execution/jobs',previous.request_digest.slice(7));
+ for(const [name,file]of [['original_allocation',join(directory,'allocation.json')],['original_native_request',join(native,'request.json')],['original_native_result',join(native,'result.json')],['original_native_transport',join(native,'transport.json')]]){
+  assert.equal(input[name].path,file);verifyRef(input[name]);assert.ok(same(witness?.[name],input[name]),'closure source binding drift');
+ }
+ assert.equal(canonicalDigest(checkedRef(input.original_native_request)),previous.request_digest);
+ assert.ok(same(checkedRef(input.original_native_result),previous.result),'only an unchanged failed native result can be observed');
+ const allocation=checkedRef(input.original_allocation);assert.equal(allocation.recipe_digest,previous.recipe_digest);assert.equal(allocation.runtime_digest,previous.runtime_digest);assert.equal(allocation.original_attempt_id,previous.attempt_id);
+ const transport=checkedRef(input.original_native_transport);assert.equal(transport.request_digest,previous.request_digest);assert.equal(transport.exit_code,0);assert.equal(transport.signal,null);
+ assert.equal(out.original_request_digest,previous.request_digest);assert.equal(out.original_receipt_digest,reference.digest);
+ for(const key of ['model_calls','task_calls','primary_calls'])assert.equal(out[key],0,'closure observation must not execute models or tasks');
+ assert.ok(same(out.result,previous.result),'closure observer must preserve the original failed result');
+ assert.equal(witness.kind,'verified_pre_dispatch_rejection_v1');assert.equal(witness.no_provider_dispatch,true);assert.equal(witness.local_termination_confirmed,true);
+ assert.ok(typeof witness.reason==='string'&&witness.reason.trim()&&witness.reason.length<=4096);
+ assert.ok(Number.isFinite(witness.duration_ms)&&witness.duration_ms>=0);
+ assert.ok(Array.isArray(witness.evidence_refs)&&witness.evidence_refs.length&&witness.evidence_refs.length<=32);
+ const pins=previous.recipe.binding.grader_pins;
+ for(const evidence of witness.evidence_refs){verifyRef(evidence);assert.ok(evidence.path.startsWith(native+'/')||pins.some(p=>p.path===evidence.path&&p.digest===evidence.digest),'closure evidence outside bound native execution or original grader pins');}
+ const control=admissionImplementation??ref(fileURLToPath(import.meta.url));verifyRef(control);
+ return {...copy(witness),observer_definition:copy(input.observer_definition),observer_runtime_digest:input.observer_runtime_digest,observer_transport:observerTransport,admission_implementation:copy(control),model_calls:0,task_calls:0,primary_calls:0};
+}
+function finishSupplement(directory,job,runtime,result,{outputPath=join(directory,'receipt.json'),observation=null,closureObservation=null}={}){
  if(!['completed','failed','interrupted'].includes(result?.status)&&!observation)return {status:'pending',directory,additional_dispatch_permitted:false};
- const o=result.output??{},recipe=job.input.recipe,closed=o.ready_for_next_root===true&&o.provider_terminal_confirmed===true&&o.process_group_closed===true;
+ const o=result.output??{},recipe=job.input.recipe,closed=closureObservation!==null||o.ready_for_next_root===true&&o.provider_terminal_confirmed===true&&o.process_group_closed===true;
  let quality=null,issue=null;
  try{
   assert.equal(result.status,'completed','failed verification supplies no authoritative quality');
@@ -179,11 +216,12 @@ function finishSupplement(directory,job,runtime,result,{outputPath=join(director
  }catch(error){quality=null;issue=String(error.message).slice(0,2048);}
  const receipt={kind:'practical_grade_supplement_receipt_v1',recipe_digest:canonicalDigest(recipe),runtime_digest:runtime.digest,request_digest:canonicalDigest(job),result_digest:canonicalDigest(result),
   original_result_digest:recipe.original_result_digest,attempt_id:recipe.attempt_id,closed,quality,issue,result:copy(result),recipe:copy(recipe),directory};
- if(observation)Object.assign(receipt,observation);
+ if(observation)Object.assign(receipt,observation);if(closureObservation)receipt.closure_observation=copy(closureObservation);
  save(outputPath,receipt);return {receipt,reference:ref(outputPath)};
 }
 
-export async function inspectPracticalGradeSupplement({reference,recipe:allocatedRecipe=null,definition:allocatedDefinition=null}){
+export async function inspectPracticalGradeSupplement({reference,recipe:allocatedRecipe=null,definition:allocatedDefinition=null,observerDefinition=null}){
+ if(observerDefinition){assert.deepEqual(Object.keys(observerDefinition.commands??{}),['grade']);assert.equal(observerDefinition.commands.grade.model_calls,false,'closure observer must be model-free');createReferenceScoringCommandRuntime({definition:observerDefinition,modelCallsAuthorized:false});}
  if(!reference){
   assert.ok(allocatedRecipe&&allocatedDefinition,'provide the consumed recipe/provider or an existing receipt');const recipe=allocatedRecipe,{a}=checkedRecipe(recipe),directory=slotPath(recipe.run_root,a);
   if(existsSync(directory)&&!existsSync(join(directory,'allocation.json')))return {status:'requires_inspection',directory,reason:'reservation_metadata_missing',additional_dispatch_permitted:false};
@@ -199,22 +237,30 @@ export async function inspectPracticalGradeSupplement({reference,recipe:allocate
     if(!observed.reference){const unknown={request_digest:canonicalDigest(job),status:'unknown',output:{}},receipt={kind:'practical_grade_supplement_receipt_v1',recipe_digest:canonicalDigest(recipe),runtime_digest:runtime.digest,request_digest:canonicalDigest(job),result_digest:canonicalDigest(unknown),original_result_digest:recipe.original_result_digest,attempt_id:recipe.attempt_id,closed:false,quality:null,issue:'Consumed reservation: dispatch/provider outcome remains unknown; inspect only.',result:unknown,recipe:copy(recipe),directory,allocation_only:true};save(join(directory,'receipt.json'),receipt);observed={receipt,reference:ref(join(directory,'receipt.json'))};}
    }
   }finally{for(const unlock of unlocks.reverse())unlock();}
-  if(observed.receipt.closed)return observed;return inspectPracticalGradeSupplement({reference:observed.reference});
+  if(observed.receipt.closed)return observed;return inspectPracticalGradeSupplement({reference:observed.reference,observerDefinition});
  }
  const old=checkedRef(reference),recipe=old.recipe;checkedRecipe(recipe);assert.equal(old.closed,false,'closed verification cannot be regraded by inspection');
  const {a}=checkedRecipe(recipe),directory=slotPath(recipe.run_root,a);assert.equal(old.directory,directory);const definition=json(join(directory,'definition.json')),command=definition.commands.grade;
  const originalRuntime=createReferenceScoringCommandRuntime({definition,modelCallsAuthorized:false}),originalJob={kind:'grade',input:{recipe,recipe_digest:canonicalDigest(recipe),maximum_model_calls:1,task_calls:0,primary_calls:0}};
- checkStoredReceipt(old,recipe,originalJob,originalRuntime);assert.equal(inspectSlot(directory).reference.digest,reference.digest,'inspect the latest retained closure observation');
- if(!command.inspect_argv)return {status:'pending',reason:'provider_has_no_read_only_inspector',additional_dispatch_permitted:false};
+ const validateOriginal=()=>{checkStoredReceipt(old,recipe,originalJob,originalRuntime);assert.ok(same(inspectSlot(directory).reference,reference),'inspect the latest canonical retained closure observation');
+  const allocation=json(join(directory,'allocation.json'));assert.equal(allocation.recipe_digest,old.recipe_digest);assert.equal(allocation.runtime_digest,old.runtime_digest);assert.equal(allocation.original_attempt_id,old.attempt_id);};validateOriginal();
+ if(!observerDefinition&&!command.inspect_argv)return {status:'pending',reason:'provider_has_no_read_only_inspector',additional_dispatch_permitted:false};
  const roots=[...new Set([recipe.run_root,...coordinatorRoots(recipe.run_root,recipe.contract)])].sort(),unlocks=[];
  try{
-  for(const root of roots)unlocks.push(lockRunJournal(root));checkedRecipe(recipe,{held:true});
+  for(const root of roots)unlocks.push(lockRunJournal(root));checkedRecipe(recipe,{held:true});validateOriginal();
   const history=join(directory,'observations');mkdirSync(history,{recursive:true,mode:0o700});const names=readdirSync(history).sort();assert.ok(names.length<256);assert.ok(names.every((v,i)=>v===String(i).padStart(6,'0')),'inspection sequence drift');
   const pending=names.find(name=>!existsSync(join(history,name,'receipt.json')));assert.ok(!pending||pending===names.at(-1),'inspection history gap');
   const index=pending?Number(pending):names.length,current=join(history,String(index).padStart(6,'0'));if(!pending)mkdirSync(current,{mode:0o700});
-  const inspector=createReferenceScoringCommandRuntime({definition:{commands:{grade:{argv:command.inspect_argv,pins:command.pins,model_calls:false}}},modelCallsAuthorized:false});
-  const job={kind:'grade',input:{inspection_only:true,original_job:originalJob,original_receipt:reference,inspection_index:index}},jobDirectory=join(current,'execution/jobs',canonicalDigest(job).slice(7));
-  const result=pending?await inspector.inspect(job,{root:join(current,'execution')}):await inspector.grade(job,{root:join(current,'execution')});checkedRecipe(recipe,{held:true});
+  const observerPath=join(current,'observer-definition.json'),neverDispatched=pending&&readdirSync(current).length===0;
+  if(pending&&existsSync(observerPath))assert.ok(observerDefinition,'pending inspection kind cannot change');
+  if(pending&&!existsSync(observerPath)&&observerDefinition)assert.deepEqual(readdirSync(current),[],'nonempty pending inspection kind cannot change');
+  if(observerDefinition){if(existsSync(observerPath))assert.ok(same(json(observerPath),observerDefinition),'pending observer cannot change');else save(observerPath,observerDefinition);}
+  const inspector=createReferenceScoringCommandRuntime({definition:observerDefinition??{commands:{grade:{argv:command.inspect_argv,pins:command.pins,model_calls:false}}},modelCallsAuthorized:false});
+  const native=join(directory,'execution/jobs',canonicalDigest(originalJob).slice(7));
+  const sourceBinding=observerDefinition?{observer_definition:ref(observerPath),observer_runtime_digest:inspector.digest,
+   original_allocation:ref(join(directory,'allocation.json')),original_native_request:ref(join(native,'request.json')),original_native_result:ref(join(native,'result.json')),original_native_transport:ref(join(native,'transport.json'))}:{};
+  const job={kind:'grade',input:{inspection_only:true,original_job:originalJob,original_receipt:reference,inspection_index:index,...sourceBinding}},jobDirectory=join(current,'execution/jobs',canonicalDigest(job).slice(7));
+  const result=pending&&!neverDispatched?await inspector.inspect(job,{root:join(current,'execution')}):await inspector.grade(job,{root:join(current,'execution')});checkedRecipe(recipe,{held:true});validateOriginal();
   if(result.status!=='completed'){
    const transport=join(jobDirectory,'transport.json'),noDispatch=!existsSync(jobDirectory);if(!existsSync(transport)&&!noDispatch)return {status:'pending',directory:current,additional_dispatch_permitted:false};
    const {allocation_only,observation,observation_request,previous_receipt,inspection_error,inspection_transport,inspection_no_dispatch,inspection_request_digest,inspection_model_calls,...base}=copy(old);
@@ -222,9 +268,20 @@ export async function inspectPracticalGradeSupplement({reference,recipe:allocate
     inspection_request_digest:canonicalDigest(job),...(existsSync(transport)?{inspection_transport:ref(transport)}:{inspection_no_dispatch:true}),inspection_model_calls:0};
    save(join(current,'receipt.json'),receipt);return {receipt,reference:ref(join(current,'receipt.json'))};
   }
-  assert.equal(result.output?.original_request_digest,canonicalDigest(originalJob));assert.equal(result.output?.original_receipt_digest,reference.digest);
-  assert.equal(result.output?.model_calls,0,'inspection cannot start another model');assert.equal(result.output?.task_calls,0);assert.equal(result.output?.primary_calls,0);
-  return finishSupplement(directory,originalJob,originalRuntime,result.output.result,{outputPath:join(current,'receipt.json'),observation:{previous_receipt:reference,
+  let closureObservation=null;
+  try{
+   assert.equal(result.output?.original_request_digest,canonicalDigest(originalJob));assert.equal(result.output?.original_receipt_digest,reference.digest);
+   assert.equal(result.output?.model_calls,0,'inspection cannot start another model');assert.equal(result.output?.task_calls,0);assert.equal(result.output?.primary_calls,0);
+   closureObservation=observerDefinition?validateClosureOnlyObservation({recorded:result,request:job,previous:old,reference,directory}):null;
+  }catch(error){
+   if(!observerDefinition)throw error;
+   const {allocation_only,observation,observation_request,previous_receipt,inspection_error,inspection_transport,inspection_no_dispatch,inspection_request_digest,inspection_model_calls,rejected_observation,inspection_observer_definition,...base}=copy(old);
+   const receipt={...base,closed:false,quality:null,issue:'Closure-only observer was rejected: '+String(error.message).slice(0,1800),previous_receipt:reference,inspection_error:true,
+    inspection_request_digest:canonicalDigest(job),inspection_transport:ref(join(jobDirectory,'transport.json')),inspection_model_calls:0,
+    rejected_observation:ref(join(jobDirectory,'result.json')),inspection_observer_definition:ref(observerPath)};
+   save(join(current,'receipt.json'),receipt);return {receipt,reference:ref(join(current,'receipt.json'))};
+  }
+  return finishSupplement(directory,originalJob,originalRuntime,result.output.result,{outputPath:join(current,'receipt.json'),closureObservation,observation:{previous_receipt:reference,
    observation:ref(join(jobDirectory,'result.json')),observation_request:ref(join(jobDirectory,'request.json')),inspection_model_calls:0}});
  }finally{for(const unlock of unlocks.reverse())unlock();}
 }

@@ -65,6 +65,24 @@ exact request/settings/prompt and output bindings, with no answer and unchanged
 unknown provider state. They are the evidence-preserving successor of the empty
 legacy session; arbitrary saved sessions do not expand the exception.
 
+### Model-free pre-dispatch observations
+
+An optional, separately pinned zero-model observer may supply an exact
+`verified_pre_dispatch_rejection_v1` witness for a failed local guard. Its
+allocation, original native request/result/transport, command definition, source
+evidence and successful observation transport are bound before accepting it.
+Keep the failed result and provider/quality fields unchanged; only a new receipt
+records that the consumed slot is operationally terminal because no provider was
+dispatched. No retry is granted. Other unconsumed logical slots may continue.
+
+This extends the existing inspection boundary rather than adding a second
+dispatcher or importing an AI closure claim. A trusted host executable owns the
+specific guard check. Candidate data cannot configure the observer. Rejected or
+uncertain observations stay unresolved and retain their evidence. Empty
+never-dispatched observation reservations can resume with a zero-model grant;
+execution evidence remains inspect-only. New quality still requires the original
+verification protocol and a fresh host-AI disposition.
+
 ## Alternatives and consequences
 
 Reject clearing markers, repeating Tasks to repair grading, best-score selection,

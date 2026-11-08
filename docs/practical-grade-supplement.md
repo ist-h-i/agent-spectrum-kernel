@@ -50,6 +50,53 @@ has a zero-model-call grant. It appends observations, preserving previous unknow
 or failed observations. A provider without an inspector remains unresolved; do
 not clear its reservation or rerun the model.
 
+### A failed local guard before provider dispatch
+
+A host can configure a separate pinned, model-free observer when the original
+provider inspector cannot interpret a known local guard rejection:
+
+```sh
+node scripts/practical-grade-supplement-cli.mjs inspect \
+  --receipt /absolute/recovery/receipt-ref.json \
+  --observer /absolute/recovery/pinned-closure-observer.json \
+  --output /absolute/recovery/observed-receipt-ref.json
+```
+
+The host chooses trusted executable configuration; candidate assets, recipes and
+model answers cannot select this observer. Its only command is `commands.grade`
+with `model_calls:false`; the runner supplies a zero-model grant. The observation
+must bind the latest canonical receipt, allocation, original request/result/
+transport and pinned evidence. Both parent locks and the evaluation lock protect
+validation before and after it runs. An observer transport failure, uncertain
+dispatch, changed source or invalid witness cannot close the slot.
+
+The observer receives `inspection_only`, the original job/receipt, its sequence
+index and digest references for the original allocation, native request, result
+and transport. It returns the ordinary completed command envelope with zero
+`model_calls`, `task_calls` and `primary_calls`, the two original request/receipt
+digests, and the exact unchanged failed `result`. Its `closure_observation` carries
+`kind: verified_pre_dispatch_rejection_v1`, `no_provider_dispatch: true`,
+`local_termination_confirmed: true`, a reason, `duration_ms`, evidence references
+and the same four original source references. Evidence files must belong to the
+bound native execution or the original grader pins. The host AI prepares this
+adapter; it adds no human approval step.
+
+A successful `verified_pre_dispatch_rejection_v1` witness records that the known
+local guard ended before the provider was invoked. The new receipt can mark that
+consumed slot operationally closed, while its original failed result,
+`provider_terminal_confirmed:false`, unavailable quality and attempted cost remain
+unchanged. The observation is separate evidence, not an upgraded provider result.
+It grants no retry or quality disposition. Only other unconsumed slots may then
+proceed. Observer evidence and duration are retained separately from Task metrics;
+unknown model usage does not become zero.
+
+Rejected observer output is retained in an unresolved observation receipt. A
+fresh model-free observer can inspect that latest reference. A pure empty
+observation reservation can resume its never-dispatched observer; execution
+evidence always requires inspection rather than dispatch. No consumed verifier
+is restarted. A host-specific observer must verify its exact guard contract;
+process-list absence or an AI assertion alone is insufficient.
+
 The AI judges the new packet using `use`, `reference` or `exclude`, recording the
 packet digest, reasons, selection basis, used dimensions and comparison limits.
 It writes the ordinary recovery assessment JSON, then records the once-only
