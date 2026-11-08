@@ -19,7 +19,7 @@ const sourceNames=['practical-grade-report-revision.mjs','practical-retained-gra
   'instruction-loop-practical-runtime.mjs','instruction-loop-retained-authoring.mjs','instruction-environment-authoring.mjs','instruction-composition.mjs','instruction-asset-package.mjs',
   'instruction-environment.mjs','instruction-environment-compiler.mjs','environment-target.mjs','environment-target-owner.mjs',
   'instruction-source-version.mjs','instruction-loop-assets.mjs','instruction-run-journal.mjs','supervised-instruction-loop.mjs',
-  'practical-evaluation-runner.mjs','practical-initialization-clearance.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
+  'practical-evaluation-runner.mjs','practical-isolated-grade-continuation.mjs','practical-isolated-grade-continuation-cli.mjs','practical-initialization-clearance.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
   'instruction-loop-command-runtime.mjs','instruction-loop-feedback.mjs','instruction-loop-case-selection.mjs','ask-pragmatic-evaluation-report.mjs',
   'asset-registry.mjs','content-addressed-store.mjs','installer-lifecycle.mjs','ask-setup-apply-state.mjs','ask-personal-prompt-target-lock.mjs',
   'instruction-projection-paths.mjs','codex-exec-runner.mjs','execution-envelope.mjs','../schemas/instruction-asset-package.schema.json'];

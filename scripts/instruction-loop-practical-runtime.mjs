@@ -15,14 +15,16 @@ import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs
 import {createPracticalEvaluationCommandRuntime} from './instruction-loop-command-runtime.mjs';
 import {advancePracticalEvaluation,inspectPracticalEvaluation} from './practical-evaluation-runner.mjs';
 import {readRunJournal} from './instruction-run-journal.mjs';
+import {assertIsolatedEvaluationJob} from './practical-isolated-grade-continuation.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
 const sourceNames=['practical-grade-report-revision.mjs','practical-retained-grade-report.mjs','practical-grade-supplement.mjs','practical-grade-source-binding.mjs','instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
   'instruction-loop-feedback.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-initialization-clearance.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
-  'instruction-loop-command-runtime.mjs','instruction-run-journal.mjs','ask-pragmatic-evaluation-report.mjs','content-addressed-store.mjs','asset-registry.mjs','codex-exec-runner.mjs'];
+  'practical-isolated-grade-continuation.mjs','practical-isolated-grade-continuation-cli.mjs','instruction-loop-command-runtime.mjs','instruction-run-journal.mjs','ask-pragmatic-evaluation-report.mjs','content-addressed-store.mjs','asset-registry.mjs','codex-exec-runner.mjs'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'practical runtime input',16*1024*1024))});
+export function fullPracticalControllerPins(){return [...new Set([...sourceNames,'supervised-instruction-loop.mjs'])].map(name=>pin(join(import.meta.dirname,name)));}
 function validateProfilePaths(p){
   inspectInstructionLoopProviderSelection(p);
   validatePracticalModelConditions(p);
@@ -118,6 +120,7 @@ export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized
     if(!existsSync(folder(job)))mkdirSync(folder(job),{mode:0o700});else assert.ok(resumable,'stage already allocated; inspect instead of replay');
     save(join(folder(job),'request.json'),job);};
   const evaluate=async(job,{root,assessment=null})=>{
+    if(job.kind==='evaluate_continuation')assertIsolatedEvaluationJob(job,root,{execute:true});
     readProfile();allocate(job,true);const selection=prepared(job),runtime=createPracticalEvaluationCommandRuntime({definition:selection.practical_runtime,modelCallsAuthorized});
     const state=await advancePracticalEvaluation({root:selection.practical_root,plan:selection.practical_plan,runtime,assessment,
       inheritedApproval:{root,job_digest:canonicalDigest(job)}});
@@ -125,8 +128,8 @@ export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized
   };
   const runtime={digest,evaluate,resumeEvaluation:evaluate,
     validateCoordinatorRoot(root){validateCoordinatorRoot(root,p);},
-    async inspect(job,context={}){readProfile();if(existsSync(resultPath(job)))return readJsonFileStrict(resultPath(job),'lifecycle result',16*1024*1024);
-      if(job.kind==='evaluate'){
+    async inspect(job,context={}){readProfile();if(job.kind==='evaluate_continuation')assertIsolatedEvaluationJob(job,context.root,{execute:false});if(existsSync(resultPath(job)))return readJsonFileStrict(resultPath(job),'lifecycle result',16*1024*1024);
+      if(['evaluate','evaluate_continuation'].includes(job.kind)){
         const selection=prepared(job);
         if(existsSync(selection.practical_root)){
           const state=inspectPracticalEvaluation(selection.practical_root);

@@ -432,3 +432,56 @@ The host AI records the exception, reason, changed coordinator version and
 comparison limits for the user. The user's two judgments remain evaluation-case
 approval and eventual change approval; routine failure recovery adds no third
 human gate.
+
+## Continue other rows after isolated, unconfirmed grading
+
+`practical-isolated-grade-continuation-cli.mjs` handles a completed, suspended
+full-profile run whose original Task is closed but one read-only grading role
+has no confirmed provider termination. It continues only the original approved
+rows that have no attempt, reservation, count or native dispatch. It never
+replays that Task or grading role. Remote termination and missing cost stay
+Unknown. This exception does not make that answer eligible for another grade.
+
+The host supplies a pinned, model-free inspection command using the existing
+reference-scoring command protocol. Its receipt must bind the original attempt,
+job/result, grader command and source receipts; attest that candidate source was
+only copied and read; identify the exact isolated native/capsule/reply roots and
+worker PIDs; and record comparison limits. The host must establish those claims
+from its actual pinned wrapper and source inventory, rather than label an
+arbitrary command read-only. Local PID and owned-cwd writer observations are
+repeated at admission and execution. They do not certify remote closure or
+descriptors held by processes with another cwd.
+
+```sh
+node scripts/practical-isolated-grade-continuation-cli.mjs prepare \
+  --operation /owned/operation --inspector /owned/inspector.json \
+  --reason 'Continue untouched rows; original grade remains Unknown.' \
+  --expected-remaining 24 --output /owned/continuation-reference.json
+node scripts/practical-isolated-grade-continuation-cli.mjs admit \
+  --intent /owned/continuation-reference.json
+node scripts/practical-isolated-grade-continuation-cli.mjs advance \
+  --intent /owned/continuation-reference.json --allow-model-calls
+```
+
+Preparation/admission make no model or Task calls. Keep the reviewed controller
+files fixed after preparing the intent. The original profile, case decision,
+execution commands, input bytes and recovery budgets remain fixed. The new
+controller revision is separately pinned in the immutable intent. The command
+currently accepts full practical operation profiles; component profiles are not
+an admitted recovery target.
+
+Admission withdraws the unconsumed old result gate first, then appends markers
+to all three coordinators and restores only the untouched queue. The old
+evaluate request, cached result, report and gate remain in history. The resumed
+job has a distinct `evaluate_continuation` identity and cache. Repeat admission
+after interruption with the same reference. A consumed owner decision prevents
+admission; an old controller stops at the unfamiliar job rather than reuse the
+old report. The cumulative report retains original observations and limits and
+creates a fresh human result/change packet. A later AI recovery judgment uses
+the same `advance` command with `--assessment /owned/judgment.json`. A paired
+retry cannot cross back into a row attempted before this admission.
+
+Model-free lifecycle regressions cover queue/cache separation, fresh gates,
+three interruption points, original-row retry rejection, direct inner entry,
+consumed decisions and symlink/foreign-root rejection. Their fake inspector and
+process observer are protocol tests, not evidence about a real host boundary.

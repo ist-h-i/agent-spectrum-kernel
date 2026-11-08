@@ -131,7 +131,7 @@ function accept(s,job,result){
   }
   const out=copy(result.output);assert.ok(out&&typeof out==='object');
   if(job.kind==='select')s.rows=selectedTrials(s,out);
-  if(job.kind==='evaluate'){
+  if(['evaluate','evaluate_continuation'].includes(job.kind)){
     assert.equal(out.practical_status,'completed');assert.ok(out.report&&Array.isArray(out.trials));s.trials=copy(out.trials);
     s.outputs[job.key]=out;delete s.evaluation_progress;
   }else if(job.kind==='trial'){
@@ -171,7 +171,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       append(root,completedImport?'historical_import':'created',s);
     }else assert.equal(completedImport,null,'historical import is initialization only');
     assert.ok(same(s.policy,policy),'resume cannot change policy');
-    if(assessment)assert.equal(s.pending?.kind,'evaluate','AI assessment requires an active practical evaluation');
+    if(assessment)assert.ok(['evaluate','evaluate_continuation'].includes(s.pending?.kind),'AI assessment requires an active practical evaluation');
     if(reportRevision){
       assert.equal(decision,null,'review the revised packet before submitting a human decision');assert.equal(assessment,null);assert.equal(requestRestore,false);
       assert.equal(policy.evaluation_mode,'practical_v1');assert.equal(s.evaluation_decision?.disposition,'approved','original case approval required for revised result');
@@ -228,10 +228,10 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         if(job.kind==='generate'&&result?.status==='awaiting_authoring'){
           assert.equal(result.request_digest,canonicalDigest(job));s.authoring_progress=copy(result.output);s.status='awaiting_authoring';append(root,'authoring_host_stop',s);return summary(s);
         }
-        if(job.kind==='evaluate'&&result?.status!=='completed'&&(assessment||result?.status==='resumable')){
+        if(['evaluate','evaluate_continuation'].includes(job.kind)&&result?.status!=='completed'&&(assessment||result?.status==='resumable')){
           result=await runtime.resumeEvaluation(job,{root,assessment});assessment=null;
         }
-        if(job.kind==='evaluate'&&result?.status==='awaiting_ai_recovery'){
+        if(['evaluate','evaluate_continuation'].includes(job.kind)&&result?.status==='awaiting_ai_recovery'){
           assert.equal(result.request_digest,canonicalDigest(job));s.evaluation_progress=copy(result.output);s.status='awaiting_ai_recovery';append(root,'evaluation_ai_stop',s);return summary(s);
         }
         if(!result||!terminal.has(result.status)){
@@ -257,7 +257,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         if(job.kind==='generate'&&result?.status==='awaiting_authoring'){
           assert.equal(result.request_digest,canonicalDigest(job));s.authoring_progress=copy(result.output);s.status='awaiting_authoring';append(root,'authoring_host_stop',s);return summary(s);
         }
-        if(job.kind==='evaluate'&&result?.status==='awaiting_ai_recovery'){
+        if(['evaluate','evaluate_continuation'].includes(job.kind)&&result?.status==='awaiting_ai_recovery'){
           assert.equal(result.request_digest,canonicalDigest(job));s.evaluation_progress=copy(result.output);s.status='awaiting_ai_recovery';append(root,'evaluation_ai_stop',s);return summary(s);
         }
         if(!result||!terminal.has(result.status)){s.status='operation_uncertain';append(root,'operation_uncertain',s);return summary(s);}
