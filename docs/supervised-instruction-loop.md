@@ -72,6 +72,15 @@ Known failures with confirmed closure enter the report; unknown process state
 stops automatic launches. Missing usage stays null. Cached input is a subset of
 input, and observed child counters do not establish complete hierarchical usage.
 
+The standard Codex task adapter preserves all reported errors. A recognized
+WebSocket idle-timeout `Reconnecting... n/5` notice is recorded separately as
+recovered only when a later `turn.completed` follows it and the local invocation
+closes cleanly with exit code zero. Fatal, authentication/approval, unrecognized
+or subsequent errors, timeouts and uncertain closure do not use this exception.
+This establishes transport completion, never task quality or runtime acceptance.
+The behavior applies to newly prepared adapters; existing pinned runs and their
+receipts are not rewritten or automatically replayed.
+
 The concrete native adapter retains the original control's conservative closure
 flag. A failed root for which that control does not issue readiness remains stopped;
 the adapter does not rewrite its completion record or silently relaunch it.

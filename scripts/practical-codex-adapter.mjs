@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {existsSync,mkdirSync,openSync,writeFileSync,fsyncSync,closeSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {canonicalDigest,readStableBytes,readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
+import {canonicalDigest,readStableBytes,readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments,parseJsonRejectDuplicateKeys} from './content-addressed-store.mjs';
 import {instructionPath} from './instruction-projection-paths.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {executeCodexSession} from './codex-exec-runner.mjs';
@@ -39,6 +39,24 @@ export function createCodexPracticalCommand({settingsPath,options,evidenceKind})
   model_calls:true,timeout_ms:options.timeout_ms+5000,provider_closure_path:'{evaluation_command_role}-codex-provider.json'};
 }
 function bytes(path,data){const fd=openSync(path,'wx',0o600);try{writeFileSync(fd,data);fsyncSync(fd);}finally{closeSync(fd);}}
+// The CLI emits these transport retry notices as error events even when a later
+// turn completes. Preserve them, but never treat a fatal/unknown/late error as a
+// recovered notice or infer process closure from the transcript alone.
+function recoveredReconnects(stdout,telemetry){
+ if(!telemetry.errors.length||telemetry.interaction)return [];
+ let notices=0,lastType=null;
+ for(const line of stdout.split(/\r?\n/u)){
+  if(!line.trim())continue;
+  let event;try{event=parseJsonRejectDuplicateKeys(line);}catch{return [];}
+  if(!event||typeof event!=='object'||Array.isArray(event)||typeof event.type!=='string')return [];
+  lastType=event.type;
+  if(['error','turn.failed','authentication.required','approval.required'].includes(event.type)){
+   if(event.type!=='error'||Object.keys(event).length!==2||typeof event.message!=='string'||!/^Reconnecting\.\.\. [1-5]\/5 \(stream disconnected before completion: idle timeout waiting for websocket\)$/u.test(event.message))return [];
+   notices++;
+  }else if(!['thread.started','turn.started','item.started','item.updated','item.completed','turn.completed'].includes(event.type))return [];
+ }
+ return notices===telemetry.errors.length&&lastType==='turn.completed'?[...telemetry.errors]:[];
+}
 export async function executeCodexPracticalAdapter({settings,controlRoot,requestDigest,commandDigest,invocationDigest,role},session=executeCodexSession){
  assert.equal(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED,'1','standard Codex model calls not authorized');
  assert.equal(settings.kind,'practical_codex_settings_v1');validateCodexPracticalOptions(Object.fromEntries(['executable','model','reasoning','task_file','timeout_ms'].map(k=>[k,settings[k]])));
@@ -53,8 +71,9 @@ export async function executeCodexPracticalAdapter({settings,controlRoot,request
    ...(settings.model===null?[]:['--model',settings.model]),...(settings.reasoning===null?[]:['--config','model_reasoning_effort='+JSON.stringify(settings.reasoning)]),'-'];
   attempted=true;r=await session({executable:settings.executable,argv,cwd:process.cwd(),input,timeoutMs:settings.timeout_ms,terminationScope:'direct_child'});
  }catch(error){r={spawnObserved:attempted?null:false,terminationConfirmed:!attempted,exitCode:null,error:{message:sanitizeComparisonLog(error.message).slice(0,2048)},stdout:Buffer.alloc(0),stderr:Buffer.alloc(0),durationMs:null};}
- const telemetry=parseUserCodexTelemetry(Buffer.from(r.stdout??'').toString('utf8'));
+ const stdout=Buffer.from(r.stdout??'').toString('utf8'),telemetry=parseUserCodexTelemetry(stdout);
  const clean=r.spawnObserved===true&&r.terminationConfirmed===true&&r.exitCode===0&&!r.error&&!r.timedOut&&!r.interrupted&&!r.outputLimited;
+ const recovered_errors=clean?recoveredReconnects(stdout,telemetry):[];
  const terminal=clean||r.spawnObserved===false&&r.terminationConfirmed===true;
  const artifacts=[];
  for(const [suffix,data] of [['stdout.jsonl',r.stdout??Buffer.alloc(0)],['stderr.log',r.stderr??Buffer.alloc(0)]]){
@@ -68,9 +87,9 @@ export async function executeCodexPracticalAdapter({settings,controlRoot,request
   local:{spawn_observed:r.spawnObserved,termination_confirmed:r.terminationConfirmed,exit_code:r.exitCode,error:r.error??null,timed_out:r.timedOut??false,interrupted:r.interrupted??false,output_limited:r.outputLimited??false},
   observation:{kind:'provider_observation_v1',scope:'root_turn_completed_only',metrics,artifacts,
    known_usage_lower_bound:telemetry.usage_lower_bound,provider_duration_ms:r.durationMs??null,complete_cost:null},
-  reported_errors:telemetry.errors,authentication_verified:false};
+  reported_errors:telemetry.errors,recovered_errors,authentication_verified:false};
  writeCanonicalJsonNoReplace({outputPath:join(controlRoot,role+'-codex-provider.json'),artifact:receipt,label:'Codex provider receipt',maximumBytes:2*1024*1024});
- return {completed:clean&&telemetry.errors.length===0,terminal,models_started:r.spawnObserved===true,receipt};
+ return {completed:clean&&telemetry.errors.length===recovered_errors.length,terminal,models_started:r.spawnObserved===true,receipt};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [settingsPath,expected,controlRoot,requestDigest,commandDigest,invocationDigest,role]=process.argv.slice(2);
