@@ -9,6 +9,7 @@ import { buildPragmaticEvaluationReport } from './ask-pragmatic-evaluation-repor
 import { buildInstructionRecoveryPacket, validateInstructionRecoveryPolicy, validateInstructionRecoveryAssessment } from './instruction-evaluation-recovery.mjs';
 import {inspectPracticalQualityObservation} from './practical-quality-observation.mjs';
 import {validatePracticalInitializationClearance} from './practical-initialization-clearance.mjs';
+import {assertIsolatedEvaluationJob,activeIsolatedPracticalRows} from './practical-isolated-grade-continuation.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b),copy=v=>structuredClone(v);
 const metrics=['duration_ms','human_review_minutes','rework_minutes','input_tokens','output_tokens','cached_tokens'];
@@ -88,6 +89,7 @@ function report(s){
     assessment:a.assessment??null,observation:notes(s,a),quality_observation:inspectPracticalQualityObservation(a.result.output).value,
     quality_observation_issue:inspectPracticalQualityObservation(a.result.output).issue})),recovery_decisions:s.decisions,
     execution_suspended:s.suspended??false,extra_trials:s.extra_trials,continuation_clearances:s.continuation_clearances??[],
+    ...(s.isolated_grade_continuations?.length?{isolated_grade_continuations:copy(s.isolated_grade_continuations)}:{}),
     resources_all_attempts:Object.fromEntries(metrics.map(k=>{
       const values=s.attempts.map(a=>notes(s,a).metrics[k]),known=values.filter(v=>v!==null);
       return [k,{known_total:known.length?known.reduce((a,b)=>a+b,0):null,observed_count:known.length,unknown_count:values.length-known.length}];})),
@@ -105,10 +107,10 @@ function report(s){
        const values=grades.map(a=>{const m=a.result.output?.grade?.provider_observation?.metrics,v=m?.[k];return Number.isSafeInteger(v)&&v>=0&&!(k==='cached_tokens'&&Number.isSafeInteger(m.input_tokens)&&v>m.input_tokens)?v:null;}),known=values.filter(v=>v!==null);
        return [k,{known_total:known.length?known.reduce((a,b)=>a+b,0):null,observed_count:known.length,unknown_count:values.length-known.length}];})),
       usage_scope:'caller-reported grading observations only; cached is an input subset; complete hierarchy and billed cost remain unknown'},
-    comparison_limits:s.decisions.flatMap(d=>d.assessment.comparison_limits),
+    comparison_limits:[...s.decisions.flatMap(d=>d.assessment.comparison_limits),...(s.isolated_grade_continuations?.length?['An earlier read-only grading role remains Unknown and consumed; only unattempted approved rows continued after a bounded local isolation inspection. Original Task/grade results and unknown costs are preserved; no provider closure or retry was inferred.']:[])],
     completeness_required:false,formal_admission_implied:false,application_performed:false};
 }
-function applyAssessment(s,assessment){
+function applyAssessment(s,assessment,allowedRows=null){
   const r=s.recovery;validateInstructionRecoveryAssessment(r.packet,assessment);
   if(assessment.action==='stop'){s.status='awaiting_ai_recovery';s.last_stop=copy(assessment);s.decisions.push({attempt_id:r.entry_id,assessment:copy(assessment)});return false;}
   const record={attempt_id:r.entry_id,packet_digest:canonicalDigest(r.packet),assessment:copy(assessment)};
@@ -116,6 +118,7 @@ function applyAssessment(s,assessment){
   if(assessment.action==='retry'){
     if(clearanceFor(s,r.entry_id))assert.equal(assessment.retry_scope,'trial','initialization exception permits only the failed logical row');
     targets=assessment.retry_scope==='case'?s.rows.filter(row=>row.block_id===r.row.block_id):[r.row];
+    if(allowedRows)assert.ok(targets.every(row=>allowedRows.has(row.id)),'retry target is outside the admitted unattempted rows');
     const additional=targets.filter(row=>(s.counts[rowKey(row)]??0)>0).length;
     assert.ok(s.extra_trials+additional<=s.plan.recovery.max_extra_trials,'paired retry exceeds approved extra-trial budget');
     assert.ok(targets.every(row=>(s.counts[rowKey(row)]??0)<=s.plan.recovery.max_retries_per_row),'per-row retry budget exhausted');
@@ -146,10 +149,12 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
     if(!s){const planned=rows(plan);s={plan:copy(plan),rows:planned,queue:planned.map(row=>({row,cohort:1})),attempts:[],counts:{},selected:{},decisions:[],extra_trials:0,
       active:null,recovery:null,assessed_packets:[],assessments:[],status:'awaiting_evaluation_approval',gate:{kind:'evaluation',packet:{plan:copy(plan),planned_rows:planned,max_extra_trials:plan.recovery.max_extra_trials}}};save(s,'prepared');}
     assert.ok(same(s.plan,plan),'resume cannot change approved plan');
+    const allowedRows=activeIsolatedPracticalRows(root,s);
     if(inheritedApproval){
       assert.equal(decision,null,'do not replace verified parent case approval');
       const parent=readRunJournal(resolve(inheritedApproval.root)).state;
-      assert.ok(parent?.pending?.kind==='evaluate'&&parent.evaluation_decision?.disposition==='approved','active approved supervised evaluation required');
+      assert.ok(['evaluate','evaluate_continuation'].includes(parent?.pending?.kind)&&parent.evaluation_decision?.disposition==='approved','active approved supervised evaluation required');
+      if(parent.pending.kind==='evaluate_continuation')assertIsolatedEvaluationJob(parent.pending,resolve(inheritedApproval.root),{execute:true});
       assert.equal(canonicalDigest(parent.pending),inheritedApproval.job_digest,'parent evaluation operation mismatch');
       assert.equal(parent.outputs.select.practical_plan_digest,canonicalDigest(plan),'nested plan differs from human-approved selection');
       const outer=parent.rows.map(r=>[r.case.id,r.repetition,r.condition,r.case.public_input_digest]).sort();
@@ -179,7 +184,7 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
     if(assessment){assert.ok(s.recovery,'no AI recovery judgment pending');
       await refreshRecovery(s,runtime,root,save);
       if(s.active?.kind==='assess'){save(s,'ai_assessment_superseded',{job:s.active});s.active=null;}
-      if(!applyAssessment(s,assessment)){save(s,'ai_recovery_stop');return view(s);}save(s,'ai_recovery_decision');}
+      if(!applyAssessment(s,assessment,allowedRows)){save(s,'ai_recovery_stop');return view(s);}save(s,'ai_recovery_decision');}
     for(;;){
       if(s.recovery&&!s.active){
         await refreshRecovery(s,runtime,root,save);
@@ -193,6 +198,7 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
       }
       if(!s.active){
         if(!s.queue.length){s.report=report(s);s.status='completed';save(s,'reported');return view(s);}
+        if(allowedRows)assert.ok(allowedRows.has(s.queue[0].row.id),'queued trial is outside the admitted unattempted rows');
         const item=s.queue.shift(),count=(s.counts[rowKey(item.row)]??0)+1;
         const input={row:item.row,attempt:count,cohort:item.cohort,case:plan.cases.find(c=>c.id===item.row.case_id),
           condition_context:plan.conditions.find(c=>c.id===item.row.condition).context,
@@ -206,6 +212,7 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
       // Dispatch only the just-reserved job. A later invocation inspects the
       // existing reservation and cannot infer absence from a missing result.
       const events=readRunJournal(root).events,latest=events.at(-1);
+      if(job.kind==='trial'&&allowedRows)assert.ok(allowedRows.has(job.input.row.id),'trial is outside the admitted unattempted rows');
       const fresh=['trial_reserved','assessment_reserved'].includes(latest.kind)&&same(latest.state.active,job);
       // A reservation is already consumed even if the process dies before the
       // next append. Record consumption before crossing the process boundary.
@@ -224,7 +231,7 @@ export async function advancePracticalEvaluation({root,plan,runtime,decision=nul
         if(!same(job.input.packet,s.recovery.packet)){save(s,'assessment_evidence_superseded');continue;}
         const choice=result.output.assessment??result.output;
         try{
-          if(!applyAssessment(s,choice)){save(s,'ai_recovery_stop');return view(s);}
+          if(!applyAssessment(s,choice,allowedRows)){save(s,'ai_recovery_stop');return view(s);}
         }catch(error){
           s.status='awaiting_ai_recovery';s.rejected_assessments??=[];s.rejected_assessments.push({assessment_digest:canonicalDigest(choice),reason:String(error.message).slice(0,2048)});
           save(s,'ai_assessment_rejected');return view(s);

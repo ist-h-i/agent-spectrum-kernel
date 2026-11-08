@@ -13,6 +13,10 @@ import {exportInstructionEnvironment} from './instruction-environment.mjs';
 import {writeFileSync} from 'node:fs';
 import {createComponentInstructionLoopConfiguration} from './instruction-loop-component-runtime.mjs';
 const approve=s=>({disposition:'approved',packet_digest:canonicalDigest(s.pending_gate),reason:'Synthetic exact human decision.'});
+test('component profiles pin the transitive isolated-grade controller',t=>{
+  const f=componentLoopFixture(t),config=createComponentInstructionLoopConfiguration(f.profilePath);
+  for(const name of ['practical-isolated-grade-continuation.mjs','practical-isolated-grade-continuation-cli.mjs'])assert.ok(config.runtime.source_pins.some(p=>p.path.endsWith('/'+name)));
+});
 test('trust fields cannot override a component store or application identity',t=>{
   const f=componentLoopFixture(t),profile=structuredClone(f.profile);profile.environmentTrust.storeRoot=f.target;
   const path=join(f.workspaceRoot,'invalid-trust.json');writeFileSync(path,JSON.stringify(profile));

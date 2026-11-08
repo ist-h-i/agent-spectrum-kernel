@@ -30,7 +30,7 @@ export function inspectInitializationRecoveryOperation(operationRoot){
  const selection=cycle.outputs.select,s=readRunJournal(root).state;
  assert.equal(selection.practical_root,root);assert.ok(same(selection.practical_plan,s.plan));assert.equal(selection.practical_plan_digest,canonicalDigest(s.plan));
  assert.equal(canonicalDigest(selection.practical_runtime),s.plan.runtime_digest);
- if(cycle.pending){assert.equal(cycle.pending.kind,'evaluate');assert.ok(same(selection,cycle.pending.input.selection));}
+ if(cycle.pending){assert.ok(['evaluate','evaluate_continuation'].includes(cycle.pending.kind));assert.ok(same(selection,cycle.pending.input.selection));}
  assert.equal(cycle.evaluation_decision.disposition,'approved');assert.equal(s.evaluation_decision.disposition,'approved');
  for(const p of [...config.runtime.source_pins,...Object.values(selection.practical_runtime.commands).flatMap(c=>c.pins)])assert.equal(ref(p.path).digest,p.digest,'original execution input drift');
  return {o,cycleRoot,cycle,config,profile,root,state:s,selection};
