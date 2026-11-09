@@ -133,10 +133,10 @@ try{
     console.log(JSON.stringify(prepareRetainedFullAuthoringConfiguration({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),replacementProfilePath:options['--replacement-profile']?resolve(options['--replacement-profile']):resolve(options['--profile']),outputRoot:resolve(options['--output-root']),id:options['--id'],preEvaluation:command==='reconfigure-evaluation'}),null,2));
   }
   else if(['recover-authoring-initialization','recover-authoring-interrupted'].includes(command)){
-    assert.ok(Object.keys(options).every(k=>['--root','--output-root','--id','--reason'].includes(k)));
+    assert.ok(Object.keys(options).every(k=>['--root','--output-root','--id','--reason','--session-root'].includes(k)));
     assert.ok(options['--output-root']&&options['--id']&&options['--reason']);
     const prepare=command==='recover-authoring-interrupted'?prepareInterruptedFullAuthoringRetry:prepareFullAuthoringInitializationRetry;
-    console.log(JSON.stringify(prepare({operationRoot:root,outputRoot:resolve(options['--output-root']),id:options['--id'],reason:options['--reason']}),null,2));
+    console.log(JSON.stringify(prepare({operationRoot:root,outputRoot:resolve(options['--output-root']),id:options['--id'],reason:options['--reason'],...(options['--session-root']?{sessionRoot:resolve(options['--session-root'])}:{})}),null,2));
   }
   else if(command==='recover-preparation'){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));

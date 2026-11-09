@@ -400,3 +400,14 @@ initialization and retained-answer cases remain regression coverage. Related
 failed-preparation, operation, supervised-loop, source-application and practical
 initialization-recovery tests cover shared consumers. These tests do not measure
 real model quality, remote costs, or a successful live recovery.
+
+
+If the pinned provider restricts generation to its original input-only directory
+namespace, either retry command accepts `--session-root FRESH_SIBLING_SESSION`.
+This optional session must have the same parent as the original provider session,
+be fresh, and overlap neither retained evidence, source/owner paths nor the fresh
+configuration. It is included in the once-only retry intent; changing it cannot
+create another retry. Preparation does not create the session or change the
+provider executable, permissions, prompt, or input digest. Without this option,
+the session remains `FRESH/generation-session`. Use a name accepted by the pinned
+provider; the option does not relax that provider's own checks.

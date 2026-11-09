@@ -230,3 +230,22 @@ test('interrupted source authoring advances only fresh generation and stops at b
  state=await run({decision:{disposition:'rejected',packet_digest:canonicalDigest(state.pending_gate),reason:'Synthetic result rejection.'}});
  assert.equal(state.status,'completed');assert.equal(calls.includes('apply'),false);assert.equal(readRunJournal(f.root).state.status,'advancing');
 });
+
+
+test('provider-constrained retry can use one fresh sibling session without changing its input',async t=>{
+ const f=interruptedFixture(t),{prepareInterruptedFullAuthoringRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
+ const options={...f,sessionRoot:join(f.base,'authoring-session-retry')},r=prepare(options,noWriters),p=JSON.parse(readFileSync(r.profile_path));
+ assert.equal(p.generator.provider.sessionRoot,options.sessionRoot);assert.equal(existsSync(options.sessionRoot),false);
+ assert.equal(JSON.parse(readFileSync(join(f.root,'.authoring-initialization-retry/claim.json'))).session_root,options.sessionRoot);
+ assert.equal(canonicalDigest(fullGenerationInput({...p.generator,observation:p.policy.observation})),f.execution.input_digest);
+ assert.deepEqual(prepare(options,noWriters),r);
+ assert.throws(()=>prepare({...options,sessionRoot:join(f.base,'other-session')},noWriters),/different|reserved/);
+});
+for(const [name,session] of [
+ ['original evidence',f=>f.p.generator.provider.sessionRoot],['source owner',f=>f.p.normal.target],
+ ['fresh configuration',f=>f.outputRoot],['unrelated parent',f=>join(f.p.normal.target,'nested-session')],
+ ['existing sibling',f=>{const path=join(f.base,'occupied-session');mkdirSync(path);writeFileSync(join(path,'keep'),'keep');return path;}],
+])test(`explicit retry session rejects ${name} before reserving work`,async t=>{
+ const f=interruptedFixture(t),{prepareInterruptedFullAuthoringRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
+ assert.throws(()=>prepare({...f,sessionRoot:session(f)},noWriters));assert.equal(existsSync(f.outputRoot),false);assert.equal(existsSync(join(f.root,'.authoring-initialization-retry')),false);
+});
