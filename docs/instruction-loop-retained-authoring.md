@@ -89,3 +89,27 @@ retaining raw replies and original/normalized digests. Conflicting coverage or
 other metadata remains invalid. This helper neither grades source nor grants
 model permission. Keep projected packet/capsule inventories identical for the
 existing retained-source binding; never exempt a schema file from that binding.
+
+## Reselect cases without changing the candidate
+
+If a generated candidate reveals that the initial catalog does not test its
+main effect, do not approve an unsuitable packet or edit its pinned files.
+Before any approval or trial, prepare a separate replacement profile and run:
+
+```text
+node scripts/supervised-instruction-loop-cli.mjs reselect-evaluation \
+  --root OLD_RUN --profile OLD_PROFILE --config OLD_CONFIG \
+  --replacement-profile NEW_CASE_PROFILE --output-root FRESH_ROOT --id NEW_ID
+```
+
+The replacement can change the catalog, selection and case inputs/criteria,
+plus task commands and graders. Baseline, authoring goal/input, owner, repetition
+count and trial budget must stay fixed. No generation model or Eval is run by
+this command. Advance the fresh configuration to obtain a new approval packet.
+Old approval is never carried forward. The existing candidate stays untouched;
+the isolated reconstruction must match every original source and Full file.
+The original commit is retained only after the materialized Git tree matches,
+so installed provenance also remains identical. Do not
+advance the old gate while using this origin; its drift invalidates the new run.
+Review the actual new cases, comparison settings and scoring limits before
+approving Eval. Candidate application requires its own later approval.
