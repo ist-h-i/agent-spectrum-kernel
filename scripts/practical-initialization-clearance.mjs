@@ -85,7 +85,7 @@ function originalEvidence(root,attempt,assessorJob,assessorCommand){
 export function observeInitializationRecoveryProcesses({taskRoot,assessRoot,workerPids},inspect=spawnSync){
  for(const pid of workerPids){assert.ok(Number.isSafeInteger(pid)&&pid>0);try{process.kill(pid,0);assert.fail('original local worker is still present');}catch(error){if(error.code!=='ESRCH')throw error;}}
  // Include orphaned local writers, not merely descendants of the exited worker.
- const r=inspect(process.platform==='darwin'?'/usr/sbin/lsof':'lsof',['-nP','-a','-u',String(process.getuid()),'-d','cwd','-Fpn'],{encoding:'utf8',maxBuffer:16*1024*1024});
+ const r=inspect(process.platform==='darwin'?'/usr/sbin/lsof':'lsof',['-nP','-a','-u',String(process.getuid()),'-d','cwd','-Fpn'],{encoding:'utf8',maxBuffer:16*1024*1024,timeout:15000});
  assert.ok(!r.error&&r.status===0&&!r.stderr.trim(),'cannot completely inspect owned local writers');
  const roots=[taskRoot,assessRoot],matches=[];let pid=null,selfVisible=false;
  for(const line of r.stdout.split('\n')){if(line.startsWith('p')){pid=Number(line.slice(1));assert.ok(Number.isSafeInteger(pid)&&pid>0,'invalid process observation');}else if(line.startsWith('n')){assert.ok(pid,'cwd without process identity');const p=line.slice(1);if(pid===process.pid&&p===process.cwd())selfVisible=true;if(roots.some(root=>p===root||p.startsWith(root+'/')))matches.push({pid,cwd:p});}}

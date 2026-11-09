@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync} from 'node:fs';
 import {join} from 'node:path';import {tmpdir} from 'node:os';
@@ -163,4 +164,69 @@ test('initialization retry refuses a foreign output directory before reserving i
  const {prepareFullAuthoringInitializationRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
  assert.throws(()=>prepare(f,noWriters),/fresh.*output/);assert.equal(readFileSync(join(f.outputRoot,'foreign'),'utf8'),'keep');
  assert.equal(existsSync(join(f.root,'.authoring-initialization-retry')),false);
+});
+
+function sourceInitializationFixture(t){
+ const f=initializationFixture(t),p=f.p;
+ const remote='https://github.com/example/source.git';
+ assert.equal(spawnSync('git',['remote','add','origin',remote],{cwd:p.generator.baselineSourceRoot}).status,0);
+ p.normal={kind:'ask_source_repository_v1',target:p.generator.baselineSourceRoot,repository:'github.com/example/source',remote_url:remote,base_branch:'main',base_revision:p.generator.baselineRevision,publication_branch:'improve/skills'};
+ p.policy.normal_target=p.normal.target;
+ writeFileSync(f.profilePath,JSON.stringify(p));const config=createNativeInstructionLoopConfiguration(f.profilePath);writeFileSync(f.configPath,JSON.stringify(config));
+ const h=readRunJournal(f.root);h.state.policy=config.policy;appendRunJournal(f.root,'source_owner_fixture',h.state);
+ const o=readRunJournal(f.operationRoot);o.state.current.profile_digest=hash(readFileSync(f.profilePath));o.state.current.config_digest=canonicalDigest(config);appendRunJournal(f.operationRoot,'source_owner_fixture',o.state);
+ return f;
+}
+test('source owner initialization retry retains the exact destination and fresh approval gates',async t=>{
+ const f=sourceInitializationFixture(t),{prepareFullAuthoringInitializationRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
+ const r=prepare(f,noWriters),p=JSON.parse(readFileSync(r.profile_path));assert.deepEqual(p.normal,f.p.normal);assert.equal(p.policy.normal_target,f.p.normal.target);assert.equal(r.approval_carried_forward,false);
+ assert.equal(existsSync(p.generator.candidateRoot),false);
+});
+function interruptedFixture(t){
+ const f=sourceInitializationFixture(t);rmSync(f.executionPath);
+ for(const root of [f.operationRoot,f.root]){const h=readRunJournal(root);h.state.status='advancing';appendRunJournal(root,'interrupted_fixture',h.state);}
+ return f;
+}
+test('receipt-missing authoring reserves one fresh retry, preserving the uncertain journal and dead lock recovery',async t=>{
+ const f=interruptedFixture(t),{prepareInterruptedFullAuthoringRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');assert.equal(typeof prepare,'function');
+ for(const root of [f.operationRoot,f.root]){mkdirSync(join(root,'.advance-lock'));writeFileSync(join(root,'.advance-lock/pid'),'2147483647');}
+ const old=readRunJournal(f.root).previous,parent=readRunJournal(f.operationRoot).previous;
+ const r=prepare(f,noWriters),p=JSON.parse(readFileSync(r.profile_path));
+ assert.equal(r.remote_closure,'Unknown');assert.equal(r.prior_usage,'Unknown');assert.equal(r.models_started,false);assert.equal(r.approval_carried_forward,false);
+ assert.equal(p.generator.initializationRetry.execution,null);assert.equal(p.generator.initializationRetry.kind,'full_authoring_interruption_retry_v1');
+ assert.deepEqual(p.normal,f.p.normal);assert.equal(readRunJournal(f.root).previous,old);assert.equal(readRunJournal(f.operationRoot).previous,parent);
+ assert.equal(existsSync(f.executionPath),false);assert.deepEqual(prepare(f,noWriters),r);
+ assert.throws(()=>prepare({...f,id:'fork',outputRoot:join(f.base,'fork')},noWriters),/reserved|different/);
+ assert.throws(()=>prepare({...f,outputRoot:join(f.p.normal.target,'nested')},noWriters),/overlaps/);
+});
+for(const [name,mutate] of [
+ ['active coordinator',f=>{mkdirSync(join(f.root,'.advance-lock'));writeFileSync(join(f.root,'.advance-lock/pid'),String(process.pid));}],
+ ['existing receipt',f=>writeFileSync(f.executionPath,JSON.stringify(f.execution))],
+ ['saved answer',f=>writeFileSync(f.responsePath,'{}')],
+ ['unknown local writer',f=>f.writers=true],
+ ['invisible observer',f=>f.invisible=true],
+ ['prior retry',f=>{f.p.generator.initializationRetry={};writeFileSync(f.profilePath,JSON.stringify(f.p));}],
+ ['case approval',f=>{const h=readRunJournal(f.root);h.state.evaluation_decision={disposition:'approved'};appendRunJournal(f.root,'changed',h.state);}],
+ ['late receipt',f=>f.lateReceipt=true],
+])test(`interruption retry refuses ${name} without a fresh output`,async t=>{
+ const f=interruptedFixture(t);mutate(f);const {prepareInterruptedFullAuthoringRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');assert.equal(typeof prepare,'function');
+ assert.throws(()=>prepare(f,args=>{if(f.lateReceipt)writeFileSync(f.executionPath,JSON.stringify(f.execution));return {...noWriters(args),observer_visible:!f.invisible,matching_writers:f.writers?[{pid:123}]:[]};}));
+ assert.equal(existsSync(f.outputRoot),false);
+});
+
+test('interrupted source authoring advances only fresh generation and stops at both human gates',async t=>{
+ const f=interruptedFixture(t),{prepareInterruptedFullAuthoringRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
+ const prepared=prepare(f,noWriters),config=JSON.parse(readFileSync(prepared.config_path));
+ const {advanceSupervisedInstructionLoop}=await import('./supervised-instruction-loop.mjs');const calls=[],receipts=new Map();
+ const runtime={digest:config.policy.runtime_digest,inspect:async job=>receipts.get(canonicalDigest(job))??{status:'unknown'}};
+ for(const kind of ['generate','register','select','trial','evaluate','resumeEvaluation','report','plan','apply','version','cleanup','restore'])runtime[kind]=async job=>{
+  calls.push(kind);const result={request_digest:canonicalDigest(job),status:'completed',output:kind==='select'?{case_ids:['public']}:kind==='evaluate'?{practical_status:'completed',trials:[],report:{formal_score:null}}:{synthetic:true}};
+  receipts.set(canonicalDigest(job),result);return result;
+ };
+ const run=extra=>advanceSupervisedInstructionLoop({root:prepared.run_root,policy:config.policy,runtime,...extra});
+ let state=await run();assert.equal(state.status,'awaiting_evaluation_approval');assert.deepEqual(calls,['generate','register','select']);
+ state=await run({decision:{disposition:'approved',packet_digest:canonicalDigest(state.pending_gate),reason:'Synthetic fresh case approval.'}});
+ assert.equal(state.status,'awaiting_change_approval');assert.equal(calls.includes('apply'),false);assert.equal(calls.includes('plan'),true);
+ state=await run({decision:{disposition:'rejected',packet_digest:canonicalDigest(state.pending_gate),reason:'Synthetic result rejection.'}});
+ assert.equal(state.status,'completed');assert.equal(calls.includes('apply'),false);assert.equal(readRunJournal(f.root).state.status,'advancing');
 });
