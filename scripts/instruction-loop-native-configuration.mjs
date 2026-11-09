@@ -20,7 +20,7 @@ export function createNativeInstructionLoopConfiguration(profilePath){
   if(p.kind==='full_practical_instruction_loop_profile_v1')return createFullPracticalInstructionLoopConfiguration(profilePath);
   assert.notEqual(p.normal?.kind,'ask_source_repository_v1','source application requires the Full practical runtime');
   assert.equal(p.kind,'full_native_reference_loop_profile_v1');inspectInstructionLoopProviderSelection(p);assert.equal(p.normal.target,p.policy.normal_target);
-  const paths=['instruction-loop-artifact.mjs','instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-host-scoring.mjs','instruction-loop-command-runtime.mjs',
+  const paths=['instruction-loop-reference-evidence.mjs','instruction-loop-artifact.mjs','instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-host-scoring.mjs','instruction-loop-command-runtime.mjs',
     'instruction-loop-native-prepare.py','instruction-loop-assets.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs','instruction-loop-source-application.mjs',
     'retained-instruction-comparison.mjs','retained-instruction-layout.mjs','instruction-environment.mjs','codex-exec-runner.mjs','asset-registry.mjs','content-addressed-store.mjs','instruction-loop-source-binding.mjs','instruction-loop-feedback.mjs','practical-quality-observation.mjs','instruction-loop-result-disposition.mjs','ask-personal-evolution-observation.mjs'];
   const pins=[{path:profilePath,digest:hash(readStableBytes(profilePath,'Full/native profile',16*1024*1024))},...paths.map(name=>({path:join(import.meta.dirname,name),digest:hash(readStableBytes(join(import.meta.dirname,name),'Full/native adapter'))}))];
@@ -39,6 +39,7 @@ export function createNativeInstructionLoopConfiguration(profilePath){
 // This is preparation only: no generation, trial, grading or owner mutation.
 export function buildNextNativeInstructionLoopProfile({root,profilePath,configPath,outputRoot,id,feedback=null,decisionSummaries={},resultSummary=null,reportRevision=null}){
   const old=readJsonFileStrict(resolve(profilePath)),history=readCompletedInstructionLoopContinuation(root);
+  const referenceOnly=Boolean(history.reference_evidence);
   const discarded=history.result_disposition?.disposition==='discarded';
   if(discarded){assert.ok(feedback!==null,'discarded result requires explicit fresh feedback');assert.equal(resultSummary,null,'discarded result cannot supply a result summary');assert.equal(reportRevision,null,'discarded result cannot supply a report revision');}
   const previousConfig=readJsonFileStrict(resolve(configPath));
@@ -99,7 +100,7 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
     return [role,Object.fromEntries(['confirmed_points','unknown_points','unmet_points','cli_seconds','root_input_tokens','root_output_tokens']
       .map(k=>{const v=condition[k];assert.ok(v==null||Number.isFinite(v)&&v>=0);return [k,v??null];}))];
   }));
-  if(practical){
+  if(practical&&!referenceOnly){
     for(const attempt of history.report?.all_attempts??[]){const value=attempt.observation?.metrics?.duration_ms;
       if(Number.isFinite(value)&&value>=0)p.selection.observedCosts[attempt.row.case_id]=Math.max(p.selection.observedCosts[attempt.row.case_id]??0,value);}
     for(const condition of old.practical.conditions?Object.keys(old.practical.conditions):[]){
@@ -112,7 +113,7 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
   }
   const freshFeedback=feedback??(old.policy.observation.kind==='instruction_loop_continuation_v1'?old.policy.observation.feedback:old.policy.observation);
   const prepared=prepareNextSupervisedInstructionLoop({root,nextPolicy:{...history.policy,id,observation:freshFeedback},decisionSummaries,reportRevision,
-    resultSummary:discarded?null:resultSummary??`Previous observed result metrics (not formal admission): ${JSON.stringify(metrics)}. Missing components remain unknown.`});
+    resultSummary:discarded?null:resultSummary??(referenceOnly?'Previous evidence compares contexts using the same candidate; the original evaluation was not run, instruction effect was not measured and complete usage remains unknown. Review retained reference evidence and obtain fresh case and adoption decisions.':`Previous observed result metrics (not formal admission): ${JSON.stringify(metrics)}. Missing components remain unknown.`)});
   assert.equal(prepared.policy.observation.previous.journal_digest,history.journal_digest,'previous cycle changed during preparation');
   p.policy=prepared.policy;delete p.policy.runtime_digest;
   if(history.application_active&&history.application?.kind==='ask_source_application_v1')p.policy.normal_target=p.normal.target;

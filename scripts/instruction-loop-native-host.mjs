@@ -53,7 +53,7 @@ async function readTrial(p,job,recovered=false){
   return {...c,ready_for_next_root:true,execution_kind:p.native.executionKind,root_usage:c.root_usage,
     full_hierarchical_usage:null,recovered_from_native_records:recovered};
 }
-function verifyOwnedFullCandidate(p,candidate){
+export function verifyOwnedFullCandidate(p,candidate){
   assert.equal(candidate.source_root,p.generator.candidateRoot);assert.equal(candidate.full_root,p.generator.fullRoot);
   bindMeasuredNormalOwnerSource({sourceRoot:p.generator.candidateRoot,candidate});
   const owned=readInstructionLoopJson(join(p.stateRoot,'owned-version.json'));assert.equal(owned.path,p.generator.candidateRoot);
