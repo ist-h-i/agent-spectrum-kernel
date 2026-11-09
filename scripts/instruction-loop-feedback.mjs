@@ -1,3 +1,4 @@
+import {summarizePracticalGradingDiagnostics,validatePracticalGradingSummary} from './practical-quality-observation.mjs';
 import {validateInstructionResultDiscard} from './instruction-loop-result-disposition.mjs';
 // Work summaries are explicitly supplied by the host. Never scrape task logs.
 import assert from 'node:assert/strict';
@@ -78,6 +79,7 @@ export function summarizeInstructionLoopEvaluation(report){
       c.metrics=Object.fromEntries(evaluationMetrics.map(k=>[k,numberOrNull(practical?a.observation.metrics[k]:k==='duration_ms'?(a.cli_seconds==null?null:a.cli_seconds*1000):a[k==='input_tokens'?'root_input_tokens':'root_output_tokens'])]));
       if(!practical&&a.fixed_reference)c.fixed_reference=fixedPointReferenceSummary(a.fixed_reference);
       if(practical&&a.quality_observation?.fixed_reference)try{c.fixed_reference=validateFixedPointReferenceSummary(structuredClone(a.quality_observation.fixed_reference));}catch{c.outcome='unknown';}
+      if(practical&&a.quality_observation?.grading_diagnostics)try{c.grading_diagnostics_summary=summarizePracticalGradingDiagnostics(a.quality_observation.grading_diagnostics);}catch{c.outcome='unknown';}
       if(!practical)c.reference_points=Object.fromEntries(['confirmed','unknown','unmet','maximum'].map(k=>[k,numberOrNull(a[k+'_points'])]));
     }
   }
@@ -109,7 +111,8 @@ export function validateInstructionEvaluationSummary(s,reportDigest){
     const key=JSON.stringify([c.case_id,c.repetition]);assert.ok(!seen.has(key));seen.add(key);
     assert.ok(Array.isArray(c.conditions)&&c.conditions.length>0&&c.conditions.length<=2);const conditions=new Set();
     for(const v of c.conditions){
-      keys(v,['condition','outcome','attempt_count','excluded_count','execution_failures','selected_result_digest','metrics','reference_points',...(Object.hasOwn(v,'fixed_reference')?['fixed_reference']:[])]);
+      keys(v,['condition','outcome','attempt_count','excluded_count','execution_failures','selected_result_digest','metrics','reference_points',...(Object.hasOwn(v,'fixed_reference')?['fixed_reference']:[]),...(Object.hasOwn(v,'grading_diagnostics_summary')?['grading_diagnostics_summary']:[])]);
+      if(Object.hasOwn(v,'grading_diagnostics_summary'))validatePracticalGradingSummary(v.grading_diagnostics_summary);
       if(Object.hasOwn(v,'fixed_reference'))validateFixedPointReferenceSummary(v.fixed_reference);
       assert.ok(['baseline','candidate','challenger'].includes(v.condition)&&!conditions.has(v.condition));conditions.add(v.condition);
       assert.ok(['pass','fail','unknown','not_selected'].includes(v.outcome));integer(v.attempt_count);integer(v.excluded_count);integer(v.execution_failures);

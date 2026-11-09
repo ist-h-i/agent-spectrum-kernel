@@ -98,3 +98,9 @@ changed evidence. An already admitted revision resumes from its exact journal
 event and immutable data, without repeating inspectors or grading. The next
 cycle receives bounded new source points/limits and requires fresh case/change
 judgments. No original Task metrics or owner files are changed by this path.
+
+An entry with `fixed_reference:null` may include `grading_diagnostics` from
+[the optional partial evidence port](practical-partial-grading.md). Required
+diagnostic artifact refs are selected before other artifacts, within the same
+16-ref quality limit; excess distinct refs are rejected during inspection.
+An incomplete judgment stays Unknown; no per-criterion report becomes a score.

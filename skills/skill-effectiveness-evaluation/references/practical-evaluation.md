@@ -179,3 +179,15 @@ Before the first case judgment, a completed Full candidate can use supervised
 without another authoring call. Keep public cases/criteria and the authoring
 request fixed. The old gate/journal remains unchanged and the fresh packet needs
 human case approval. See `docs/instruction-loop-retained-authoring.md`.
+
+For a closed grader with missing/contradictory items or whole-verifier abstention,
+retain usable unconfirmed observations through the optional artifact-bound
+`grading_diagnostics` port described in `docs/practical-partial-grading.md`.
+Prefer that Unknown partial report over repeating a Task solely for a perfect
+judgment. The host supplies this routine adapter, using the existing quality or
+model-free retained-report path. Preserve reasons, all grading costs and limits;
+reported item states are unreviewed unless a separate applicable contract proves
+more. Do not reconstruct scores or agreement from review prose. Next authoring
+input receives only incident counts/digests, never private item bodies. Align the
+producer schema's required unknown reasons with its fixed validator; schema
+projection and missing-field diagnostics do not authorize semantic repairs.

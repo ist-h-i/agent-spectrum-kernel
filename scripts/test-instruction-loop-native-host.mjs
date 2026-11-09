@@ -26,7 +26,7 @@ test('explicitly unselected native owner supports reports but rejects every owne
     generator:{storeRoot:join(root,'store'),candidateRoot:join(root,'candidate'),fullRoot:join(root,'full'),stagingRoot:join(root,'staging'),provider:{kind:'fixture'}},
     normal:{target:null},policy:{normal_target:null},native:{protectedRoot:root,root:join(root,'native'),workRoot:join(root,'work'),executionKind:'real_codex'},report:{}};
   const file=join(root,'profile.json');writeFileSync(file,JSON.stringify(profile));
-  const config=createNativeInstructionLoopConfiguration(file);assert.equal(config.policy.normal_target,null);
+  const config=createNativeInstructionLoopConfiguration(file);assert.equal(config.policy.normal_target,null);assert.ok(config.runtime.commands.report.pins.some(p=>p.path.endsWith('/practical-quality-observation.mjs')),'native-only feedback dependency is pinned');
   const report=await executeNativeInstructionLoopStage(profile,{kind:'report',input:{selection:{execution_binding:{plan_object_digest:'approved-plan'}},candidate:{source_revision:'actual-source'},trials:[]}});
   assert.equal(report.received.planObjectDigest,'approved-plan');
   for(const kind of ['plan','apply','restore','cleanup'])await assert.rejects(executeNativeInstructionLoopStage(profile,{kind,input:{}}),/normal owner target required/);

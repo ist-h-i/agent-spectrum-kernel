@@ -26,7 +26,7 @@ export function buildInstructionRecoveryPacket({policy,job,result,logicalRow,ret
   if(['completed','failed','interrupted'].includes(result?.status))available.push('execution');
   if(Number.isFinite(duration)&&duration>=0)available.push('duration');
   if(Object.values(usage).some(v=>v!==null))available.push('usage');
-  if((result?.status==='completed'||out.execution_completed===true)&&(quality.value?.evidence_refs.length||!quality.value&&['pass','fail'].includes(supplied.outcome)&&Array.isArray(supplied.evidence_refs)&&supplied.evidence_refs.length&&!quality.issue))available.push('quality');
+  if((result?.status==='completed'||out.execution_completed===true)&&((quality.value?.evidence_refs.length&&(!quality.value.grading_diagnostics||quality.value.grading_diagnostics.observations.length>0))||!quality.value&&['pass','fail'].includes(supplied.outcome)&&Array.isArray(supplied.evidence_refs)&&supplied.evidence_refs.length&&!quality.issue))available.push('quality');
   const missing=policy.required_dimensions.filter(k=>!available.includes(k));
   const issues=[...(result?.status==='completed'?[]:['trial_not_completed']),...(!closed?['process_closure_unconfirmed']:[]),...missing.map(k=>'missing_'+k),
     ...(policy.required_dimensions.includes('usage')&&available.includes('usage')&&Object.values(usage).some(v=>v===null)?['partial_usage']:[]),
@@ -38,7 +38,7 @@ export function buildInstructionRecoveryPacket({policy,job,result,logicalRow,ret
     available_dimensions:available,missing_dimensions:missing,issues,
     observations:{duration_ms:Number.isFinite(duration)&&duration>=0?duration:null,usage,
       declared_outcome:['pass','fail','unknown'].includes(supplied.outcome)?supplied.outcome:'unknown',quality_certified:false,
-      scoped_quality:quality.value?{scope:quality.value.scope,outcome:quality.value.outcome,fixed_reference:quality.value.fixed_reference}:null,
+      scoped_quality:quality.value?{scope:quality.value.scope,outcome:quality.value.outcome,fixed_reference:quality.value.fixed_reference,...(quality.value.grading_diagnostics?{grading_diagnostics:structuredClone(quality.value.grading_diagnostics)}:{})}:null,
       phases:Object.fromEntries(['task','grade'].map(k=>{const phase=out[k];return [k,phase?{exit_code:Number.isSafeInteger(phase.exit_code)?phase.exit_code:null,
         timed_out:phase.timed_out===true,local_group_closed:phase.process_group_closed===true,provider_terminal_confirmed:phase.provider_terminal_confirmed??null}:null];})),
       failure_kind:typeof out.failure_kind==='string'?out.failure_kind.slice(0,100):null},
