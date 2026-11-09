@@ -40,6 +40,7 @@ function summary(state){
   return {status:state.status,run_id:state.policy.id,pending_gate:state.gate??null,
     ...(state.result_disposition?{result_disposition:instructionResultDiscard(state)}:{}),
     pending_authoring:state.authoring_progress??null,
+    pending_source_application:state.pending&&['apply','restore'].includes(state.pending.kind)?state.source_application_progress??null:null,
     ...(state.report_revision?{report_revision:copy(state.report_revision)}:{}),
     pending_recovery:state.evaluation_progress?.pending_recovery??null,
     pending_recovery_digest:state.evaluation_progress?.pending_recovery_digest??null,
@@ -132,6 +133,9 @@ function accept(s,job,result){
     throw new Error(`${job.kind} ${result.status}; preserve evidence and inspect partial effects`);
   }
   const out=copy(result.output);assert.ok(out&&typeof out==='object');
+  if(['apply','restore'].includes(job.kind)&&out.kind==='ask_source_application_v1'){
+    assert.equal(out.status,'merged','source publication is not application');assert.equal(out.local_git_content_verified,true,'source application requires exact Git content verification');
+  }
   if(job.kind==='select')s.rows=selectedTrials(s,out);
   if(['evaluate','evaluate_continuation'].includes(job.kind)){
     assert.equal(out.practical_status,'completed');assert.ok(out.report&&Array.isArray(out.trials));s.trials=copy(out.trials);
@@ -201,6 +205,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
 
     if(requestRestore){
       assert.equal(s.status,'completed');assert.ok(completedInstructionLoopApplicationIsActive(s),'restoration requires a still-active application');
+      assert.notEqual(s.outputs.apply.kind,'ask_source_application_v1','source restoration requires a separately pinned exact revert candidate and change plan');
       if(s.restore_requested){
         assert.equal(s.restore_decision?.disposition,'rejected');s.restore_history??=[];assert.ok(s.restore_history.length<16,'bounded restore request history');
         s.restore_history.push({request_index:s.restore_request_index??1,decision:copy(s.restore_decision)});delete s.restore_decision;
@@ -238,6 +243,9 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         if(['evaluate','evaluate_continuation'].includes(job.kind)&&result?.status==='awaiting_ai_recovery'){
           assert.equal(result.request_digest,canonicalDigest(job));s.evaluation_progress=copy(result.output);s.status='awaiting_ai_recovery';append(root,'evaluation_ai_stop',s);return summary(s);
         }
+        if(['apply','restore'].includes(job.kind)&&result?.status==='awaiting_source_application'){
+          assert.equal(result.request_digest,canonicalDigest(job));s.source_application_progress=copy(result.output);s.status='awaiting_source_application';append(root,'source_application_host_stop',s);return summary(s);
+        }
         if(!result||!terminal.has(result.status)){
           s.status='operation_uncertain';append(root,'inspection_pending',s);
           return summary(s);
@@ -264,6 +272,9 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         if(['evaluate','evaluate_continuation'].includes(job.kind)&&result?.status==='awaiting_ai_recovery'){
           assert.equal(result.request_digest,canonicalDigest(job));s.evaluation_progress=copy(result.output);s.status='awaiting_ai_recovery';append(root,'evaluation_ai_stop',s);return summary(s);
         }
+        if(['apply','restore'].includes(job.kind)&&result?.status==='awaiting_source_application'){
+          assert.equal(result.request_digest,canonicalDigest(job));s.source_application_progress=copy(result.output);s.status='awaiting_source_application';append(root,'source_application_host_stop',s);return summary(s);
+        }
         if(!result||!terminal.has(result.status)){s.status='operation_uncertain';append(root,'operation_uncertain',s);return summary(s);}
       }
       try{accept(s,job,result);}
@@ -282,6 +293,7 @@ export function inspectSupervisedInstructionLoop(root){
 
 export function completedInstructionLoopApplicationIsActive(s){
   if(s?.status!=='completed'||!s.outputs.apply||s.outputs.restore||s.outputs.switch_back)return false;
+  if(s.outputs.apply.kind==='ask_source_application_v1'&&(s.outputs.apply.status!=='merged'||s.outputs.apply.local_git_content_verified!==true))return false;
   return s.outputs.final?.outcome==='applied'||s.outputs.final?.outcome==='restoration_declined'&&s.restore_decision?.disposition==='rejected';
 }
 export function readCompletedInstructionLoopContinuation(root){
@@ -290,7 +302,7 @@ export function readCompletedInstructionLoopContinuation(root){
   assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'previous cycle must be completed, with no uncertain operation');
   const discarded=instructionResultDiscard(s);
   return copy({policy:s.policy,journal_digest:previous,candidate:s.outputs.register,report:discarded?null:s.outputs.report??null,
-    ...(discarded?{result_disposition:discarded}:{}),outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),
+    ...(discarded?{result_disposition:discarded}:{}),outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),application:s.outputs.apply??null,
     registry:s.outputs.switch_back??s.outputs.cleanup?.registry??s.outputs.activate??s.outputs.retire??s.outputs.register.registry});
 }
 

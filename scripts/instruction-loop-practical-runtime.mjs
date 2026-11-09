@@ -16,11 +16,12 @@ import {createPracticalEvaluationCommandRuntime} from './instruction-loop-comman
 import {advancePracticalEvaluation,inspectPracticalEvaluation} from './practical-evaluation-runner.mjs';
 import {readRunJournal} from './instruction-run-journal.mjs';
 import {assertIsolatedEvaluationJob} from './practical-isolated-grade-continuation.mjs';
+import {inspectSourceApplication,readSourceApplicationRequest,claimSourceApplication,completeSourceApplication,validateSourceApplicationOwner,verifyRetainedSourceApplication} from './instruction-loop-source-application.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
 const sourceNames=['practical-grade-report-revision.mjs','practical-retained-grade-report.mjs','practical-grade-supplement.mjs','practical-grade-source-binding.mjs','instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
   'instruction-loop-feedback.mjs','instruction-loop-result-disposition.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
-  'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
+  'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-loop-source-application.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-initialization-clearance.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
   'practical-isolated-grade-continuation.mjs','practical-isolated-grade-continuation-cli.mjs','instruction-loop-command-runtime.mjs','instruction-run-journal.mjs','ask-pragmatic-evaluation-report.mjs','content-addressed-store.mjs','asset-registry.mjs','codex-exec-runner.mjs'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'practical runtime input',16*1024*1024))});
@@ -42,6 +43,7 @@ export function createFullPracticalInstructionLoopConfiguration(profilePath){
   profilePath=resolve(profilePath);const p=readJsonFileStrict(profilePath,'Full practical profile',16*1024*1024);
   assert.equal(p.kind,'full_practical_instruction_loop_profile_v1');assert.equal(p.policy.evaluation_mode,'practical_v1');
   assert.equal(p.normal.target,p.policy.normal_target);
+  if(p.normal.kind!==undefined){assert.equal(p.normal.kind,'ask_source_repository_v1');validateSourceApplicationOwner(p);}
   validateProfilePaths(p);
   const runtime={kind:'full_practical_instruction_loop_runtime_v1',profile_path:profilePath,profile_digest:pin(profilePath).digest,
     source_pins:sourceNames.map(name=>pin(join(import.meta.dirname,name)))};
@@ -103,17 +105,21 @@ function evaluationOutput(job,state){
     {practical_status:state.status,pending_recovery:state.pending_recovery,pending_recovery_digest:state.pending_recovery_digest}};
 }
 export function createFullPracticalInstructionLoopRuntime({definition,modelCallsAuthorized=false}){
-  return createPracticalLifecycleRuntime({definition,modelCallsAuthorized,readProfile:()=>checkedProfile(definition),executeStage:executeNativeInstructionLoopStage,
+  const runtime=createPracticalLifecycleRuntime({definition,modelCallsAuthorized,readProfile:()=>checkedProfile(definition),executeStage:executeNativeInstructionLoopStage,
+    inspectStage:(p,job,context)=>p.normal.kind==='ask_source_repository_v1'?inspectSourceApplication(p,job,context):null,
     validateCoordinatorRoot(root,p){
       for(const path of [p.practical.root,p.storeRoot,p.stateRoot,p.practical.baselineRoot,p.generator.baselineSourceRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,
         ...(p.normal.target===null?[]:[p.normal.target])])assert.ok(root!==path&&!root.startsWith(path+'/')&&!path.startsWith(root+'/'),'coordinator overlaps evaluation, source, state or owner');
     }});
+  for(const [name,method] of Object.entries({sourceApplicationRequest:readSourceApplicationRequest,sourceApplicationClaim:claimSourceApplication,sourceApplicationComplete:completeSourceApplication}))
+    runtime[name]=(...args)=>{const p=checkedProfile(definition);assert.equal(p.normal.kind,'ask_source_repository_v1','no source application capability');return method(p,...args);};
+  return runtime;
 }
 export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized=false,readProfile,executeStage,validateCoordinatorRoot,inspectStage=null}){
   const p=readProfile(),digest=canonicalDigest(definition);
-  const stageResult=(job,output)=>({request_digest:canonicalDigest(job),status:output?.kind==='component_authoring_pending_v1'?'awaiting_authoring':'completed',output});
+  const stageResult=(job,output)=>({request_digest:canonicalDigest(job),status:output?.kind==='component_authoring_pending_v1'?'awaiting_authoring':output?.kind==='source_application_pending_v1'?'awaiting_source_application':'completed',output});
   const folder=job=>join(p.stateRoot,'stages',canonicalDigest(job).slice(7)),resultPath=job=>join(folder(job),'result.json');
-  const handoffPath=job=>join(folder(job),'authoring-prepared.json');
+  const handoffPath=job=>join(folder(job),['apply','restore'].includes(job.kind)?'source-application-prepared.json':'authoring-prepared.json');
   const prepared=job=>{const stored=readJsonFileStrict(selectionPath(p),'practical selection',16*1024*1024);assert.equal(canonicalDigest(stored),canonicalDigest(job.input.selection),'approved practical selection drift');return stored;};
   const allocate=(job,resumable=false)=>{assertNoSymlinkPathSegments(folder(job),'practical lifecycle stage',{allowMissingLeaf:true});
     mkdirSync(dirname(folder(job)),{recursive:true,mode:0o700});
@@ -128,7 +134,14 @@ export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized
   };
   const runtime={digest,evaluate,resumeEvaluation:evaluate,
     validateCoordinatorRoot(root){validateCoordinatorRoot(root,p);},
-    async inspect(job,context={}){readProfile();if(job.kind==='evaluate_continuation')assertIsolatedEvaluationJob(job,context.root,{execute:false});if(existsSync(resultPath(job)))return readJsonFileStrict(resultPath(job),'lifecycle result',16*1024*1024);
+    async inspect(job,context={}){readProfile();if(job.kind==='evaluate_continuation')assertIsolatedEvaluationJob(job,context.root,{execute:false});if(existsSync(resultPath(job))){
+      const cached=readJsonFileStrict(resultPath(job),'lifecycle result',16*1024*1024);
+      if(p.normal.kind==='ask_source_repository_v1')try{
+        if(job.kind==='apply'){const current=inspectSourceApplication(p,job,context);assert.equal(current?.kind,'ask_source_application_v1');assert.equal(canonicalDigest(current),canonicalDigest(cached.output),'source completion changed after caching');}
+        if(job.kind==='version'&&job.input.action==='activate'||job.kind==='cleanup'&&job.input.disposition==='applied')verifyRetainedSourceApplication(p,job.input.application??null,{root:context.root,job});
+      }catch(error){const issue={request_digest:canonicalDigest(job),reason:String(error.message).slice(0,2048)};save(join(folder(job),'source-inspection-'+canonicalDigest(issue).slice(7)+'.json'),issue);return {request_digest:canonicalDigest(job),status:'unknown',inspection_issue:issue};}
+      return cached;
+    }
       if(['evaluate','evaluate_continuation'].includes(job.kind)){
         const selection=prepared(job);
         if(existsSync(selection.practical_root)){

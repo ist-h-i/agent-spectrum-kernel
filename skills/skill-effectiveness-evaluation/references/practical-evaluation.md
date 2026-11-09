@@ -191,3 +191,14 @@ more. Do not reconstruct scores or agreement from review prose. Next authoring
 input receives only incident counts/digests, never private item bodies. Align the
 producer schema's required unknown reasons with its fixed validator; schema
 projection and missing-field diagnostics do not authorize semantic repairs.
+
+When the adopted target is ASK's canonical source, use a fresh Full practical
+profile with the explicit `ask_source_repository_v1` owner from
+`docs/instruction-loop-source-application.md`. Pin its repository/base/branch and
+show the source plan at the existing change judgment; do not turn an old
+null-owner result approval into target authority. After approval, use the standard
+source-application request/claim/completion commands as the AI host. Only a new
+claim permits publication; inspect an existing execution after response loss.
+Keep a pushed branch or PR pending until the exact merged commit/tree and bound
+host CI/review evidence are recorded. Do not run a consumer Full installer on ASK,
+force-push, reset the shared checkout, or promote an unmerged candidate baseline.

@@ -3,7 +3,7 @@ import {readInstructionLoopJson,INSTRUCTION_LOOP_ARTIFACT_MAX_BYTES} from './ins
 // Native execution still uses the original Python runner/control/monitor.
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdirSync,existsSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdirSync,existsSync,writeFileSync,rmSync,readdirSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -14,6 +14,7 @@ import {selectInstructionLoopCases} from './instruction-loop-case-selection.mjs'
 import {prepareRetainedInstructionComparison,readRetainedInstructionResults} from './retained-instruction-comparison.mjs';
 import {buildInstructionLoopReferenceReport} from './instruction-loop-reference-report.mjs';
 import {runNormalOwnerLoopOperation,cleanOwnedInstructionLoopStaging} from './instruction-loop-normal-owner-worker.mjs';
+import {planSourceApplication,prepareSourceApplication,verifyRetainedSourceApplication} from './instruction-loop-source-application.mjs';
 import {transitionInstructionLoopAssets} from './instruction-loop-assets.mjs';
 import {verifyRetainedInstructionLayout} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry} from './asset-registry.mjs';
@@ -65,7 +66,7 @@ function verifyOwnedFullCandidate(p,candidate){
   assert.equal(canonicalDigest(fullInstructionInventory(p.generator.fullRoot)),canonicalDigest(retained.layout.files.map(f=>({path:f.path,bytes:f.bytes,mode:f.mode,sha256:f.raw_digest}))), 'owned Full snapshot changed before disposal');
   return owned;
 }
-export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false,inspectOnly=false,coordinatorRoot=null}={}){
+export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthorized=false,inspectOnly=false,coordinatorRoot=null,root=null}={}){
   sourceInputs(p);mkdirSync(p.stateRoot,{recursive:true,mode:0o700});
   if(job.kind==='generate'){
     assert.equal(canonicalDigest(job.input.observation),canonicalDigest(p.policy.observation),'controller observation differs from pinned profile');
@@ -153,12 +154,27 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     const c=job.input.candidate;assert.equal(c.no_change,true);assert.deepEqual(c.candidate_assets,[]);assert.deepEqual(c.baseline_assets,[]);
     assert.equal(canonicalDigest(c.environment_assets),canonicalDigest(p.generator.parentAssets),'unchanged selected refs drift');
     const owned=verifyOwnedFullCandidate(p,c);
-    if(p.normal.target!==null){const state=await import(pathToFileURL(join(owned.path,'scripts/ask-setup-apply-state.mjs')).href);assert.ok(state.managedSetupIdentities(p.normal.target).every(i=>i.source_revision!==owned.source_revision),'candidate is still installed on the scoped owner');}
+    if(p.normal.target!==null&&p.normal.kind!=='ask_source_repository_v1'){const state=await import(pathToFileURL(join(owned.path,'scripts/ask-setup-apply-state.mjs')).href);assert.ok(state.managedSetupIdentities(p.normal.target).every(i=>i.source_revision!==owned.source_revision),'candidate is still installed on the scoped owner');}
     const value=cleanOwnedInstructionLoopStaging(p.generator.stagingRoot,'unchanged');rmSync(owned.path,{recursive:true});rmSync(p.generator.fullRoot,{recursive:true});
     return {...value,owned_version_materialization_removed:true,owned_full_snapshot_removed:true,version_archive_preserved:owned.archive,owner_operation_performed:false};
   }
   if(['plan','apply','restore','cleanup'].includes(job.kind)){
     assert.notEqual(p.normal.target,null,'normal owner target required for owner operations');
+    if(p.normal.kind==='ask_source_repository_v1'){
+      assert.equal(p.kind,'full_practical_instruction_loop_profile_v1','source application requires the Full practical runtime');
+      if(job.kind==='plan')return planSourceApplication(p,job);
+      if(['apply','restore'].includes(job.kind))return prepareSourceApplication(p,job,{root:coordinatorRoot??root});
+      if(job.input.disposition==='rejected'){
+        const retirement=job.input.retirement;assert.ok(retirement,'candidate retirement must precede disposal');
+        const assets=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:retirement.snapshot_digest,trustedAuthorityContexts:retirement.trusted_authority_contexts}).assets;
+        assert.ok(job.input.candidate.candidate_assets.every(a=>assets.some(e=>e.record_digest===a.record_digest&&e.state==='retired')),'candidate is still active');
+        const requests=join(p.stateRoot,'source-applications');assert.ok(!existsSync(requests)||readdirSync(requests).length===0,'publication preparation exists; inspect it before disposal');
+        const owned=verifyOwnedFullCandidate(p,job.input.candidate),value=cleanOwnedInstructionLoopStaging(p.generator.stagingRoot,job.input.disposition);rmSync(owned.path,{recursive:true});rmSync(p.generator.fullRoot,{recursive:true});
+        return {...value,owned_version_materialization_removed:true,owned_full_snapshot_removed:true,version_archive_preserved:owned.archive};
+      }
+      verifyRetainedSourceApplication(p,null,{root:coordinatorRoot??root,job});
+      return {...cleanOwnedInstructionLoopStaging(p.generator.stagingRoot,job.input.disposition),publication_and_source_history_retained:true};
+    }
     if(job.kind==='cleanup'&&job.input.disposition==='rejected')bindMeasuredNormalOwnerSource({sourceRoot:p.generator.candidateRoot,candidate:job.input.candidate});
     const value=await runNormalOwnerLoopOperation({sourceRoot:p.generator.candidateRoot,baselineSourceRoot:p.generator.baselineSourceRoot,target:p.normal.target,stagingRoot:p.generator.stagingRoot,job});
     if(job.kind==='cleanup'&&job.input.disposition==='rejected'){
@@ -175,6 +191,10 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     return value;
   }
   assert.equal(job.kind,'version');const previous=job.input.previous_version??job.input.candidate.registry;
+  if(p.normal.kind==='ask_source_repository_v1'&&job.input.action==='activate'){
+    assert.equal(job.input.application?.kind,'ask_source_application_v1');assert.equal(job.input.application.status,'merged','unmerged publication cannot activate a source version');assert.equal(job.input.application.local_git_content_verified,true);
+    verifyRetainedSourceApplication(p,job.input.application,{root:coordinatorRoot??root,job});
+  }
   return transitionInstructionLoopAssets({storeRoot:p.storeRoot,snapshotDigest:previous.snapshot_digest,trustedAuthorityContexts:previous.trusted_authority_contexts,
     candidateAssets:job.input.candidate.candidate_assets,baselineAssets:job.input.candidate.baseline_assets??p.generator.parentAssets,action:job.input.action,authority:p.assetAuthority,baselineSnapshotDigest:job.input.action==='restore'?job.input.candidate.registry.snapshot_digest:null});
 }
