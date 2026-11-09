@@ -144,13 +144,44 @@ function prepareAuthoringRetry({operationRoot,outputRoot,id,reason,sessionRoot},
   assert.equal(canonicalDigest(config.policy),canonicalDigest(s.policy));assert.equal(canonicalDigest(config.runtime),s.policy.runtime_digest);
   assert.equal(canonicalDigest({...p.policy,runtime_digest:s.policy.runtime_digest}),canonicalDigest(s.policy));
   for(const ref of config.runtime.source_pins)assert.deepEqual(pin(ref.path),ref,'original authoring source drift');
-  assert.equal(p.generator.provider.kind,'codex');assert.equal(p.generator.initializationRetry,undefined,'authoring retry cannot be chained');
+  assert.equal(p.generator.provider.kind,'codex');
+  const prior=p.generator.initializationRetry,lineageProtectedPaths=[];let interruptedSession;
+  if(prior!==undefined){
+   assert.ok(!interrupted&&prior.kind==='full_authoring_interruption_retry_v1'&&prior.prior_origin===undefined,'authoring retry cannot be chained');
+   assert.equal(prior.attempt,1);assert.equal(prior.maximum_additional_authoring_jobs,1);assert.equal(prior.execution,null);assert.equal(prior.approval_carried_forward,false);
+   for(const path of [prior.operation_root,prior.root]){
+    assert.equal(resolve(path),path);assertNoSymlinkPathSegments(path,'interrupted origin');
+    assert.ok(path!==operationRoot&&path!==root,'retry origin must be distinct');
+   }
+   assert.ok(prior.root.startsWith(prior.operation_root+'/'));
+   for(const path of [prior.operation_root,prior.root].sort())unlocks.push(lockRunJournal(path));
+   assert.equal(readRunJournal(prior.operation_root).previous,prior.operation_journal_digest,'interrupted operation advanced');
+   assert.equal(readRunJournal(prior.root).previous,prior.journal_digest,'interrupted cycle advanced');
+   for(const ref of [prior.profile,prior.config])assert.deepEqual(pin(ref.path),ref,'interrupted input drift');
+   const claimPath=join(prior.root,'.authoring-initialization-retry/claim.json');assertNoSymlinkPathSegments(claimPath,'interrupted canonical claim');
+   const claim=json(claimPath),{intent_digest:claimedDigest,local_observation,...claimedIntent}=claim;
+   assert.equal(canonicalDigest(claimedIntent),claimedDigest,'interrupted claim drift');assert.deepEqual(claim.origin,prior,'interrupted lineage drift');
+   assert.equal(resolve(claim.output_root),dirname(profilePath),'retry must use the canonical prepared profile');
+   const receiptPath=join(claim.output_root,'recovery-prepared.json');assertNoSymlinkPathSegments(receiptPath,'interrupted preparation receipt');
+   const receipt=json(receiptPath);assert.equal(receipt.intent_digest,claimedDigest);
+   assert.deepEqual(receipt.profile,pin(profilePath));assert.deepEqual(receipt.config,pin(configPath));
+   const old=json(prior.profile.path),oldSession=old.generator.provider.sessionRoot;interruptedSession=oldSession;
+   assert.equal(old.generator.initializationRetry,undefined,'interrupted origin cannot itself be a retry');
+   assertNoSymlinkPathSegments(oldSession,'interrupted session');
+   assert.ok(!existsSync(join(oldSession,'provider-execution.json'))&&!existsSync(join(oldSession,'last-message.json')),'interrupted evidence appeared; inspect it before recovery');
+   const oldObserved=observe({taskRoot:oldSession,assessRoot:prior.root,workerPids:[]});
+   for(const key of ['workers_absent','same_uid_cwd_observation','observer_visible'])assert.equal(oldObserved[key],true);
+   assert.equal(oldObserved.provider_closure_inferred,false);assert.deepEqual(oldObserved.matching_writers,[],'interrupted owned local writer remains');assert.deepEqual(oldObserved.owned_roots,[oldSession,prior.root]);
+   assert.ok(!existsSync(join(oldSession,'provider-execution.json'))&&!existsSync(join(oldSession,'last-message.json')),'interrupted evidence appeared during inspection');
+   lineageProtectedPaths.push(prior.root,old.stateRoot,old.generator.candidateRoot,old.generator.fullRoot,old.generator.stagingRoot,oldSession,old.practical.root,prior.profile.path,prior.config.path);
+  }
   assert.equal(canonicalDigest(s.pending.input.observation),canonicalDigest(p.policy.observation));
   if(s.pending.input_digest!==undefined)assert.equal(s.pending.input_digest,canonicalDigest(s.pending.input));
   const session=p.generator.provider.sessionRoot;assert.equal(resolve(session),session);assertNoSymlinkPathSegments(session,'original authoring session');
   assert.ok(!existsSync(join(session,'last-message.json')),'inspect and retain an existing answer instead');
-  const executionPath=join(session,'provider-execution.json');
+  const executionPath=join(session,'provider-execution.json'),executionPin=interrupted?null:pin(executionPath);
   const input=fullGenerationInput({...p.generator,observation:p.policy.observation});
+  if(prior)assert.equal(prior.input_digest,canonicalDigest(input),'interrupted authoring request drift');
   if(interrupted)assert.ok(!existsSync(executionPath),'existing provider receipt requires its evidence-specific recovery');
   else {
   const execution=json(executionPath);
@@ -169,8 +200,10 @@ function prepareAuthoringRetry({operationRoot,outputRoot,id,reason,sessionRoot},
   assert.deepEqual(observed.matching_writers,[],'original owned local writer remains');assert.deepEqual(observed.owned_roots,[session,root]);
   assert.ok(!existsSync(join(session,'last-message.json')),'answer appeared during local inspection; retain it instead');
   if(interrupted)assert.ok(!existsSync(executionPath),'provider receipt appeared during local inspection');
+  else assert.deepEqual(pin(executionPath),executionPin,'provider receipt changed during local inspection');
+  if(interruptedSession)assert.ok(!existsSync(join(interruptedSession,'provider-execution.json'))&&!existsSync(join(interruptedSession,'last-message.json')),'interrupted evidence appeared during local inspection');
   assert.match(id,/^[A-Za-z0-9._-]{1,100}$/u);assert.notEqual(id,p.policy.id);assert.ok(outputRoot.startsWith(p.protectedRoot+'/'));
-  const protectedPaths=[root,p.storeRoot,p.stateRoot,p.generator.baselineSourceRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,session,p.practical.root,p.practical.baselineRoot,profilePath,configPath,...(p.normal.target===null?[]:[p.normal.target])];
+  const protectedPaths=[...lineageProtectedPaths,root,p.storeRoot,p.stateRoot,p.generator.baselineSourceRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,session,p.practical.root,p.practical.baselineRoot,profilePath,configPath,...(p.normal.target===null?[]:[p.normal.target])];
   for(const path of protectedPaths)assert.ok(!overlap(outputRoot,resolve(path)),'retry output overlaps original work');
   const retrySession=sessionRoot===undefined?join(outputRoot,'generation-session'):resolve(sessionRoot);
   assertNoSymlinkPathSegments(retrySession,'fresh retry session',{allowMissingLeaf:true});
@@ -181,8 +214,8 @@ function prepareAuthoringRetry({operationRoot,outputRoot,id,reason,sessionRoot},
   if(!existsSync(join(outputRoot,'recovery-prepared.json')))assert.ok(!existsSync(retrySession),'fresh retry session required');
   const origin={kind:interrupted?'full_authoring_interruption_retry_v1':'full_authoring_initialization_retry_v1',operation_root:operationRoot,operation_journal_digest:parent.previous,root,journal_digest:h.previous,
    job_digest:canonicalDigest(s.pending),execution:interrupted?null:pin(executionPath),profile:pin(profilePath),config:pin(configPath),input_digest:canonicalDigest(input),reason,
-   attempt:1,maximum_additional_authoring_jobs:1,remote_closure:'Unknown',...(interrupted?{prior_usage:'Unknown',prior_local_termination:'Unknown',evidence_status:'receipt_missing'}:{}),approval_carried_forward:false};
-  const intent={origin,output_root:outputRoot,id,...(sessionRoot===undefined?{}:{session_root:retrySession})},intentDigest=canonicalDigest(intent),slot=join(root,'.authoring-initialization-retry');
+   ...(prior?{prior_origin:prior}:{}),attempt:1,maximum_additional_authoring_jobs:1,remote_closure:'Unknown',...(interrupted?{prior_usage:'Unknown',prior_local_termination:'Unknown',evidence_status:'receipt_missing'}:{}),approval_carried_forward:false};
+  const intent={origin,output_root:outputRoot,id,...(sessionRoot===undefined?{}:{session_root:retrySession})},intentDigest=canonicalDigest(intent),slot=join(prior?.root??root,prior?'.authoring-interruption-initialization-retry':'.authoring-initialization-retry');
   assertNoSymlinkPathSegments(slot,'canonical authoring retry slot',{allowMissingLeaf:true});
   if(existsSync(slot))assert.equal(json(join(slot,'claim.json')).intent_digest,intentDigest,'a different authoring retry is already reserved');
   else{assert.ok(!existsSync(outputRoot),'fresh authoring retry output root required');mkdirSync(slot,{mode:0o700});writeCanonicalJsonNoReplace({outputPath:join(slot,'claim.json'),artifact:{intent_digest:intentDigest,...intent,local_observation:observed},label:'one authoring initialization retry'});}
