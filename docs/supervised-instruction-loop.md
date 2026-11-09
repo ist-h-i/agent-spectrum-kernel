@@ -5,6 +5,12 @@ generation connector, retained external runner and normal setup installers. It
 does not change the formal Evolution certification, its evidence dimensions or
 its application-receipt type. A candidate does not need to win to finish a loop.
 
+The standard evaluation path has two human judgment types. A separate opt-in
+[reference-evidence path](instruction-loop-reference-evidence.md) keeps an unrun
+standard evaluation unchanged and requires a fresh reference-use judgment before
+the existing adoption judgment. External evidence never authorizes adoption by
+itself.
+
 The two human judgment types are:
 
 1. Approve or reject an exact public Eval packet before any evaluation starts.

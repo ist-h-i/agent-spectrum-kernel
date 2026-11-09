@@ -358,6 +358,7 @@ jobs:
           node --experimental-test-module-mocks --test scripts/test-environment-evaluation.mjs scripts/test-environment-saved-results.mjs
           node --experimental-test-module-mocks --test scripts/test-retained-instruction-bridge.mjs scripts/test-supervised-instruction-loop.mjs scripts/test-instruction-loop-result-discard.mjs scripts/test-instruction-loop-generation-worker.mjs
           node --experimental-test-module-mocks --test scripts/test-instruction-loop-native-bindings.mjs scripts/test-full-source-validation.mjs scripts/test-instruction-loop-source-application.mjs scripts/test-instruction-loop-reference-report.mjs scripts/test-instruction-loop-native-host.mjs scripts/test-instruction-loop-native-input-bound.mjs scripts/test-instruction-loop-native-public-inputs.mjs scripts/test-instruction-loop-fixed-scoring.mjs scripts/test-instruction-loop-reference-scoring-runtime.mjs scripts/test-instruction-loop-host-scoring.mjs scripts/test-instruction-loop-failed-preparation.mjs scripts/test-instruction-loop-retained-authoring.mjs scripts/test-instruction-loop-grade-response.mjs scripts/test-instruction-loop-artifact-bounds.mjs scripts/test-instruction-loop-source-binding.mjs
+          node --experimental-test-module-mocks --test scripts/test-instruction-loop-reference-evidence.mjs scripts/test-instruction-loop-reference-preparation.mjs
           python3 -B scripts/test-instruction-loop-native-prepare.py
 
       - name: Run governed Evolution full-closure integration tests
