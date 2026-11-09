@@ -29,6 +29,10 @@ review are explicitly host-reported evidence. No JSON statement alone certifies
 remote authentication. Activation/cleanup and next-baseline promotion follow only
 that completion. The merged private checkout is retained as the next source base.
 
+The saved selection binds the entire profile, including private state and source
+roots. A pending job or matching policy alone cannot transplant that approval into
+a different profile or create a second publication directory.
+
 Closed inputs and durable claim/completion records reject foreign receipts,
 conflicts, changed source/base/remote and duplicate execution permission. Interrupted
 public operations remain claimed and require observation of the existing branch/PR;
