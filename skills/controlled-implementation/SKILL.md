@@ -87,6 +87,8 @@ Before editing, inspect:
 
 Before minimizing the diff, identify the current invariants, owners, and affected providers/consumers that must be covered together. Inspect runtime or configuration connections when relevant. Use `scope-control` when the sufficient boundary is unclear and `application-boundary-architecture` when boundary mechanics need a decision; reuse decisions already made upstream.
 
+For requests with multiple deliverables or constraints, identify each required outcome and its affected components before editing. During final diff inspection, check each outcome against the actual change and its evidence; finish authorized independent work even if another outcome is blocked. Record any unmet outcome and its specific blocker in the existing contract or envelope, without creating a separate report.
+
 When a material structural choice exists, compare adequate options by their ongoing investigation, maintenance, verification, and operation burden before diff size. Keep meaningful responsibility distinctions. A local fix with no structural choice needs no additional alternatives or design report.
 
 Rules:
