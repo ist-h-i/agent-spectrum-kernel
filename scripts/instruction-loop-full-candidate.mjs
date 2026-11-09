@@ -28,6 +28,8 @@ export function fullInstructionInventory(root,relative=''){
   }).sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
 }
 function allowed(path,skills){return typeof path==='string'&&skills.some(s=>path===`skills/${s}/SKILL.md`||new RegExp(`^skills/${s}/references/[A-Za-z0-9._/-]+\\.md$`,'u').test(path))&&path.split('/').every(x=>/^[A-Za-z0-9_][A-Za-z0-9._-]*$/u.test(x));}
+export const FULL_SOURCE_DERIVED_PATHS=['docs/fixtures/adapter-runtime-bundle.json','docs/fixtures/adapter-runtime-evidence.json','docs/fixtures/adapter-runtime-profiles.json','docs/fixtures/verification-proof-policy-cases.json','docs/verification-proof-policy-contract.md','docs/validation-report.md',
+  ...['implement','investigate','review-pr','verify','handoff'].map(name=>`adapters/claude-code/plugin/skills/${name}/SKILL.md`)];
 function sourceValidation(p){
   if(p.sourceValidation===undefined)return null;
   assert.deepEqual(Object.keys(p.sourceValidation).sort(),['kind'],'closed source validation setting required');
@@ -146,12 +148,23 @@ export async function generateFullInstructionCandidate(p,provider){
   // The provider never receives candidateRoot or this executable checkout.
   for(const c of changes){const path=join(p.candidateRoot,c.path);assertNoSymlinkPathSegments(path,'canonical generated file',{allowMissingLeaf:true});
     if(c.operation==='delete')rmSync(path);else{mkdirSync(dirname(path),{recursive:true});writeFileSync(path,c.text,{mode:0o644});}}
-  const derivedPaths=['docs/fixtures/adapter-runtime-bundle.json','docs/fixtures/adapter-runtime-evidence.json','docs/fixtures/adapter-runtime-profiles.json','docs/fixtures/verification-proof-policy-cases.json','docs/verification-proof-policy-contract.md'];
+  const pluginWriter=join(p.candidateRoot,'scripts/claude-plugin-fixed-entries.mjs');
+  const derivedPaths=FULL_SOURCE_DERIVED_PATHS.filter(path=>path!=='docs/validation-report.md'&&(!path.startsWith('adapters/')||existsSync(pluginWriter)));
   if(p.sourceValidation)derivedPaths.push('docs/validation-report.md');
   const authored=p.sourceValidation?fullInstructionInventory(p.candidateRoot):null;
   const refresh=spawnSync(process.execPath,[join(p.candidateRoot,'scripts/update-adapter-runtime-fixtures.mjs')],{encoding:'utf8',maxBuffer:4*1024*1024});
   assert.equal(refresh.status,0,'existing adapter fixture writer failed');
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
+  const derivation=[];
+  if(existsSync(pluginWriter))for(const mode of ['write','check']){
+    const result=spawnSync(process.execPath,[pluginWriter,'--'+mode],{cwd:p.candidateRoot,encoding:'utf8',maxBuffer:4*1024*1024,timeout:120000});
+    const record={kind:'full_source_derivation_receipt_v1',writer:'claude-plugin-fixed-entries',mode,exit_code:result.status,signal:result.signal??null,
+      stdout:String(result.stdout??'').slice(0,131072),stderr:String(result.stderr??'').slice(0,131072),runtime_or_effectiveness_implied:false};
+    const path=join(p.stagingRoot,'source-derivation-'+mode+'.json');writeCanonicalJsonNoReplace({outputPath:path,artifact:record,label:'owned source derivation'});
+    derivation.push({path:'source-derivation-'+mode+'.json',digest:hash(readStableBytes(path,'source derivation')),record});
+    assert.equal(result.status,0,'existing Claude plugin fixed-entry '+mode+' failed; inspect source derivation receipt');
+    if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
+  }
   const validation=p.sourceValidation?validateGeneratedSource(p,input.source_validation.validator_digest):null;
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
   git(p.candidateRoot,['add','--','skills',...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
@@ -175,10 +188,10 @@ export async function generateFullInstructionCandidate(p,provider){
   const layout=captureRetainedInstructionLayout({storeRoot:p.storeRoot,sourceRoot:p.fullRoot,expectedFiles:files,expectedInventoryDigest:canonicalDigest(files)});
   writeCanonicalJsonNoReplace({outputPath:join(p.stagingRoot,'changes.json'),artifact:{input_digest:canonicalDigest(input),changes},label:'owned generation changes',maximumBytes:4*1024*1024});
   writeCanonicalJsonNoReplace({outputPath:join(p.stagingRoot,'owned-files.json'),artifact:{files:[{path:'changes.json',digest:hash(readStableBytes(join(p.stagingRoot,'changes.json'),'owned changes',4*1024*1024))},
-    ...(validation?[{path:'source-validation.json',digest:validation.receipt.digest}]:[])]},label:'owned generation staging'});
+    ...derivation.map(({path,digest})=>({path,digest})),...(validation?[{path:'source-validation.json',digest:validation.receipt.digest}]:[])]},label:'owned generation staging'});
   return {kind:'generated_full_instruction_candidate_v1',source_root:p.candidateRoot,source_revision:revision,baseline_revision:p.baselineRevision,
     full_root:p.fullRoot,staging_root:p.stagingRoot,changed_paths:changed,derived_binding_paths:changed.filter(path=>derivedPaths.includes(path)),layout_object_digest:layout.object_digest,
-    generated_by_this_loop:true,execution:provided.execution,...(validation?{source_validation:validation}:{}),formal_admission_implied:false};
+    generated_by_this_loop:true,execution:provided.execution,...(derivation.length?{source_derivation:derivation}:{}),...(validation?{source_validation:validation}:{}),formal_admission_implied:false};
 }
 export function registerFullInstructionCandidate(p,candidate){
   assert.equal(candidate.source_root,p.candidateRoot);assert.equal(candidate.full_root,p.fullRoot);

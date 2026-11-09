@@ -26,7 +26,7 @@
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:a1d83abd448aaf4447e4fc5f99953bed57416baa0b523c4286dab157cb016aaa"
+      "profile_fingerprint": "sha256:c0f483e4f1acbbf75a95e5b3aca1be68fbbcaa84f352032d89fee405bf3df78e"
     },
     {
       "record_id": "codex-projection-manifest",

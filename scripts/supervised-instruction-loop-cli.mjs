@@ -23,6 +23,25 @@ try{
     assert.deepEqual(Object.keys(options),['--profile']);assert.ok(options['--profile'],'--profile required');
     console.log(JSON.stringify(inspectInstructionLoopReadiness(resolve(options['--profile'])),null,2));
   }
+  else if(['source-application-request','source-application-claim','source-application-complete'].includes(command)){
+    const allowed=['--root','--config',...(command==='source-application-claim'?['--claim']:command==='source-application-complete'?['--submission']:[])];
+    assert.ok(Object.keys(options).every(k=>allowed.includes(k)));assert.ok(options['--config']);
+    const config=readInstructionLoopJson(resolve(options['--config']));assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
+    const runtime=createConfiguredInstructionLoopRuntime({definition:config.runtime,modelCallsAuthorized:false});assert.equal(typeof runtime.sourceApplicationRequest,'function','runtime has no source application port');runtime.validateCoordinatorRoot(root);
+    const unlock=lockRunJournal(root);
+    try{const {state}=readRunJournal(root);assert.ok(state&&canonicalDigest(state.policy)===canonicalDigest(config.policy),'source application policy mismatch');
+      const job=state.pending;assert.ok(job&&['apply','restore'].includes(job.kind),'no pending source application');assert.equal(job.input.decision.disposition,'approved','exact change approval required');
+      const request=runtime.sourceApplicationRequest(job,{root});let result=request;
+      if(command==='source-application-claim'){
+        assert.ok(options['--claim']);result=runtime.sourceApplicationClaim(job,readInstructionLoopJson(resolve(options['--claim'])),{root});
+        state.source_application_progress={...state.source_application_progress,job_digest:canonicalDigest(job),handoff_digest:request.handoff_digest,claim_digest:result.claim_digest,completion_state:'claimed_publication_requires_inspection'};appendRunJournal(root,'source_application_claimed',state);
+      }else if(command==='source-application-complete'){
+        assert.ok(options['--submission']);result=runtime.sourceApplicationComplete(job,readInstructionLoopJson(resolve(options['--submission'])),{root});
+        state.source_application_progress={...state.source_application_progress,completion_digest:result.completion_digest,completion_state:'completion_recorded_awaiting_inspection'};appendRunJournal(root,'source_application_completion',state);
+      }
+      console.log(JSON.stringify(result,null,2));
+    }finally{unlock();}
+  }
   else if(['scoring-request','scoring-claim','scoring-complete'].includes(command)){
     const allowed=['--root','--profile','--config',...(command==='scoring-claim'?['--claim','--allow-model-calls']:command==='scoring-complete'?['--submission']:[])];
     assert.ok(Object.keys(options).every(k=>allowed.includes(k)));assert.ok(options['--profile']&&options['--config']);

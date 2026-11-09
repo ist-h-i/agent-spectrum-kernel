@@ -10,15 +10,18 @@ import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareNextSupervisedInstructionLoop,readCompletedInstructionLoopContinuation} from './supervised-instruction-loop.mjs';
 import {createFullPracticalInstructionLoopConfiguration} from './instruction-loop-practical-runtime.mjs';
 import {createComponentInstructionLoopConfiguration} from './instruction-loop-component-runtime.mjs';
+import {verifyMergedSourceContinuation} from './instruction-loop-source-application.mjs';
 // A complete set of executable bindings. No ports/no-op placeholders remain.
 export function createNativeInstructionLoopConfiguration(profilePath){
   profilePath=resolve(profilePath);const p=readJsonFileStrict(profilePath);
+  if(p.normal?.kind==='ask_source_repository_v1')assert.equal(p.kind,'full_practical_instruction_loop_profile_v1','source application requires the Full practical runtime');
   if(p.report?.scoringProvider)assert.equal(p.kind,'full_native_reference_loop_profile_v1','host scoring provider is native-only');
   if(p.kind==='component_practical_instruction_loop_profile_v1')return createComponentInstructionLoopConfiguration(profilePath);
   if(p.kind==='full_practical_instruction_loop_profile_v1')return createFullPracticalInstructionLoopConfiguration(profilePath);
+  assert.notEqual(p.normal?.kind,'ask_source_repository_v1','source application requires the Full practical runtime');
   assert.equal(p.kind,'full_native_reference_loop_profile_v1');inspectInstructionLoopProviderSelection(p);assert.equal(p.normal.target,p.policy.normal_target);
   const paths=['instruction-loop-artifact.mjs','instruction-projection-paths.mjs','instruction-loop-native-public-inputs.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','instruction-loop-provider-policy.mjs','instruction-loop-native-worker.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','instruction-loop-reference-report.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-host-scoring.mjs','instruction-loop-command-runtime.mjs',
-    'instruction-loop-native-prepare.py','instruction-loop-assets.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
+    'instruction-loop-native-prepare.py','instruction-loop-assets.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs','instruction-loop-source-application.mjs',
     'retained-instruction-comparison.mjs','retained-instruction-layout.mjs','instruction-environment.mjs','codex-exec-runner.mjs','asset-registry.mjs','content-addressed-store.mjs','instruction-loop-source-binding.mjs','instruction-loop-feedback.mjs','practical-quality-observation.mjs','instruction-loop-result-disposition.mjs','ask-personal-evolution-observation.mjs'];
   const pins=[{path:profilePath,digest:hash(readStableBytes(profilePath,'Full/native profile',16*1024*1024))},...paths.map(name=>({path:join(import.meta.dirname,name),digest:hash(readStableBytes(join(import.meta.dirname,name),'Full/native adapter'))}))];
   const scoringCommand=instructionReferenceScoringCommand(p);
@@ -78,6 +81,13 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
     p.generator.parentAssets=c.environment_assets??c.candidate_assets;
     if(practical)p.practical.baselineRoot=c.full_root;else p.native.baselineFullRoot=c.full_root;
     p.baselineEnvironmentObjectDigest=c.environment_object_digest;
+    if(history.application?.kind==='ask_source_application_v1'){
+      const source=verifyMergedSourceContinuation(history.application,p.normal.remote_url);
+      p.generator.baselineSourceRoot=source.publication_root;p.generator.baselineRevision=source.merge_commit;
+      p.normal.target=source.publication_root;p.normal.base_revision=source.merge_commit;
+      const stem=old.normal.publication_branch.replace(/\/[^/]+$/u,'').slice(0,40).replace(/\/+$/u,'');
+      p.normal.publication_branch=stem+'/cycle-'+cycleKey.slice(0,20);
+    }
   }
   p.selection.observedCosts={...(p.selection.observedCosts??{})};
   for(const row of history.report?.rows??[])if(typeof row.fixture_id==='string'&&Number.isFinite(row.cli_seconds)&&row.cli_seconds>=0)
@@ -105,6 +115,7 @@ export function buildNextNativeInstructionLoopProfile({root,profilePath,configPa
     resultSummary:discarded?null:resultSummary??`Previous observed result metrics (not formal admission): ${JSON.stringify(metrics)}. Missing components remain unknown.`});
   assert.equal(prepared.policy.observation.previous.journal_digest,history.journal_digest,'previous cycle changed during preparation');
   p.policy=prepared.policy;delete p.policy.runtime_digest;
+  if(history.application_active&&history.application?.kind==='ask_source_application_v1')p.policy.normal_target=p.normal.target;
   return {profile:p,output_root:outputRoot};
 }
 export function prepareNextNativeInstructionLoopConfiguration(options){

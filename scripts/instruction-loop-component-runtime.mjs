@@ -16,7 +16,7 @@ import {readHostInstructionAuthoringRequest,claimHostInstructionAuthoring,comple
 import {supervisedEnvironmentReceipt} from './instruction-loop-environment-approval.mjs';
 import {planEnvironmentTargetApply,applyEnvironmentTargetPlan,restoreEnvironmentTarget,inspectSupervisedEnvironmentTarget} from './environment-target.mjs';
 const sourceNames=['practical-grade-report-revision.mjs','practical-retained-grade-report.mjs','practical-grade-supplement.mjs','practical-grade-source-binding.mjs','instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-host-authoring.mjs','instruction-loop-provider-policy.mjs','instruction-loop-component-runtime.mjs','instruction-loop-component-candidate.mjs','instruction-loop-environment-approval.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
-  'instruction-loop-practical-runtime.mjs','instruction-loop-retained-authoring.mjs','instruction-environment-authoring.mjs','instruction-composition.mjs','instruction-asset-package.mjs',
+  'instruction-loop-practical-runtime.mjs','instruction-loop-source-application.mjs','instruction-loop-source-binding.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','instruction-environment-authoring.mjs','instruction-composition.mjs','instruction-asset-package.mjs',
   'instruction-environment.mjs','instruction-environment-compiler.mjs','environment-target.mjs','environment-target-owner.mjs',
   'instruction-source-version.mjs','instruction-loop-assets.mjs','instruction-run-journal.mjs','supervised-instruction-loop.mjs',
   'practical-evaluation-runner.mjs','practical-isolated-grade-continuation.mjs','practical-isolated-grade-continuation-cli.mjs','practical-initialization-clearance.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
@@ -25,6 +25,7 @@ const sourceNames=['practical-grade-report-revision.mjs','practical-retained-gra
   'instruction-projection-paths.mjs','codex-exec-runner.mjs','execution-envelope.mjs','../schemas/instruction-asset-package.schema.json'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'component runtime source',16*1024*1024))});
 function checkedPaths(p){
+  assert.notEqual(p.normal?.kind,'ask_source_repository_v1','source application requires the Full practical runtime');
   inspectInstructionLoopProviderSelection(p);
   validatePracticalModelConditions(p);
   componentEnvironmentOptions(p);

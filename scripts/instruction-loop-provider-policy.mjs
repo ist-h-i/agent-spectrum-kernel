@@ -18,5 +18,6 @@ export function inspectInstructionLoopProviderSelection(p){
   const commands=native?[]:Object.values(p.practical?.conditions??{}),standard=commands.filter(c=>c.codex).length;
   return {instruction_adapter:component?p.adapter:'codex',authoring_provider:!component&&p.generator.provider.retainedAuthoring?'retained_codex_response':authoring,
     recovery_assessor:assessor,
-    trial_transport:native?'codex_native_reference':standard===0?'pinned_commands':standard===commands.length?'standard_codex':'mixed_standard_codex_and_pinned_commands',normal_target_configured:p.normal?.target!=null};
+    trial_transport:native?'codex_native_reference':standard===0?'pinned_commands':standard===commands.length?'standard_codex':'mixed_standard_codex_and_pinned_commands',normal_target_configured:p.normal?.target!=null,
+    ...(p.normal?.kind==='ask_source_repository_v1'?{application_transport:'source_publication_external_host'}:{})};
 }

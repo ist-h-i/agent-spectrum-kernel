@@ -8,7 +8,7 @@ import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
 import {generateFullInstructionCandidate,fullGenerationInput} from './instruction-loop-full-candidate.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {cleanOwnedInstructionLoopStaging} from './instruction-loop-normal-owner-worker.mjs';
-function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false}={}){
+function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false,pluginWriterSuffix=null}={}){
  const root=realpathSync(mkdtempSync(join(tmpdir(),'ask-full-validation-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
  const base=join(root,'base');mkdirSync(join(base,'skills/demo'),{recursive:true});
  writeFileSync(join(base,'AGENTS.md'),'Synthetic Full instructions.\n');writeFileSync(join(base,'skills/demo/SKILL.md'),'## Goal\nOriginal instruction.\n');
@@ -18,6 +18,10 @@ function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false}={}){
  for(const name of ['adapter-runtime-evidence.json','adapter-runtime-profiles.json'])writeFileSync(join(base,'docs/fixtures',name),'{}');
  writeFileSync(join(base,'docs/verification-proof-policy-contract.md'),'Synthetic fixed policy.\n');
  writeFileSync(join(base,'scripts/update-adapter-runtime-fixtures.mjs'),`import{writeFileSync,mkdirSync}from'node:fs';mkdirSync(new URL('../docs/fixtures/',import.meta.url),{recursive:true});writeFileSync(new URL('../docs/fixtures/adapter-runtime-bundle.json',import.meta.url),'{}');${writerSuffix}`);
+ if(pluginWriterSuffix!==null){
+  for(const name of ['implement','investigate','review-pr','verify','handoff']){mkdirSync(join(base,'adapters/claude-code/plugin/skills',name),{recursive:true});writeFileSync(join(base,'adapters/claude-code/plugin/skills',name,'SKILL.md'),'stale fingerprint');}
+  writeFileSync(join(base,'scripts/claude-plugin-fixed-entries.mjs'),`import{readFileSync,writeFileSync}from'node:fs';import{createHash}from'node:crypto';const digest=createHash('sha256').update(readFileSync(new URL('../skills/demo/SKILL.md',import.meta.url))).digest('hex');for(const n of ['implement','investigate','review-pr','verify','handoff']){const p=new URL('../adapters/claude-code/plugin/skills/'+n+'/SKILL.md',import.meta.url);if(process.argv[2]==='--write')writeFileSync(p,digest);else if(readFileSync(p,'utf8')!==digest)throw Error('stale fingerprint');}${pluginWriterSuffix}`);
+ }
  writeFileSync(join(base,'scripts/validate-repo.mjs'),`import{readFileSync,writeFileSync,chmodSync}from'node:fs';import{spawnSync}from'node:child_process';
  const root=new URL('../',import.meta.url),body=readFileSync(new URL('skills/demo/SKILL.md',root),'utf8');
  if(process.argv.slice(2).join(' ')!=='--write-report')throw Error('exact trusted validator invocation required');
@@ -88,4 +92,17 @@ test('trusted fixture refresh commits the derived verification cases without bro
  assert.ok(c.derived_binding_paths.includes('docs/fixtures/verification-proof-policy-cases.json'));
  const status=spawnSync('git',['status','--porcelain'],{cwd:p.candidateRoot,encoding:'utf8'});assert.equal(status.status,0);assert.equal(status.stdout,'');
  assert.equal(c.source_validation.status,'passed');
+});
+test('Full candidate synchronizes fixed plugin fingerprints before commit, preserving source and owned receipts',async t=>{
+ const {p}=fixture(t,{pluginWriterSuffix:''});const c=await generateFullInstructionCandidate(p,provider('## Goal\nChanged source.\n'));
+ for(const name of ['implement','investigate','review-pr','verify','handoff']){const path=`adapters/claude-code/plugin/skills/${name}/SKILL.md`;assert.ok(c.derived_binding_paths.includes(path));assert.equal(readFileSync(join(p.candidateRoot,path),'utf8'),hash(readFileSync(join(p.candidateRoot,'skills/demo/SKILL.md'))).slice(7));assert.equal(readFileSync(join(p.baselineSourceRoot,path),'utf8'),'stale fingerprint');}
+ assert.deepEqual(c.source_derivation.map(r=>r.record.exit_code),[0,0]);assert.deepEqual(c.source_derivation.map(r=>r.record.mode),['write','check']);
+ cleanOwnedInstructionLoopStaging(p.stagingRoot);assert.equal(existsSync(join(p.stagingRoot,'source-derivation-write.json')),false);assert.equal(c.source_derivation[0].record.exit_code,0);
+});
+test('failed plugin synchronization retains the failure without commit or installer dispatch',async t=>{
+ const {p}=fixture(t,{pluginWriterSuffix:`console.error('synthetic writer failure');process.exitCode=7;`});await assert.rejects(generateFullInstructionCandidate(p,provider('## Goal\nChanged.\n')),/fixed-entry write failed/);
+ const receipt=JSON.parse(readFileSync(join(p.stagingRoot,'source-derivation-write.json')));assert.equal(receipt.exit_code,7);assert.match(receipt.stderr,/synthetic writer failure/);assert.equal(existsSync(join(p.fullRoot,'AGENTS.md')),false);
+});
+test('plugin writer cannot change executable sources under derived-output authority',async t=>{
+ const {p}=fixture(t,{pluginWriterSuffix:`writeFileSync(new URL('./install-kernel.mjs',import.meta.url),'throw Error("must not execute")');`});await assert.rejects(generateFullInstructionCandidate(p,provider('## Goal\nChanged.\n')),/source writer changed unexpected path: scripts\/install-kernel/);assert.equal(existsSync(join(p.fullRoot,'AGENTS.md')),false);
 });
