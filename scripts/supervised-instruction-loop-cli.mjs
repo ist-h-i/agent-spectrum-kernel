@@ -12,7 +12,7 @@ import {readRunJournal,appendRunJournal,lockRunJournal} from './instruction-run-
 import {advanceInstructionLoopOperation,inspectInstructionLoopOperation} from './instruction-loop-operation.mjs';
 import {prepareNextComponentInstructionLoopConfiguration} from './instruction-loop-component-continuation.mjs';
 import { prepareNextNativeInstructionLoopConfiguration,createNativeInstructionLoopConfiguration,inspectInstructionLoopReadiness } from './instruction-loop-native-configuration.mjs';
-import {prepareFailedInstructionLoopConfiguration,prepareRetainedFullAuthoringConfiguration,prepareFullAuthoringInitializationRetry} from './instruction-loop-failed-preparation.mjs';
+import {prepareFailedInstructionLoopConfiguration,prepareRetainedFullAuthoringConfiguration,prepareFullAuthoringInitializationRetry,prepareInterruptedFullAuthoringRetry} from './instruction-loop-failed-preparation.mjs';
 import { advanceSupervisedInstructionLoop, inspectSupervisedInstructionLoop, prepareNextSupervisedInstructionLoop } from './supervised-instruction-loop.mjs';
 const args=process.argv.slice(2),command=args.shift(),options={};
 try{
@@ -132,10 +132,11 @@ try{
     assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
     console.log(JSON.stringify(prepareRetainedFullAuthoringConfiguration({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),replacementProfilePath:options['--replacement-profile']?resolve(options['--replacement-profile']):resolve(options['--profile']),outputRoot:resolve(options['--output-root']),id:options['--id'],preEvaluation:command==='reconfigure-evaluation'}),null,2));
   }
-  else if(command==='recover-authoring-initialization'){
-    assert.ok(Object.keys(options).every(k=>['--root','--output-root','--id','--reason'].includes(k)));
+  else if(['recover-authoring-initialization','recover-authoring-interrupted'].includes(command)){
+    assert.ok(Object.keys(options).every(k=>['--root','--output-root','--id','--reason','--session-root'].includes(k)));
     assert.ok(options['--output-root']&&options['--id']&&options['--reason']);
-    console.log(JSON.stringify(prepareFullAuthoringInitializationRetry({operationRoot:root,outputRoot:resolve(options['--output-root']),id:options['--id'],reason:options['--reason']}),null,2));
+    const prepare=command==='recover-authoring-interrupted'?prepareInterruptedFullAuthoringRetry:prepareFullAuthoringInitializationRetry;
+    console.log(JSON.stringify(prepare({operationRoot:root,outputRoot:resolve(options['--output-root']),id:options['--id'],reason:options['--reason'],...(options['--session-root']?{sessionRoot:resolve(options['--session-root'])}:{})}),null,2));
   }
   else if(command==='recover-preparation'){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));

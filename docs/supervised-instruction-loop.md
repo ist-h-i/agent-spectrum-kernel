@@ -360,3 +360,54 @@ changed intent, chained retries, drift, unknown executions and other diagnostics
 are refused. A partial reservation remains consumed/preserved for inspection.
 This is not a general retry policy or permission to replay Task/Eval/owner work.
 If a saved authoring answer exists, use `recover-authoring` to retain it instead.
+
+### Interrupted authoring with no provider receipt
+
+A lost coordinator may leave `generate` reserved, an old `.advance-lock`, and no
+`provider-execution.json`. Do not fabricate a failure receipt, mark the original
+work complete, or replay the old reservation. For this distinct case:
+
+```sh
+node scripts/supervised-instruction-loop-cli.mjs recover-authoring-interrupted \
+  --root OPERATION --output-root FRESH --id FRESH_ID --reason PUBLIC_REASON
+```
+
+This prepares at most one fresh read-only authoring job from the exact pinned
+input. It does not start model work. Both recovery commands support a null owner
+or the validated `ask_source_repository_v1` owner, preserving its destination.
+Case selection and application still require fresh human decisions. They share
+one retry slot; a retry cannot itself request another retry.
+
+Admission is limited to pre-case `generate`, with no answer, no provider receipt,
+no case approval, trial, or owner effect. The parent and cycle must be `advancing`
+or `operation_uncertain`; their locks are acquired using the existing dead-PID
+check. A live or reused lock PID, unknown lock owner, or remaining local writer
+blocks preparation. The same-user cwd observation is bounded to 15 seconds and
+fails closed on timeout or incomplete visibility. It does not prove absence of
+all open descriptors or remote work. The original journal and session stay
+retained; prior local termination, remote closure and usage remain **Unknown**.
+Late answers or receipts detected during inspection stop preparation rather
+than being discarded. A retained receipt uses its evidence-specific recovery.
+
+Formal Verification Contract `authoring-interruption-recovery@1` is selected under
+`ask.verification-proof-policy@1.0.0` for lifecycle/persistence, regression and
+human-authority boundaries. Its obligations are: `REC-OWNER` preserve source
+owner and approval gates; `REC-MISSING` prepare a single isolated job without
+inventing prior evidence; `REC-REFUSE` reject live/unknown writers, late evidence,
+prior approvals, forks and input drift. The executable evidence is
+`scripts/test-instruction-loop-retained-authoring.mjs`; the original
+initialization and retained-answer cases remain regression coverage. Related
+failed-preparation, operation, supervised-loop, source-application and practical
+initialization-recovery tests cover shared consumers. These tests do not measure
+real model quality, remote costs, or a successful live recovery.
+
+
+If the pinned provider restricts generation to its original input-only directory
+namespace, either retry command accepts `--session-root FRESH_SIBLING_SESSION`.
+This optional session must have the same parent as the original provider session,
+be fresh, and overlap neither retained evidence, source/owner paths nor the fresh
+configuration. It is included in the once-only retry intent; changing it cannot
+create another retry. Preparation does not create the session or change the
+provider executable, permissions, prompt, or input digest. Without this option,
+the session remains `FRESH/generation-session`. Use a name accepted by the pinned
+provider; the option does not relax that provider's own checks.

@@ -101,3 +101,12 @@ test('recovery CLI admits a fresh packet without model calls and rejects output 
  r=spawnSync(process.execPath,[cli,'admit','--operation',f.operation,'--clearance',output],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout).pending_recovery.process_closed,false);assert.equal(f.calls.length,1);assert.equal(f.state().extra_trials,0);
  r=spawnSync(process.execPath,[cli,'prepare','--operation',f.operation,'--reason','Synthetic.','--output',join(f.root,'bad.json')],{encoding:'utf8'});assert.notEqual(r.status,0);assert.equal(existsSync(join(f.root,'bad.json')),false);
 });
+
+test('local writer inspection has a finite timeout and never treats timeout as absence',()=>{
+ let inspected=false;
+ assert.throws(()=>observeInitializationRecoveryProcesses({taskRoot:'/owned/session',assessRoot:'/owned/run',workerPids:[]},(_command,_args,options)=>{
+  inspected=true;assert.equal(options.timeout,15000);
+  return {status:null,error:Object.assign(new Error('timed out'),{code:'ETIMEDOUT'}),stdout:'',stderr:''};
+ }),/cannot completely inspect/);
+ assert.equal(inspected,true);
+});
