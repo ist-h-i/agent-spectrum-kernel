@@ -120,7 +120,7 @@ function report(s){
        const values=grades.map(a=>{const m=a.result.output?.grade?.provider_observation?.metrics,v=m?.[k];return Number.isSafeInteger(v)&&v>=0&&!(k==='cached_tokens'&&Number.isSafeInteger(m.input_tokens)&&v>m.input_tokens)?v:null;}),known=values.filter(v=>v!==null);
        return [k,{known_total:known.length?known.reduce((a,b)=>a+b,0):null,observed_count:known.length,unknown_count:values.length-known.length}];})),
       usage_scope:'caller-reported grading observations only; cached is an input subset; complete hierarchy and billed cost remain unknown'},
-    comparison_limits:[...s.decisions.flatMap(d=>d.assessment.comparison_limits),...(s.isolated_grade_continuations?.length?['An earlier read-only grading role remains Unknown and consumed; only unattempted approved rows continued after a bounded local isolation inspection. Original Task/grade results and unknown costs are preserved; no provider closure or retry was inferred.']:[])],
+    comparison_limits:[...(s.attempts.some(a=>inspectPracticalQualityObservation(a.result.output).value?.grading_diagnostics)?['Partial grading observations are unconfirmed caller reports, not fixed points, passes or independent item verification. Missing judgments remain Unknown.']:[]),...s.decisions.flatMap(d=>d.assessment.comparison_limits),...(s.isolated_grade_continuations?.length?['An earlier read-only grading role remains Unknown and consumed; only unattempted approved rows continued after a bounded local isolation inspection. Original Task/grade results and unknown costs are preserved; no provider closure or retry was inferred.']:[])],
     completeness_required:false,formal_admission_implied:false,application_performed:false};
 }
 function applyAssessment(s,assessment,allowedRows=null){

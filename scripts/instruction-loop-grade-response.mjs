@@ -7,7 +7,19 @@ export function fixedGradeJudgmentSchema(schema){
  const result=structuredClone(schema);
  result.title='Fixed source judgment only; host binds identity, coverage and score';
  result.required=[...fields];result.properties=Object.fromEntries(fields.map(k=>[k,result.properties[k]]));
- result.additionalProperties=false;return result;
+ result.additionalProperties=false;
+ // Tighten only the producer schema's existing status/reason vocabulary. This
+ // requests a missing explanation; it does not repair a saved model judgment.
+ function visit(node){
+  if(!node||typeof node!=='object')return;
+  const props=node.properties,status=props?.status;
+  if(props?.reason?.type==='string'&&Array.isArray(status?.enum)&&status.enum.includes('undetermined')){
+   const rule={if:{properties:{status:{const:'undetermined'}},required:['status']},then:{required:['reason'],properties:{reason:{type:'string',minLength:1,pattern:'\\S'}}}};
+   node.allOf??=[];if(!node.allOf.some(v=>canonicalDigest(v)===canonicalDigest(rule)))node.allOf.push(rule);
+  }
+  for(const value of Object.values(node))if(Array.isArray(value))value.forEach(visit);else visit(value);
+ }
+ visit(result);return result;
 }
 export function normalizeFixedGradeResponse(value,{role,expectedCoverage}){
  assert.ok(['primary','verification'].includes(role));assert.ok(Array.isArray(expectedCoverage));

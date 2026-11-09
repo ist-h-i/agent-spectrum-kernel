@@ -1,3 +1,4 @@
+import{validateSchemaValue}from'./json-schema-validation.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {fixedGradeJudgmentSchema,normalizeFixedGradeResponse} from './instruction-loop-grade-response.mjs';
 const fields=['items','crosscutting','nonfunctional','defects','critical'];
@@ -20,4 +21,18 @@ for(const raw of [{...judgment(),coverage:['other']},{...judgment(),identity:{}}
 test('verification preserves abstention and refuses contradictory or incomplete output',()=>{
  for(const verdict of ['agree','undetermined']){const raw={verdict,judgment:null,review:'bounded evidence'};assert.deepEqual(normalizeFixedGradeResponse(raw,{role:'verification',expectedCoverage:[]}).value,raw);}
  for(const raw of [{verdict:'agree',judgment:judgment(),review:'bad'},{verdict:'correct',judgment:null,review:'bad'},{verdict:'correct',judgment:{items:{}},review:'bad'},{verdict:'agree',judgment:null,review:'',score:100}])assert.throws(()=>normalizeFixedGradeResponse(raw,{role:'verification',expectedCoverage:[]}));
+});
+
+test('unknown reasons declared by the source schema are required without changing saved judgments',()=>{
+ const row={type:'object',required:['status'],properties:{status:{enum:['achieved','undetermined']},reason:{type:'string'}},additionalProperties:false};
+ const full={type:'object',properties:{items:{type:'array',items:{$ref:'#/$defs/row'}},crosscutting:{type:'object'},nonfunctional:{type:'object'},defects:{type:'array'},critical:{type:'object'}},$defs:{row}};
+ const before=structuredClone(full),projected=fixedGradeJudgmentSchema(full);
+ assert.deepEqual(full,before);
+ assert.deepEqual(projected.$defs.row.allOf,[{if:{properties:{status:{const:'undetermined'}},required:['status']},then:{required:['reason'],properties:{reason:{type:'string',minLength:1,pattern:'\\S'}}}}]);
+ assert.deepEqual(fixedGradeJudgmentSchema(projected),projected,'schema projection is idempotent');
+ for(const value of [{status:'undetermined'},{status:'undetermined',reason:''},{status:'undetermined',reason:' \t\n'}])assert.ok(validateSchemaValue(value,projected.$defs.row).length>0,'missing/blank unknown reasons are rejected');
+ assert.deepEqual(validateSchemaValue({status:'undetermined',reason:'Runtime evidence is unavailable.'},projected.$defs.row),[]);
+ assert.deepEqual(validateSchemaValue({status:'achieved'},projected.$defs.row),[],'known rows do not gain unrelated reason requirements');
+ const raw={...judgment(),items:[{id:'C06',status:'undetermined'}]};
+ assert.deepEqual(normalizeFixedGradeResponse(raw,{role:'primary',expectedCoverage:['C06']}).value,raw,'never invent a missing reason');
 });

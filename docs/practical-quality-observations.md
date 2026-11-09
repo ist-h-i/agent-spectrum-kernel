@@ -61,3 +61,9 @@ type, and grants no new score, source authenticity or execution authority.
 Revisit before certifying source evidence as runtime acceptance, accepting
 unbound quality, pooling different scales or inferring full cost from partial
 usage. Arbitrary grading content stays in retained artifacts, not next-cycle input.
+
+For an incomplete/contradictory full judgment, optional artifact-bound
+`grading_diagnostics` preserves unconfirmed per-criterion reported states and
+validator incidents while outcome remains Unknown and fixed_reference stays
+null. See [partial grading evidence](practical-partial-grading.md) for the closed
+shape, helper, bounded privacy projection and continuation rules.
