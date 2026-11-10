@@ -4,7 +4,7 @@ import {readInstructionLoopJson as readJsonFileStrict,readInstructionLoopBytes a
 // replaying an expensive or mutating operation. No shell or model-selected code.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, closeSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, closeSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {canonicalDigest,stableCanonicalJson,assertNoSymlinkPathSegments,writeCanonicalJsonNoReplace} from './content-addressed-store.mjs';
 import { instructionBytesDigest } from './instruction-environment.mjs';
@@ -17,6 +17,7 @@ function checkedDefinition(definition,requiredKinds){
     assert.equal(resolve(c.argv[0]),c.argv[0]);
     assert.ok(Array.isArray(c.pins)&&c.pins.length>0);
     assert.equal(typeof c.model_calls,'boolean');
+    if(c.refresh_inspection!==undefined){assert.equal(c.refresh_inspection,true);assert.ok(c.inspect_argv,'refresh requires inspector');}
     if(c.inspect_argv)assert.ok(Array.isArray(c.inspect_argv)&&c.inspect_argv.length>=2&&c.inspect_argv[0]===c.argv[0]&&c.inspect_argv.every(x=>typeof x==='string'&&!x.includes('\0')));
     for(const p of c.pins){assert.equal(resolve(p.path),p.path);assert.match(p.digest,/^sha256:[a-f0-9]{64}$/u);}
   }
@@ -40,9 +41,10 @@ function createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKin
   }
   async function inspect(job,{root}){
     const directory=folder(job,root);assertNoSymlinkPathSegments(directory,'loop job',{allowMissingLeaf:true});
-    const file=join(directory,'result.json');
+    let file=join(directory,'result.json'),inspectionDirectory=null;
     const command=definition.commands[job.kind];
-    if(!existsSync(file)&&existsSync(join(directory,'request.json'))&&command.inspect_argv){
+    if((!existsSync(file)||command.refresh_inspection)&&existsSync(join(directory,'request.json'))&&command.inspect_argv){
+      if(command.refresh_inspection){inspectionDirectory=mkdtempSync(join(directory,'inspection-tmp-'));file=join(inspectionDirectory,'result.json');}
       verifyPins(command);
       const err=openSync(join(directory,'inspector.stderr.log'),'a',0o600);
       let code;
@@ -51,6 +53,15 @@ function createPinnedCommandRuntime({definition,modelCallsAuthorized,requiredKin
           cwd:directory,shell:false,stdio:['ignore','ignore',err],env:{...process.env,ASK_LOOP_MODEL_CALLS_AUTHORIZED:'0'}});
         code=await new Promise((done,fail)=>{child.once('error',fail);child.once('close',done);});
       }finally{closeSync(err);}
+      if(inspectionDirectory){
+        if(existsSync(file)){
+          const observed=readJsonFileStrict(file),original=join(directory,'result.json');
+          const retained=existsSync(original)&&canonicalDigest(readJsonFileStrict(original))===canonicalDigest(observed)?directory:join(directory,'inspection-'+canonicalDigest(observed).slice(7));
+          if(existsSync(join(retained,'result.json'))){assert.equal(canonicalDigest(readJsonFileStrict(join(retained,'result.json'))),canonicalDigest(observed));rmSync(inspectionDirectory,{recursive:true});}
+          else renameSync(inspectionDirectory,retained);
+          file=join(retained,'result.json');
+        }else rmSync(inspectionDirectory,{recursive:true});
+      }
       if(code!==0&&!existsSync(file))return {status:'unknown',inspection_exit_code:code,inspection_error_log:join(directory,'inspector.stderr.log')};
     }
     if(existsSync(file)){

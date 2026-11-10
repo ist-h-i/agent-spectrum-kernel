@@ -41,7 +41,7 @@ function bindEvaluator(c,root,output){
  root=realpathSync(root);assert.ok(outside(root,output)&&outside(root,SOURCE),'private evaluator must be external to checkout and run');
  return {root,files:c.evaluator.files.map(f=>{safe(f.path);verified({path:join(root,f.path),digest:f.digest});return f;})};
 }
-export function preparePracticalChallenge({id,root,options,updatePath,evaluatorRoot=null,instructionsRoot=null,toolchainRoots,sessionRoots=[],evidenceKind='observed'}){
+export function preparePracticalChallenge({id,root,options,updatePath,evaluatorRoot=null,instructionsRoot=null,instructionsSupplements=[],toolchainRoots,sessionRoots=[],evidenceKind='observed'}){
  assert.ok(['observed','synthetic'].includes(evidenceKind));
  const c=registration(id),files=verifyPublic(c);root=resolve(root);assertNoSymlinkPathSegments(root,'challenge run',{allowMissingLeaf:true});
  assert.ok(outside(root,SOURCE),'run must be outside source checkout');assert.ok(!existsSync(root),'fresh run required');
@@ -51,13 +51,18 @@ export function preparePracticalChallenge({id,root,options,updatePath,evaluatorR
  const update={path:realpathSync(updatePath??join(SOURCE,c.stages[1].update.path)),digest:c.stages[1].update.digest};verified(update);assert.ok(outside(update.path,root));
  const evaluator=evaluatorRoot?bindEvaluator(c,evaluatorRoot,root):null;
  const instructions=instructionsRoot?{root:realpathSync(instructionsRoot),files:tree(realpathSync(instructionsRoot))}:null;
+ assert.ok(Array.isArray(instructionsSupplements));
+ const supplements=new Map();
+ for(const f of instructionsSupplements){assert.deepEqual(Object.keys(f).sort(),['digest','path']);safe(f.path);assert.match(f.digest,/^sha256:[a-f0-9]{64}$/u);assert.ok(!supplements.has(f.path),'duplicate instruction supplement');supplements.set(f.path,f.digest);}
+ if(supplements.size)assert.ok(instructions,'supplements require an instruction root');
  if(instructions){
+  for(const [path,digest] of supplements){assert.ok(instructions.files.some(f=>f.path===path&&f.digest===digest),'instruction supplement missing or changed');}
   assert.ok(outside(instructions.root,root));const managed=new Map();
   const states=['.agent-spectrum-kernel/install-state.json','.agent-spectrum-kernel/codex-install-state.json'];
   for(const name of states)if(existsSync(join(instructions.root,name))){const state=readJsonFileStrict(join(instructions.root,name));for(const [path,entry] of Object.entries(state.managed_files??{})){safe(path);managed.set(path,'sha256:'+entry.sha256);}}
   for(const f of instructions.files){
    const base=f.path==='AGENTS.md'||states.includes(f.path)||f.path.startsWith('.agents/');
-   assert.ok(base||managed.has(f.path),'instructions must be an instruction-only tree or canonical installer-managed file');
+   assert.ok(base||managed.has(f.path)||supplements.has(f.path),'instructions must be an instruction-only tree or canonical installer-managed file');
    if(managed.has(f.path))assert.equal(f.digest,managed.get(f.path),'installed instruction digest drift');
   }
  }
@@ -65,7 +70,7 @@ export function preparePracticalChallenge({id,root,options,updatePath,evaluatorR
 
  const sourcePins=['practical-challenge-evaluation.mjs','practical-session-usage.mjs','practical-codex-adapter.mjs','codex-exec-runner.mjs','ask-user-comparison.mjs','content-addressed-store.mjs','instruction-environment.mjs','ask-benchmark-stable-file.mjs'].map(n=>pin(join(SOURCE,'scripts',n)));
  const manifest={kind:'practical_staged_challenge_run_v1',root,registration:c,registration_digest:canonicalDigest(c),options,
-  executable:executablePin(options.executable),source_pins:sourcePins,files,update,evaluator,instructions,toolchain_roots:toolchainRoots,session_roots:sessionRoots,
+  executable:executablePin(options.executable),source_pins:sourcePins,files,update,evaluator,instructions,instruction_supplements:instructionsSupplements,toolchain_roots:toolchainRoots,session_roots:sessionRoots,
   evidence_kind:evidenceKind,network_policy:'enabled; external access prohibited by task contract, not claimed as network isolation',comparison_limits:['Linked root/descendant response records are observed where available; complete usage and billed cost remain unknown.','Instruction overlay, toolchain and network contract must be held equal across compared runs.','This is separate challenge scoring, not primary24 admission.']};
  mkdirSync(root,{mode:0o700});mkdirSync(join(root,'workspace'),{mode:0o700});copyFiles(join(SOURCE,c.workspace),join(root,'workspace'),files);
  if(instructions)copyFiles(instructions.root,join(root,'workspace'),instructions.files);
@@ -130,7 +135,7 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
   initial_written_before_investigation:'not_automatically_verified; semantic assessor checks transcript',automatic_semantic_scoring:false};
  save(join(root,stage,'stage-result.json'),record);return inspectPracticalChallenge(root);
 }
-export function preparePracticalChallengeScoreHandoff(root,{evaluatorRoot=null}={}){
+function challengeScorePacket(root,{evaluatorRoot=null}={}){
  root=resolve(root);const m=load(root);frozen(root,m);const stages=m.registration.stages.map(s=>verifyStage(root,s.id));
  assert.ok(evaluatorRoot||m.evaluator?.root,'external semantic evaluator assets required');
  const evaluator=bindEvaluator(m.registration,evaluatorRoot??m.evaluator.root,root);
@@ -140,5 +145,14 @@ export function preparePracticalChallengeScoreHandoff(root,{evaluatorRoot=null}=
   workspace:join(root,'workspace'),quality_score:null,semantic_assessment_required:true,automatic_semantic_scoring:false,
   method:'External semantic assessor evaluates frozen rubric against answer/source/transcript evidence; the pinned external score.mjs validates and totals those decisions only.',
   comparison_limits:m.comparison_limits};
- const path=join(root,'score-handoff.json');save(path,packet);return {path,digest:canonicalDigest(packet),quality_score:null,semantic_assessment_required:true};
+ return packet;
+}
+
+export function preparePracticalChallengeScoreHandoff(root,options={}){
+ root=resolve(root);const packet=challengeScorePacket(root,options),path=join(root,'score-handoff.json');save(path,packet);return {path,digest:canonicalDigest(packet),quality_score:null,semantic_assessment_required:true};
+}
+export function inspectPracticalChallengeScoreHandoff(root){
+ root=resolve(root);const saved=readJsonFileStrict(join(root,'score-handoff.json'));
+ const expected=challengeScorePacket(root,{evaluatorRoot:saved.evaluator?.root});
+ assert.deepEqual(saved,expected,'semantic handoff changed');return expected;
 }

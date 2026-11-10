@@ -68,8 +68,9 @@ remain prohibited by the task contract; this is not a claim of enforced
 localhost-only network isolation. Missing UI/dependency evidence remains missing.
 Pin the same instruction/tool environment for each compared condition; do not
 claim exact pilot equivalence merely from these launch defaults.
-The standard multi-condition `advance` queue is not changed or bypassed; this
-explicit staged path does not automatically enter it.
+The standalone `challenge-*` commands do not automatically enter the standard
+multi-condition `advance` queue. Use the opt-in standard comparison-loop port
+below when continuing an approved comparison; the queue itself is not bypassed.
 
 ## Resume and uncertainty
 
@@ -143,3 +144,87 @@ introduced here. Calibration details are in the source package's
 - Remaining evidence: real Codex CLI option/sandbox behavior and actual staged
   model execution have not been validated through this new entry point. Registry
   availability and synthetic checks do not establish measurement readiness.
+
+## Standard comparison-loop connection
+
+`practical-challenge-worker.mjs` is an opt-in trial port for the existing
+`advancePracticalEvaluation` queue. It does not regenerate a candidate or modify
+an older run's approval packet. A fresh comparison retains explicit source
+revision/projection provenance for both conditions. Each logical trial executes
+initial review and same-session reassessment exactly once, then returns to the
+usual recovery/quality boundary for semantic assessment. Inspection never
+starts a model or repeats a consumed stage.
+
+Create pinned worker settings with these fields:
+
+- `evidence_kind`: `observed` for real execution, `synthetic` only for tests.
+- `cases[challengeId].files`: `registeredChallengeFiles(challengeId)`; the
+  ordinary plan's public-input digest is the canonical digest of the ordered
+  `{target,digest}` inventory. The challenge ID must equal the case ID.
+- `cases[challengeId].challenge`: `{id, toolchainRoots, evaluatorRoot,
+  sessionRoots}`. The private evaluator stays outside all solver/tool roots.
+- `conditions[conditionId]`: `{files, codex, instructionsSupplements}`. `files`
+  are the full pinned instruction projection (`source,target,digest,mode`);
+  `codex` is the existing adapter options including `task_file: "task.md"`.
+- `instructionsSupplements` is an explicit optional `{path,digest}` inventory
+  for public instruction documents not tracked by the canonical installer.
+  Missing, duplicate, changed, or undeclared extra files are rejected. This
+  preserves a previously measured Full projection without silently dropping
+  supporting documents or accepting an entire source repository.
+
+Write settings once, then use
+`createPracticalChallengeCommandDefinition(settingsPath)` as
+`runtime.commands.trial`. Set the normal plan's `runtime_digest` to the canonical
+digest of that runtime and run the existing `practical-evaluation-cli.mjs advance`
+with the usual exact case-approval packet. Full practical loop profiles also
+accept `practical.cases[].challenge` and pass their verified condition projections
+to this port. Ordinary cases in a mixed queue retain their ordinary worker.
+
+The private `score-handoff.json` is created automatically after both stages.
+An independent semantic assessor reads the frozen answers/source/transcripts and
+private rubric, then provides:
+
+```json
+{
+  "kind": "practical_challenge_assessment_input_v1",
+  "manifest_digest": "sha256:...",
+  "handoff_digest": "sha256:...",
+  "assessment": {"requirements": [], "release_blockers": []},
+  "grading_metrics": {"duration_ms": null, "input_tokens": null, "output_tokens": null, "cached_tokens": null}
+}
+```
+
+`requirements` must satisfy the pinned external calculator's complete rubric
+contract; an empty list above is illustrative, not valid scoring evidence.
+Import it using:
+
+```sh
+node scripts/practical-evaluation-cli.mjs challenge-import-score --root /absolute/evaluation/jobs/JOB/challenge --assessment /absolute/assessment.json
+```
+
+Import verifies the exact handoff, private evaluator, frozen public inputs,
+instructions, answer hashes and quoted answer evidence. It totals the assessor's
+decisions, not their semantic truth. Identical imports are idempotent; conflicting
+imports cannot replace an existing assessment. Partial/unknown rubric items stay
+explicit: the full quality score remains null when any item is unknown.
+
+Run the same normal `advance` again. Its read-only inspector imports the new
+quality observation through existing recovery refresh; no solver is rerun. The
+original result remains in history. Changed observations get digest-addressed
+snapshots, while repeated identical inspection reuses existing evidence instead
+of accumulating duplicate files. Missing usage or other issues still require the
+existing AI recovery judgment; no score-based automatic retries are introduced.
+The result remains subject to the separate human adoption decision.
+
+The latest cumulative linked-session usage snapshot is used, never the sum of
+stage snapshots. Missing hierarchy data remains unknown; root-only telemetry is
+retained in stage receipts but is not mislabeled as complete parent/child cost.
+Grading overhead is separate from task time. This connection is not proof that
+candidate generation, adoption, version switching or cleanup were exercised by
+an evaluation-only continuation.
+
+Model-free regression command:
+
+```sh
+node --experimental-test-module-mocks --test scripts/test-practical-challenge-worker.mjs scripts/test-challenge-evaluation.mjs scripts/test-instruction-loop-practical-runtime.mjs scripts/test-practical-evaluation-runner.mjs
+```
