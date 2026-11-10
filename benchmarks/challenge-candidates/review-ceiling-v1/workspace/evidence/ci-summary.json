@@ -1,0 +1,11 @@
+{
+  "source": "synthetic release-team CI note",
+  "kind": "reported_not_independently_verified",
+  "claimed_status": "green",
+  "claimed_scope": ["portal unit smoke", "legacy typecheck"],
+  "environment": "Node 24, local fake provider",
+  "browser_matrix": null,
+  "production_load_test": null,
+  "restart_with_remote_effect_test": null,
+  "note": "This summary is not a substitute for the actual test bodies or current execution. Missing entries do not mean failures or passes."
+}

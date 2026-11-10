@@ -1,0 +1,21 @@
+{
+  "name": "@reviewops/providers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ReviewOps provider adapter package boundary.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@reviewops/core": "workspace:*"
+  }
+}

@@ -1,0 +1,474 @@
+{
+  "name": "reviewops-guard",
+  "displayName": "%reviewops.displayName%",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "%reviewops.description%",
+  "publisher": "reviewops",
+  "icon": "resources/reviewops_guard_icon_128.png",
+  "engines": {
+    "vscode": "^1.105.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onCommand:reviewops.initializeProject",
+    "onCommand:reviewops.updateProjectContext",
+    "onCommand:reviewops.openPreview",
+    "onCommand:reviewops.openArtifacts",
+    "onCommand:reviewops.commandCenter",
+    "onCommand:reviewops.nextAction",
+    "onCommand:reviewops.resumeCurrentCycle",
+    "onCommand:reviewops.prepareGitHubPullRequestReview",
+    "onCommand:reviewops.previewGitHubReplyComment",
+    "onCommand:reviewops.prepareGitHubCommentTriage",
+    "onCommand:reviewops.prepareLocalDiffReview",
+    "onCommand:reviewops.importManualReviewResponse",
+    "onCommand:reviewops.buildReviewActionPlan",
+    "onCommand:reviewops.planReviewFix",
+    "onCommand:reviewops.buildReviewFixChecklist",
+    "onCommand:reviewops.verifyReviewFix",
+    "onCommand:reviewops.explainReviewFix",
+    "onCommand:reviewops.draftReviewReplies",
+    "onCommand:reviewops.showMetaNext",
+    "onCommand:reviewops.showP0Readiness",
+    "onCommand:reviewops.previewGitHubSummaryComment",
+    "onCommand:reviewops.setupGitHubToken",
+    "onCommand:reviewops.applyRules",
+    "onCommand:reviewops.updateRules",
+    "onCommand:reviewops.proposeRules",
+    "onCommand:reviewops.captureKnowledgeCandidates",
+    "onCommand:reviewops.captureSkillEvidence",
+    "onCommand:reviewops.generateFieldReport",
+    "onCommand:reviewops.status",
+    "onView:reviewops.statusView",
+    "onView:reviewops.reviewWorkView",
+    "onView:reviewops.knowledgeView",
+    "onView:reviewops.skillEvidenceView",
+    "onView:reviewops.reportsView",
+    "workspaceContains:.reviewops/config.yaml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "reviewops.initializeProject",
+        "title": "%reviewops.command.initializeProject.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.updateProjectContext",
+        "title": "%reviewops.command.updateProjectContext.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.openPreview",
+        "title": "%reviewops.command.openPreview.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.openArtifacts",
+        "title": "%reviewops.command.openArtifacts.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.commandCenter",
+        "title": "%reviewops.command.commandCenter.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.nextAction",
+        "title": "%reviewops.command.nextAction.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.resumeCurrentCycle",
+        "title": "%reviewops.command.resumeCurrentCycle.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.prepareGitHubPullRequestReview",
+        "title": "%reviewops.command.prepareGitHubPullRequestReview.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.prepareGitHubCommentTriage",
+        "title": "%reviewops.command.prepareGitHubCommentTriage.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.prepareLocalDiffReview",
+        "title": "%reviewops.command.prepareLocalDiffReview.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.importManualReviewResponse",
+        "title": "%reviewops.command.importManualReviewResponse.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.buildReviewActionPlan",
+        "title": "%reviewops.command.buildReviewActionPlan.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.planReviewFix",
+        "title": "%reviewops.command.planReviewFix.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.buildReviewFixChecklist",
+        "title": "%reviewops.command.buildReviewFixChecklist.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.verifyReviewFix",
+        "title": "%reviewops.command.verifyReviewFix.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.explainReviewFix",
+        "title": "%reviewops.command.explainReviewFix.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.draftReviewReplies",
+        "title": "%reviewops.command.draftReviewReplies.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.showMetaNext",
+        "title": "%reviewops.command.showMetaNext.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.showP0Readiness",
+        "title": "%reviewops.command.showP0Readiness.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.previewGitHubSummaryComment",
+        "title": "%reviewops.command.previewGitHubSummaryComment.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.previewGitHubReplyComment",
+        "title": "%reviewops.command.previewGitHubReplyComment.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.setupGitHubToken",
+        "title": "%reviewops.command.setupGitHubToken.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.applyRules",
+        "title": "%reviewops.command.applyRules.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.updateRules",
+        "title": "%reviewops.command.updateRules.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.proposeRules",
+        "title": "%reviewops.command.proposeRules.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.captureKnowledgeCandidates",
+        "title": "%reviewops.command.captureKnowledgeCandidates.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.captureSkillEvidence",
+        "title": "%reviewops.command.captureSkillEvidence.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.generateFieldReport",
+        "title": "%reviewops.command.generateFieldReport.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      },
+      {
+        "command": "reviewops.status",
+        "title": "%reviewops.command.status.title%",
+        "category": "ReviewOps",
+        "icon": {
+          "light": "resources/reviewops-command-light.svg",
+          "dark": "resources/reviewops-command-dark.svg"
+        }
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "reviewops",
+          "title": "ReviewOps",
+          "icon": "resources/reviewops-activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "reviewops": [
+        {
+          "id": "reviewops.statusView",
+          "name": "%reviewops.view.status.name%"
+        },
+        {
+          "id": "reviewops.reviewWorkView",
+          "name": "%reviewops.view.reviewWork.name%"
+        },
+        {
+          "id": "reviewops.knowledgeView",
+          "name": "%reviewops.view.knowledge.name%"
+        },
+        {
+          "id": "reviewops.skillEvidenceView",
+          "name": "%reviewops.view.skillEvidence.name%"
+        },
+        {
+          "id": "reviewops.reportsView",
+          "name": "%reviewops.view.reports.name%"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "reviewops.commandCenter",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.status",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.updateProjectContext",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.prepareLocalDiffReview",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.resumeCurrentCycle",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.prepareGitHubPullRequestReview",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.prepareGitHubCommentTriage",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.buildReviewFixChecklist",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.explainReviewFix",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.previewGitHubSummaryComment",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.previewGitHubReplyComment",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.setupGitHubToken",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.applyRules",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.updateRules",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.proposeRules",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.captureKnowledgeCandidates",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.captureSkillEvidence",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.generateFieldReport",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.showP0Readiness",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.openPreview",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewops.openArtifacts",
+          "when": "view == reviewops.statusView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@reviewops/core": "workspace:*",
+    "@reviewops/providers": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.105.0"
+  },
+  "l10n": "./l10n"
+}
