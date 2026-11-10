@@ -97,9 +97,12 @@ Findings:
   Evidence location:
   Required post-fix condition:
   Category: optional
+
+Suggestions:
+- concise evidence-grounded supplementary guidance, when useful
 ~~~
 
-Use - none when there is no finding. Do not emit empty category sections. Do not emit a final merge Decision.
+Use - none when there is no finding. Do not emit empty category sections. Omit Suggestions unless guidance grounded in the reviewed work adds decision-relevant value beyond the findings and verification stated. Keep it concise and conditional on available evidence, including relevant limits; do not invent defects, imply unperformed gates or CI passed, or treat missing evidence as approval. Such guidance may be useful even with no material defect or with missing evidence. It is neither a final merge judgment nor permission for consequential action. Do not emit a final merge Decision.
 
 ## Exit criteria
 
