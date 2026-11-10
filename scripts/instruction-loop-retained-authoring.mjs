@@ -4,7 +4,7 @@ import {existsSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,assertNoSymlinkPathSegments,parseJsonRejectDuplicateKeys} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
-import {readRunJournal} from './instruction-run-journal.mjs';
+import {readRunJournal,lockRunJournal} from './instruction-run-journal.mjs';
 import {fullGenerationInput,fullInstructionInventory} from './instruction-loop-full-candidate.mjs';
 import {bindMeasuredNormalOwnerSource} from './instruction-loop-source-binding.mjs';
 import {verifyRetainedInstructionLayout} from './retained-instruction-layout.mjs';
@@ -12,8 +12,21 @@ const json=path=>readJsonFileStrict(path,'retained Full authoring evidence',16*1
 export const retainedAuthoringPin=path=>({path:resolve(path),digest:hash(readStableBytes(resolve(path),'retained Full authoring evidence',16*1024*1024))});
 const checked=ref=>{assert.deepEqual(Object.keys(ref).sort(),['digest','path']);assert.equal(resolve(ref.path),ref.path);assert.deepEqual(retainedAuthoringPin(ref.path),ref,'retained authoring evidence drift');return json(ref.path);};
 export function inspectClosedFullAuthoring({root,profilePath,configPath,preEvaluation=false,reselectCases=false}){
- root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);
+ assert.ok(!existsSync(join(resolve(root),'.advance-lock')),'original coordinator lock requires inspection');
+ return inspectClosed({root,profilePath,configPath,preEvaluation,reselectCases});
+}
+// Keep the original controller excluded for the entire retained-copy operation.
+// A public boolean bypass would not establish lock ownership.
+export function withClosedFullAuthoring(options,action){
+ const root=resolve(options.root);
+ assertNoSymlinkPathSegments(root,'original retained coordinator');
  assert.ok(!existsSync(join(root,'.advance-lock')),'original coordinator lock requires inspection');
+ const unlock=lockRunJournal(root);
+ try{const result=action(inspectClosed({...options,root}));assert.ok(!result?.then,'retained authoring reservation must remain synchronous');return result;}
+ finally{unlock();}
+}
+function inspectClosed({root,profilePath,configPath,preEvaluation=false,reselectCases=false}){
+ root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);
  for(const path of [root,profilePath,configPath])assertNoSymlinkPathSegments(path,'original retained authoring evidence');
  assert.ok(!reselectCases||preEvaluation,'case reselection requires the unapproved evaluation gate');
  const history=readRunJournal(root),s=history.state,p=json(profilePath),config=json(configPath);

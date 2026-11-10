@@ -8,6 +8,7 @@ import { canonicalDigest, assertNoSymlinkPathSegments, readJsonFileStrict,
 import { readRunJournal as journal, appendRunJournal as append, lockRunJournal as lock } from './instruction-run-journal.mjs';
 import { projectInstructionLoopObservation, assertPublicInstructionSummary, summarizeInstructionLoopEvaluation } from './instruction-loop-feedback.mjs';
 import {instructionResultDiscard,makeInstructionResultDiscard} from './instruction-loop-result-disposition.mjs';
+import {prepareInstructionReferenceEvidence,readInstructionReferenceEvidence,referenceEvidenceReport,referenceEvidenceGate,referenceContinuationSummary} from './instruction-loop-reference-evidence.mjs';
 import {readPracticalGradeSupplementContinuation,readAdmittedPracticalGradeSupplement} from './practical-grade-report-revision.mjs';
 
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
@@ -41,6 +42,7 @@ function summary(state){
     ...(state.result_disposition?{result_disposition:instructionResultDiscard(state)}:{}),
     pending_authoring:state.authoring_progress??null,
     pending_source_application:state.pending&&['apply','restore'].includes(state.pending.kind)?state.source_application_progress??null:null,
+    ...(state.reference_evidence?{reference_evidence:copy(state.reference_evidence)}:{}),
     ...(state.report_revision?{report_revision:copy(state.report_revision)}:{}),
     pending_recovery:state.evaluation_progress?.pending_recovery??null,
     pending_recovery_digest:state.evaluation_progress?.pending_recovery_digest??null,
@@ -74,36 +76,47 @@ function next(s){
     return 'no_change';
   }
   if(!o.select)return schedule(s,'select','select',{observation:p.observation,candidate:o.register,catalog:p.catalog});
-  if(!s.evaluation_decision){
-    s.gate={kind:'evaluation',packet:{candidate:o.register,selection:o.select,rows:s.rows,runtime_digest:p.runtime_digest,
-      normal_target:p.normal_target,formal_admission_implied:false}};return null;
+  if(s.reference_evidence){
+    if(!s.reference_decision){s.gate=referenceEvidenceGate(s);return null;}
+    if(s.reference_decision.disposition==='rejected'){
+      if(p.normal_target===null)return 'reference_rejected_retained';
+      if(!o.retire)return schedule(s,'version','retire',{action:'retire',candidate:o.register,reason:'reference_rejected'});
+      if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'rejected',candidate:o.register,retirement:o.retire});
+      return 'reference_rejected';
+    }
+    o.report??=referenceEvidenceReport(s.reference_evidence);
+  }else{
+    if(!s.evaluation_decision){
+      s.gate={kind:'evaluation',packet:{candidate:o.register,selection:o.select,rows:s.rows,runtime_digest:p.runtime_digest,
+        normal_target:p.normal_target,formal_admission_implied:false}};return null;
+    }
+    if(s.evaluation_decision.disposition==='rejected'){
+      if(p.normal_target===null)return 'evaluation_rejected_retained';
+      if(!o.retire)return schedule(s,'version','retire',{action:'retire',candidate:o.register,reason:'evaluation_rejected'});
+      if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'rejected',candidate:o.register,retirement:o.retire});
+      return 'evaluation_rejected';
+    }
+    if(p.evaluation_mode==='practical_v1'){
+      if(!o.evaluate)return schedule(s,'evaluate','evaluate',{candidate:o.register,selection:o.select,rows:s.rows,evaluation_decision:s.evaluation_decision});
+      if(!o.report)o.report=o.evaluate.report;
+    }else if(s.trials.length<s.rows.length){
+      const row=s.rows[s.trials.length];
+      return schedule(s,'trial',`trial-${row.id}`,{row,candidate:o.register,selection:o.select,evaluation_decision:s.evaluation_decision});
+    }
+    if(!o.report)return schedule(s,'report','report',{candidate:o.register,selection:o.select,rows:s.rows,trials:s.trials,
+      formal_score:null,complete_hierarchical_usage:null});
   }
-  if(s.evaluation_decision.disposition==='rejected'){
-    if(p.normal_target===null)return 'evaluation_rejected_retained';
-    if(!o.retire)return schedule(s,'version','retire',{action:'retire',candidate:o.register,reason:'evaluation_rejected'});
-    if(!o.cleanup)return schedule(s,'cleanup','cleanup',{disposition:'rejected',candidate:o.register,retirement:o.retire});
-    return 'evaluation_rejected';
-  }
-  if(p.evaluation_mode==='practical_v1'){
-    if(!o.evaluate)return schedule(s,'evaluate','evaluate',{candidate:o.register,selection:o.select,rows:s.rows,evaluation_decision:s.evaluation_decision});
-    if(!o.report)o.report=o.evaluate.report;
-  }else if(s.trials.length<s.rows.length){
-    const row=s.rows[s.trials.length];
-    return schedule(s,'trial',`trial-${row.id}`,{row,candidate:o.register,selection:o.select,evaluation_decision:s.evaluation_decision});
-  }
-  if(!o.report)return schedule(s,'report','report',{candidate:o.register,selection:o.select,rows:s.rows,trials:s.trials,
-    formal_score:null,complete_hierarchical_usage:null});
   if(p.normal_target===null){
     if(!s.result_decision){
       s.gate={kind:'result',packet:{candidate:o.register,report:o.report,normal_target:null,
-        application_available:false,candidate_disposition:'retain',...(s.report_revision?{report_revision:s.report_revision}:{}),formal_admission_implied:false}};return null;
+        application_available:false,candidate_disposition:'retain',...(s.reference_evidence?{reference_evidence:s.reference_evidence,reference_decision:s.reference_decision}:{}),...(s.report_revision?{report_revision:s.report_revision}:{}),formal_admission_implied:false}};return null;
     }
     return `result_${s.result_decision.disposition}_retained`;
   }
   if(!o.plan)return schedule(s,'plan','plan',{candidate:o.register,report:o.report,target:p.normal_target});
   if(!s.change_decision){
     s.gate={kind:'change',packet:{candidate:o.register,report:o.report,plan:o.plan,
-      ...(s.report_revision?{report_revision:s.report_revision}:{}),post_approval:['exact_normal_apply','activate_version','clean_owned_staging','final_report'],
+      ...(s.reference_evidence?{reference_evidence:s.reference_evidence,reference_decision:s.reference_decision}:{}),...(s.report_revision?{report_revision:s.report_revision}:{}),post_approval:['exact_normal_apply','activate_version','clean_owned_staging','final_report'],
       rejection:['retire_candidate','clean_owned_staging','final_report'],formal_admission_implied:false}};return null;
   }
   if(s.change_decision.disposition==='rejected'){
@@ -151,7 +164,7 @@ function accept(s,job,result){
 /** runtime is a host-owned capability, not data loaded from model output/CAS.
  * Every operation must have durable inspect(job) evidence. An unknown consumed
  * operation is a safety stop, not permission to repeat it. */
-export async function advanceSupervisedInstructionLoop({root,policy,runtime,decision=null,requestRestore=false,completedImport=null,assessment=null,reportRevision=null}){
+export async function advanceSupervisedInstructionLoop({root,policy,runtime,decision=null,requestRestore=false,completedImport=null,assessment=null,reportRevision=null,referenceEvidence=null}){
   root=resolve(root);if(runtime.validateCoordinatorRoot)await runtime.validateCoordinatorRoot(root);
   assertNoSymlinkPathSegments(root,'loop root',{allowMissingLeaf:true});
   if(!existsSync(root))mkdirSync(root,{mode:0o700});
@@ -177,6 +190,19 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       append(root,completedImport?'historical_import':'created',s);
     }else assert.equal(completedImport,null,'historical import is initialization only');
     assert.ok(same(s.policy,policy),'resume cannot change policy');
+    if(referenceEvidence||s.reference_evidence){assert.equal(typeof runtime.validateReferenceEvidence,'function','runtime has no reference evidence capability');await runtime.validateReferenceEvidence();}
+    if(referenceEvidence){
+      assert.equal(decision,null,'review reference evidence before submitting a human decision');assert.equal(assessment,null);assert.equal(reportRevision,null);assert.equal(requestRestore,false);
+      if(s.reference_evidence)assert.equal(canonicalDigest(referenceEvidence),s.reference_evidence.manifest_digest,'reference evidence cannot be replaced');
+      else{
+        s.reference_evidence=prepareInstructionReferenceEvidence({root,state:s,journalDigest:journal(root).previous,manifest:referenceEvidence});
+        s.gate=null;s.status='advancing';append(root,'reference_evidence_prepared',s);
+      }
+    }
+    if(s.reference_evidence){
+      readInstructionReferenceEvidence({root,state:s,verifySource:!s.outputs.cleanup&&s.pending?.kind!=='cleanup'});
+      assert.equal(reportRevision,null,'reference evidence is not a standard report revision');
+    }
     if(assessment)assert.ok(['evaluate','evaluate_continuation'].includes(s.pending?.kind),'AI assessment requires an active practical evaluation');
     if(reportRevision){
       assert.equal(decision,null,'review the revised packet before submitting a human decision');assert.equal(assessment,null);assert.equal(requestRestore,false);
@@ -221,16 +247,17 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
       if(decision.disposition==='discarded')assert.ok(s.gate.kind==='result'&&policy.normal_target===null,'discard requires a result-only gate');
       assert.ok(typeof decision.reason==='string'&&decision.reason.trim());
       if(decision.disposition==='deferred'){
-        assert.ok(['result','change'].includes(s.gate.kind),'deferral requires a result or change gate');
+        assert.ok(['reference','result','change'].includes(s.gate.kind),'deferral requires a result or change gate');
         append(root,'human_deferred',s,{decision:copy(decision)});return summary(s);
       }
-      const key=s.gate.kind==='evaluation'?'evaluation_decision':s.gate.kind==='result'?'result_decision':s.restore_requested?'restore_decision':'change_decision';
+      const key=s.gate.kind==='reference'?'reference_decision':s.gate.kind==='evaluation'?'evaluation_decision':s.gate.kind==='result'?'result_decision':s.restore_requested?'restore_decision':'change_decision';
       assert.equal(s[key],undefined,'decision already consumed');s[key]=copy(decision);s.gate=null;s.status='advancing';
       if(decision.disposition==='discarded'){s.result_disposition=makeInstructionResultDiscard(s,{sourceJournalDigest:journal(root).previous,reason:decision.reason});instructionResultDiscard(s);}
       append(root,'human_decision',s,{kind:key});
     }
     if(s.status==='completed')return summary(s);
     for(;;){
+      if(s.reference_evidence)readInstructionReferenceEvidence({root,state:s,verifySource:!s.outputs.cleanup&&s.pending?.kind!=='cleanup'});
       let job=s.pending,result;
       if(job){
         result=await runtime.inspect(job,{root});
@@ -252,7 +279,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
         }
       }else{
         const n=next(s);
-        if(n===null){s.status=s.gate.kind==='evaluation'?'awaiting_evaluation_approval':s.gate.kind==='result'?'awaiting_result_review':'awaiting_change_approval';
+        if(n===null){s.status=s.gate.kind==='reference'?'awaiting_reference_review':s.gate.kind==='evaluation'?'awaiting_evaluation_approval':s.gate.kind==='result'?'awaiting_result_review':'awaiting_change_approval';
           append(root,'human_stop',s);return summary(s);}
         if(typeof n==='string'){
           s.status='completed';s.outputs.final={outcome:n,candidate:s.outputs.register,report:s.outputs.report??null,
@@ -288,6 +315,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
 export function inspectSupervisedInstructionLoop(root){
   assertNoSymlinkPathSegments(resolve(root),'loop root');
   const {state,events}=journal(resolve(root));assert.ok(state,'loop not initialized');
+  if(state.reference_evidence)readInstructionReferenceEvidence({root:resolve(root),state});
   return {...summary(state),journal_records:events.length,policy_digest:canonicalDigest(state.policy)};
 }
 
@@ -300,9 +328,10 @@ export function readCompletedInstructionLoopContinuation(root){
   assertNoSymlinkPathSegments(resolve(root),'previous loop root');
   const {state:s,previous}=journal(resolve(root));
   assert.ok(s&&s.status==='completed'&&!s.pending&&!s.gate,'previous cycle must be completed, with no uncertain operation');
+  if(s.reference_evidence)readInstructionReferenceEvidence({root:resolve(root),state:s});
   const discarded=instructionResultDiscard(s);
   return copy({policy:s.policy,journal_digest:previous,candidate:s.outputs.register,report:discarded?null:s.outputs.report??null,
-    ...(discarded?{result_disposition:discarded}:{}),outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),application:s.outputs.apply??null,
+    ...(discarded?{result_disposition:discarded}:s.reference_evidence?{reference_evidence:referenceContinuationSummary(s)}:{}),outcome:s.outputs.final.outcome,application_active:completedInstructionLoopApplicationIsActive(s),application:s.outputs.apply??null,
     registry:s.outputs.switch_back??s.outputs.cleanup?.registry??s.outputs.activate??s.outputs.retire??s.outputs.register.registry});
 }
 
@@ -340,7 +369,8 @@ export function prepareNextSupervisedInstructionLoop({root,nextPolicy,resultSumm
     const observation={kind:'instruction_loop_discarded_continuation_v1',feedback:copy(nextPolicy.observation),previous:{run_id:s.policy.id,journal_digest:previous,policy_digest:canonicalDigest(s.policy),candidate_digest:canonicalDigest(s.outputs.register),outcome:s.outputs.final.outcome,result_disposition:discarded}};
     projectInstructionLoopObservation(observation);return {status:'prepared',policy:{...copy(nextPolicy),observation},models_started:false,approval_carried_forward:false};
   }
-  const decisions=['evaluation_decision','result_decision','change_decision','restore_decision'].filter(k=>s[k]).map(k=>({
+  if(s.reference_evidence){assert.equal(reportRevision,null,'reference evidence is not a standard report revision');readInstructionReferenceEvidence({root:resolve(root),state:s});}
+  const decisions=['reference_decision','evaluation_decision','result_decision','change_decision','restore_decision'].filter(k=>s[k]).map(k=>({
     kind:k,disposition:s[k].disposition,digest:canonicalDigest(s[k]),
     reason_summary:assertPublicInstructionSummary(decisionSummaries[canonicalDigest(s[k])]??s[k].reason??'Historical prior approval; original public reason unavailable.')}));
   const originalReport=s.outputs.original_report??s.outputs.report,revisionRef=reportRevision??s.report_revision?.reference;
@@ -350,6 +380,7 @@ export function prepareNextSupervisedInstructionLoop({root,nextPolicy,resultSumm
   const observation={kind:'instruction_loop_continuation_v1',feedback:copy(nextPolicy.observation),previous:{
     run_id:s.policy.id,journal_digest:previous,policy_digest:canonicalDigest(s.policy),outcome:s.outputs.final.outcome,
     candidate_digest:canonicalDigest(s.outputs.register),report_digest:originalReport?canonicalDigest(originalReport):null,
+    ...(s.reference_evidence?{reference_evidence:referenceContinuationSummary(s)}:{}),
     ...(revised?{report_revision:revised.provenance}:{}),
     ...(evaluationSummary===null?{}:{evaluation_summary:evaluationSummary}),
     decisions,failure_count:s.trials.filter(t=>t.status!=='completed'||t.state==='failed_or_interrupted').length,

@@ -2,6 +2,7 @@
 import {readHostReferenceScoringRequest,claimHostReferenceScoring,completeHostReferenceScoring} from './instruction-loop-host-scoring.mjs';
 import {instructionReferenceScoringJob,instructionReferenceScoringCommand} from './instruction-loop-reference-scoring-runtime.mjs';
 import {readInstructionLoopJson} from './instruction-loop-artifact.mjs';
+import {prepareReferenceEvidenceInstructionLoop} from './instruction-loop-reference-preparation.mjs';
 // Operator entry point. A config is trusted local executable configuration, not
 // an imported candidate artifact. Human flags must be supplied by the host.
 import assert from 'node:assert/strict';
@@ -127,6 +128,11 @@ try{
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     console.log(JSON.stringify(prepareNextSupervisedInstructionLoop({root,nextPolicy:config.policy,reportRevision:options['--report-revision']?readInstructionLoopJson(resolve(options['--report-revision'])):null}),null,2));
   }
+  else if(command==='prepare-reference-evidence'){
+    assert.deepEqual(Object.keys(options).sort(),['--config','--id','--output-root','--profile','--reference-evidence','--root']);
+    console.log(JSON.stringify(prepareReferenceEvidenceInstructionLoop({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),
+      outputRoot:resolve(options['--output-root']),id:options['--id'],referenceEvidence:readInstructionLoopJson(resolve(options['--reference-evidence']))}),null,2));
+  }
   else if(['recover-authoring','reconfigure-evaluation','reselect-evaluation'].includes(command)){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));
     assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
@@ -157,7 +163,7 @@ try{
   }
   else{
     assert.equal(command,'advance');assert.ok(options['--config']);
-    assert.ok(Object.keys(options).every(k=>['--root','--config','--allow-model-calls','--request-restore','--decision','--packet','--reason','--import','--assessment','--report-revision'].includes(k)));
+    assert.ok(Object.keys(options).every(k=>['--root','--config','--allow-model-calls','--request-restore','--decision','--packet','--reason','--import','--assessment','--report-revision','--reference-evidence'].includes(k)));
     const config=readInstructionLoopJson(resolve(options['--config']));
     assert.equal(config.policy.runtime_digest,canonicalDigest(config.runtime));
     const runtime=createConfiguredInstructionLoopRuntime({definition:config.runtime,modelCallsAuthorized:options['--allow-model-calls']===true});
@@ -167,6 +173,7 @@ try{
       requestRestore:options['--request-restore']===true,
       assessment:options['--assessment']?readJsonFileStrict(resolve(options['--assessment'])):null,
       reportRevision:options['--report-revision']?readInstructionLoopJson(resolve(options['--report-revision'])):null,
+      referenceEvidence:options['--reference-evidence']?readInstructionLoopJson(resolve(options['--reference-evidence'])):null,
       completedImport:options['--import']?readInstructionLoopJson(resolve(options['--import'])):null});
     console.log(JSON.stringify({...result,pending_packet_digest:result.pending_gate?canonicalDigest(result.pending_gate):null},null,2));
   }

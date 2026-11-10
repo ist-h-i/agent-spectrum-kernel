@@ -12,6 +12,7 @@ const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execut
 const publicSandboxFile = 'scripts/test-ask-user-comparison-public-sandbox.mjs';
 const manualComparisonCommand = 'node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs';
 const environmentCommands = [
+  'node --experimental-test-module-mocks --test scripts/test-instruction-loop-reference-evidence.mjs scripts/test-instruction-loop-reference-preparation.mjs',
   'node --experimental-test-module-mocks --test scripts/test-practical-isolated-grade-continuation.mjs scripts/test-practical-isolated-grade-lifecycle.mjs',
   'node --test scripts/test-instruction-loop-component-runtime.mjs scripts/test-instruction-loop-component-recovery.mjs scripts/test-instruction-loop-receiving.mjs scripts/test-instruction-loop-operation.mjs scripts/test-instruction-loop-operation-resume.mjs scripts/test-instruction-loop-normal-chain.mjs scripts/test-instruction-loop-operator-cli.mjs scripts/test-instruction-loop-provider-preflight.mjs scripts/test-instruction-loop-host-authoring.mjs',
   'node --experimental-test-module-mocks --test scripts/test-practical-evaluation-runner.mjs scripts/test-practical-initialization-recovery.mjs scripts/test-instruction-loop-practical-runtime.mjs scripts/test-practical-codex-adapter.mjs scripts/test-practical-assessment-shape-repair.mjs scripts/test-practical-grade-supplement.mjs scripts/test-practical-retained-grade-report.mjs',
