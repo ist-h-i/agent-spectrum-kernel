@@ -5,13 +5,15 @@ import {join,resolve} from 'node:path';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,assertNoSymlinkPathSegments,parseJsonRejectDuplicateKeys} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {readRunJournal,lockRunJournal} from './instruction-run-journal.mjs';
-import {fullGenerationInput} from './instruction-loop-full-candidate.mjs';
+import {fullGenerationInput,fullInstructionInventory} from './instruction-loop-full-candidate.mjs';
+import {bindMeasuredNormalOwnerSource} from './instruction-loop-source-binding.mjs';
+import {verifyRetainedInstructionLayout} from './retained-instruction-layout.mjs';
 const json=path=>readJsonFileStrict(path,'retained Full authoring evidence',16*1024*1024);
 export const retainedAuthoringPin=path=>({path:resolve(path),digest:hash(readStableBytes(resolve(path),'retained Full authoring evidence',16*1024*1024))});
 const checked=ref=>{assert.deepEqual(Object.keys(ref).sort(),['digest','path']);assert.equal(resolve(ref.path),ref.path);assert.deepEqual(retainedAuthoringPin(ref.path),ref,'retained authoring evidence drift');return json(ref.path);};
-export function inspectClosedFullAuthoring({root,profilePath,configPath,preEvaluation=false}){
+export function inspectClosedFullAuthoring({root,profilePath,configPath,preEvaluation=false,reselectCases=false}){
  assert.ok(!existsSync(join(resolve(root),'.advance-lock')),'original coordinator lock requires inspection');
- return inspectClosed({root,profilePath,configPath,preEvaluation});
+ return inspectClosed({root,profilePath,configPath,preEvaluation,reselectCases});
 }
 // Keep the original controller excluded for the entire retained-copy operation.
 // A public boolean bypass would not establish lock ownership.
@@ -23,9 +25,10 @@ export function withClosedFullAuthoring(options,action){
  try{const result=action(inspectClosed({...options,root}));assert.ok(!result?.then,'retained authoring reservation must remain synchronous');return result;}
  finally{unlock();}
 }
-function inspectClosed({root,profilePath,configPath,preEvaluation=false}){
+function inspectClosed({root,profilePath,configPath,preEvaluation=false,reselectCases=false}){
  root=resolve(root);profilePath=resolve(profilePath);configPath=resolve(configPath);
  for(const path of [root,profilePath,configPath])assertNoSymlinkPathSegments(path,'original retained authoring evidence');
+ assert.ok(!reselectCases||preEvaluation,'case reselection requires the unapproved evaluation gate');
  const history=readRunJournal(root),s=history.state,p=json(profilePath),config=json(configPath);
  assert.equal(p.kind,'full_practical_instruction_loop_profile_v1','retained authoring recovery requires the inline Full practical port');
  if(preEvaluation){
@@ -66,15 +69,25 @@ function inspectClosed({root,profilePath,configPath,preEvaluation=false}){
  if(execution.input_digest!==undefined)assert.equal(execution.input_digest,canonicalDigest(input),'recorded authoring input differs');
  if(execution.response_ref!==undefined)assert.deepEqual(execution.response_ref,retainedAuthoringPin(responsePath));
  assert.equal(readRunJournal(root).previous,history.previous,'original run changed during inspection');
- return {profile:p,input,response,origin:{kind:preEvaluation?'retained_full_authoring_origin_v2':'retained_full_authoring_origin_v1',root,journal_digest:history.previous,
+ let preservedCandidate;
+ if(reselectCases){
+  const candidate=s.outputs.register;bindMeasuredNormalOwnerSource({sourceRoot:p.generator.candidateRoot,candidate});
+  assert.equal(candidate.full_root,p.generator.fullRoot);
+  const retained=verifyRetainedInstructionLayout({storeRoot:p.storeRoot,layoutObjectDigest:candidate.layout_object_digest});
+  const fullDigest=canonicalDigest(fullInstructionInventory(candidate.full_root));
+  assert.equal(fullDigest,canonicalDigest(retained.layout.files.map(f=>({path:f.path,bytes:f.bytes,mode:f.mode,sha256:f.raw_digest}))),'retained candidate Full content drift');
+  preservedCandidate={source_revision:candidate.source_revision,source_inventory_digest:canonicalDigest(fullInstructionInventory(candidate.source_root)),full_inventory_digest:fullDigest};
+ }
+ assert.equal(readRunJournal(root).previous,history.previous,'original run changed during candidate inspection');
+ return {profile:p,input,response,origin:{kind:reselectCases?'retained_full_authoring_origin_v3':preEvaluation?'retained_full_authoring_origin_v2':'retained_full_authoring_origin_v1',root,journal_digest:history.previous,
   profile:retainedAuthoringPin(profilePath),config:retainedAuthoringPin(configPath),execution:retainedAuthoringPin(executionPath),response:retainedAuthoringPin(responsePath),
   ...(preEvaluation?{authoring_job_digest:canonicalDigest(job),source_status:s.status,source_candidate_digest:canonicalDigest(s.outputs.register)}:{failed_job_digest:canonicalDigest(job)}),input_digest:canonicalDigest(input),input_evidence:execution.input_digest?'recorded_request_digest':'reconstructed_from_pinned_profile_and_source',
-  closure_scope:execution.closure_scope,previous_state_completed:false,approval_carried_forward:false}};
+  ...(preservedCandidate?{preserved_candidate:preservedCandidate}:{}),closure_scope:execution.closure_scope,previous_state_completed:false,approval_carried_forward:false}};
 }
 export function readRetainedFullAuthoring(ref){
- const origin=checked(ref);assert.ok(['retained_full_authoring_origin_v1','retained_full_authoring_origin_v2'].includes(origin.kind));
+ const origin=checked(ref);assert.ok(['retained_full_authoring_origin_v1','retained_full_authoring_origin_v2','retained_full_authoring_origin_v3'].includes(origin.kind));
  checked(origin.profile);checked(origin.config);checked(origin.execution);checked(origin.response);
- const inspected=inspectClosedFullAuthoring({root:origin.root,profilePath:origin.profile.path,configPath:origin.config.path,preEvaluation:origin.kind==='retained_full_authoring_origin_v2'});
+ const inspected=inspectClosedFullAuthoring({root:origin.root,profilePath:origin.profile.path,configPath:origin.config.path,preEvaluation:origin.kind!=='retained_full_authoring_origin_v1',reselectCases:origin.kind==='retained_full_authoring_origin_v3'});
  assert.equal(canonicalDigest(inspected.origin),canonicalDigest(origin),'retained authoring origin changed');
  return inspected;
 }
@@ -83,6 +96,16 @@ export function retainedFullAuthoringProvider(provider,input){
  assert.deepEqual(provider.response,inspected.origin.response,'response origin transplant');
  assert.equal(canonicalDigest(input),inspected.origin.input_digest,'retained authoring cannot answer a changed request');
  return {response:inspected.response,execution:{kind:'retained_codex_response',model_calls:0,original_provider_invocations:1,
+  ...(inspected.origin.preserved_candidate?{preserved_candidate_source:{source_root:inspected.profile.generator.candidateRoot,source_revision:inspected.origin.preserved_candidate.source_revision}}:{}),
   original_execution:inspected.origin.execution,origin:provider.retainedAuthoring,input_evidence:inspected.origin.input_evidence,
   prior_usage_recounted:false,closure_scope:inspected.origin.closure_scope,previous_state_completed:false}};
+}
+
+// Reselection retains the original source commit and every source/Full byte.
+export function verifyReselectedCandidate(provider,candidate){
+ if(!provider.retainedAuthoring)return;
+ const {origin}=readRetainedFullAuthoring(provider.retainedAuthoring);
+ if(!origin.preserved_candidate)return;
+ assert.equal(canonicalDigest(fullInstructionInventory(candidate.source_root)),origin.preserved_candidate.source_inventory_digest,'reselected candidate source content changed');
+ assert.equal(canonicalDigest(fullInstructionInventory(candidate.full_root)),origin.preserved_candidate.full_inventory_digest,'reselected candidate Full content changed');
 }

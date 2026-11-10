@@ -202,7 +202,17 @@ export async function generateFullInstructionCandidate(p,provider){
   const validation=p.sourceValidation?validateGeneratedSource(p,input.source_validation.validator_digest):null;
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
   git(p.candidateRoot,['add','--','skills',...(scope?[scope.path]:[]),...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
-  git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
+  const preserved=provided.execution?.preserved_candidate_source;
+  if(preserved){
+    assert.ok(p.provider?.retainedAuthoring&&p.provider.caseReselection===true,'preserved commit requires retained case reselection');
+    assert.equal(resolve(preserved.source_root),preserved.source_root);assertNoSymlinkPathSegments(preserved.source_root,'retained candidate source');
+    assert.match(preserved.source_revision,/^[a-f0-9]{40}$/u);
+    git(p.candidateRoot,['fetch','--quiet','--no-tags',preserved.source_root,preserved.source_revision]);
+    assert.equal(git(p.candidateRoot,['write-tree']),git(p.candidateRoot,['rev-parse',preserved.source_revision+'^{tree}']),'retained candidate source tree changed');
+    // Preserve the proven original commit without overwriting any materialized
+    // file. This also keeps installer provenance and the Full bytes identical.
+    git(p.candidateRoot,['reset','--soft',preserved.source_revision]);
+  }else git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
   const revision=git(p.candidateRoot,['rev-parse','HEAD']);
   const changed=git(p.candidateRoot,['diff','--name-only',p.baselineRevision,'HEAD']).split('\n').filter(Boolean);
   assert.ok(changed.every(path=>allowed(path,p.skills)||scope&&path===scope.path||derivedPaths.includes(path)),'non-instruction/non-derived source changed');

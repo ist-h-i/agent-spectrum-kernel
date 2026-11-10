@@ -5,7 +5,8 @@ import {join} from 'node:path';
 import {tmpdir,devNull} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
-import {generateFullInstructionCandidate,fullGenerationInput} from './instruction-loop-full-candidate.mjs';
+import {canonicalDigest} from './content-addressed-store.mjs';
+import {generateFullInstructionCandidate,fullGenerationInput,fullInstructionInventory} from './instruction-loop-full-candidate.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {cleanOwnedInstructionLoopStaging} from './instruction-loop-normal-owner-worker.mjs';
 function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false,pluginWriterSuffix=null}={}){
@@ -148,4 +149,26 @@ test('trusted source writer cannot launder a contract edit when source validatio
  await assert.rejects(generateFullInstructionCandidate(p,contractProvider([skillWrite,contractWrite])),/source writer changed unexpected path/);
  assert.equal(existsSync(join(p.fullRoot,'AGENTS.md')),false);
  assert.equal(spawnSync('git',['rev-parse','HEAD'],{cwd:p.candidateRoot,encoding:'utf8'}).stdout.trim(),p.baselineRevision);
+});
+
+for(const pairedContract of [false,true])test('retained case reselection materializes the original Git commit and exact Full content without another model'+(pairedContract?' with paired review contract':''),async t=>{
+ const {p,root}=fixture(t),text='## Goal\nPreserved candidate.\n';
+ if(pairedContract)p.reviewFindingContract={skill:'demo'};
+ const supply=pairedContract?contractProvider([{...skillWrite,text},contractWrite]):provider(text);
+ const first=await generateFullInstructionCandidate(p,supply);
+ const fresh={...p,candidateRoot:join(root,'reselected-source'),fullRoot:join(root,'reselected-full'),stagingRoot:join(root,'reselected-staging'),provider:{kind:'fixture',retainedAuthoring:{synthetic:true},caseReselection:true}};
+ // Force a different wall-clock commit timestamp if the implementation were to
+ // make a new commit, then exercise the actual source/installer generation path.
+ await new Promise(resolve=>setTimeout(resolve,1100));
+ const retained=async input=>{const r=await supply(input);return {...r,execution:{...r.execution,model_calls:0,preserved_candidate_source:{source_root:first.source_root,source_revision:first.source_revision}}};};
+ const second=await generateFullInstructionCandidate(fresh,retained);
+ assert.equal(second.source_revision,first.source_revision);
+ assert.equal(canonicalDigest(fullInstructionInventory(second.source_root)),canonicalDigest(fullInstructionInventory(first.source_root)));
+ assert.equal(canonicalDigest(fullInstructionInventory(second.full_root)),canonicalDigest(fullInstructionInventory(first.full_root)));
+ const bad={...fresh,candidateRoot:join(root,'bad-source'),fullRoot:join(root,'bad-full'),stagingRoot:join(root,'bad-staging')};
+ await assert.rejects(generateFullInstructionCandidate(bad,async input=>{const r=structuredClone(await retained(input));r.response.changes[0].text='## Goal\nDifferent candidate.\n';return r;}),/source tree changed/);
+ if(pairedContract){
+  const badDoc={...fresh,candidateRoot:join(root,'bad-contract-source'),fullRoot:join(root,'bad-contract-full'),stagingRoot:join(root,'bad-contract-staging')};
+  await assert.rejects(generateFullInstructionCandidate(badDoc,async input=>{const r=structuredClone(await retained(input));r.response.changes.find(c=>c.path===contractPath).text='Different retained contract.\n';return r;}),/source tree changed/);
+ }
 });

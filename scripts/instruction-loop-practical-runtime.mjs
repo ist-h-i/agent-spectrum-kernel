@@ -8,6 +8,7 @@ import {existsSync,mkdirSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash,verifyInstructionEnvironment,instructionEnvironmentTrustOptions} from './instruction-environment.mjs';
+import {readRetainedFullAuthoring} from './instruction-loop-retained-authoring.mjs';
 import {executeNativeInstructionLoopStage} from './instruction-loop-native-host.mjs';
 import {fullInstructionInventory,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
 import {selectInstructionLoopCases} from './instruction-loop-case-selection.mjs';
@@ -52,7 +53,9 @@ export function createFullPracticalInstructionLoopConfiguration(profilePath){
 function checkedProfile(definition){
   assert.equal(definition.kind,'full_practical_instruction_loop_runtime_v1');
   for(const item of [...definition.source_pins,{path:definition.profile_path,digest:definition.profile_digest}])assert.equal(pin(item.path).digest,item.digest,'practical runtime source/profile drift');
-  const p=readJsonFileStrict(definition.profile_path,'Full practical profile',16*1024*1024);validateProfilePaths(p);return p;
+  const p=readJsonFileStrict(definition.profile_path,'Full practical profile',16*1024*1024);validateProfilePaths(p);
+  if(p.generator.provider.caseReselection)readRetainedFullAuthoring(p.generator.provider.retainedAuthoring);
+  return p;
 }
 function save(path,value){writeCanonicalJsonNoReplace({outputPath:path,artifact:value,label:'Full practical lifecycle result',maximumBytes:16*1024*1024});}
 function selectionPath(p){return join(p.stateRoot,'practical-selection.json');}
