@@ -44,6 +44,7 @@ Be specific and evidence-backed. Passing tests prove only their observed behavio
    - applicable output and CI/test evidence.
 
 2. If any evidence required for the concrete judgment is absent, return insufficient evidence and name the exact next check. Do not treat an inapplicable evidence class as missing.
+   For each material evidence gap, briefly retain the related behavior already verified and its source in the existing evidence summary. Distinguish the verified layer from the unverified layer; a passing test count alone is not that conclusion. Do not repeat it under Suggestions.
 
 3. Review the baseline semantic surface.
    - Logic and edge cases.
@@ -97,9 +98,12 @@ Findings:
   Evidence location:
   Required post-fix condition:
   Category: optional
+
+Suggestions:
+- concise evidence-grounded supplementary guidance, when useful
 ~~~
 
-Use - none when there is no finding. Do not emit empty category sections. Do not emit a final merge Decision.
+Use - none when there is no finding. Do not emit empty category sections. Omit Suggestions unless guidance grounded in the reviewed work adds decision-relevant value beyond the findings and verification stated. Keep it concise and conditional on available evidence, including relevant limits; do not invent defects, imply unperformed gates or CI passed, or treat missing evidence as approval. Such guidance may be useful even with no material defect or with missing evidence. It is neither a final merge judgment nor permission for consequential action. Do not emit a final merge Decision.
 
 ## Exit criteria
 

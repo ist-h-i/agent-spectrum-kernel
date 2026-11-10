@@ -111,9 +111,16 @@ Findings:
   Required post-fix condition:
   Category: optional metadata
 
+Suggestions:
+- concise evidence-grounded supplementary guidance, when useful
+
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 ~~~
+
+Omit Suggestions unless concise guidance grounded in work already reviewed adds decision-relevant value beyond the findings and verification stated. State relevant evidence limits and conditions; do not repeat findings or checks, invent defects, imply unperformed gates or CI passed, or turn missing evidence into approval. Guidance may be useful even when no material defect is found or evidence is missing. It is separate from a formal final merge judgment and does not grant permission for consequential action.
+
+For each material evidence gap, briefly retain the related behavior already verified and its source in the existing evidence summary. Distinguish the verified layer from the unverified layer; a passing test count alone is not that conclusion. Do not repeat it under Suggestions.
 
 Omit Decision when no final decision was requested. Missing evidence is a closed canonical JSON-line inventory: emit exactly one record with exactly the four named string fields for every `insufficient_evidence` gate in gate order. Reject unknown or duplicate gate IDs, records for non-insufficient gates, partial coverage, missing or extra fields, and `- none` mixed with records. Use `- none` only when no gate is insufficient. Use `- none` for empty Additional required gates or Findings. Do not emit Skipped heavy gates or empty category sections in ordinary output.
 

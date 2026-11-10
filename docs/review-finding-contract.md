@@ -41,11 +41,13 @@ This ordering is a decision-impact presentation rule. It does not infer severity
 - Duplicate Finding IDs make the current inventory invalid.
 - Unknown fields are rejected rather than becoming an adapter-specific extension.
 - Missing evidence needed to judge a possible finding remains insufficient evidence; it is not synthesized as a finding.
-- Suggestions with no actionable post-fix condition are not findings. Omit them from ordinary review output unless a separate follow-up handoff was explicitly requested.
+- Suggestions with no actionable post-fix condition are not findings. Ordinary review output may include concise supplementary guidance under Suggestions when it is grounded in work already reviewed and adds decision-relevant value beyond the stated findings and verification. Omit redundant or empty advice; state relevant evidence limits and conditions. Do not invent defects, imply unperformed gates or CI passed, or turn missing evidence into approval. Guidance is separate from a formal final merge judgment and permission for consequential action.
 
 ## Ordinary output
 
 Ordinary review output uses one Findings section. It omits empty category sections and skipped-heavy-gate boilerplate. Complete gate applicability and skipped-layer details are emitted only for explicit diagnostic/debug requests.
+
+For each material evidence gap, briefly retain the related behavior already verified and its source in the existing evidence summary. Distinguish the verified layer from the unverified layer; a passing test count alone is not that conclusion. Do not repeat it under Suggestions.
 
 ## Compatibility
 
