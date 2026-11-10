@@ -249,3 +249,72 @@ for(const [name,session] of [
  const f=interruptedFixture(t),{prepareInterruptedFullAuthoringRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
  assert.throws(()=>prepare({...f,sessionRoot:session(f)},noWriters));assert.equal(existsSync(f.outputRoot),false);assert.equal(existsSync(join(f.root,'.authoring-initialization-retry')),false);
 });
+
+async function interruptedInitializationFixture(t,{siblingSession=false}={}){
+ const original=interruptedFixture(t),api=await import('./instruction-loop-failed-preparation.mjs');
+ const prepared=api.prepareInterruptedFullAuthoringRetry({...original,...(siblingSession?{sessionRoot:join(original.base,'sibling-session')}:{})},noWriters);
+ const p=JSON.parse(readFileSync(prepared.profile_path)),config=JSON.parse(readFileSync(prepared.config_path));
+ const operationRoot=join(original.outputRoot,'operation'),root=join(operationRoot,'first-run');mkdirSync(root,{recursive:true});
+ appendRunJournal(root,'operation_uncertain',{policy:config.policy,status:'operation_uncertain',pending:{kind:'generate',key:'generate',input:{observation:p.policy.observation}},outputs:{},trials:[]});
+ appendRunJournal(operationRoot,'operation_uncertain',{status:'operation_uncertain',preparation:null,current:{root,profile_path:prepared.profile_path,profile_digest:hash(readFileSync(prepared.profile_path)),config_path:prepared.config_path,config_digest:canonicalDigest(config)}});
+ mkdirSync(p.generator.provider.sessionRoot);const executionPath=join(p.generator.provider.sessionRoot,'provider-execution.json');writeFileSync(executionPath,JSON.stringify(original.execution));
+ return {original,p,api,root,executionPath,operationRoot,outputRoot:join(original.base,'second'),id:'initialization-after-interruption',reason:'Retry the positively closed initialization failure.'};
+}
+test('interrupted retry with positive initialization failure admits exactly one bound recovery',async t=>{
+ const f=await interruptedInitializationFixture(t),before=readRunJournal(f.original.root).previous,priorClaim=readFileSync(join(f.original.root,'.authoring-initialization-retry/claim.json'));
+ const r=f.api.prepareFullAuthoringInitializationRetry(f,noWriters),p=JSON.parse(readFileSync(r.profile_path));
+ assert.deepEqual(p.generator.initializationRetry.prior_origin,f.p.generator.initializationRetry);
+ assert.deepEqual(p.normal,f.p.normal);assert.equal(r.approval_carried_forward,false);assert.equal(r.models_started,false);
+ assert.equal(readRunJournal(f.original.root).previous,before);assert.deepEqual(readFileSync(join(f.original.root,'.authoring-initialization-retry/claim.json')),priorClaim);
+ assert.deepEqual(f.api.prepareFullAuthoringInitializationRetry(f,noWriters),r);
+ assert.throws(()=>f.api.prepareFullAuthoringInitializationRetry({...f,id:'fork',outputRoot:join(f.original.base,'fork')},noWriters),/reserved|different/);
+ assert.throws(()=>f.api.prepareInterruptedFullAuthoringRetry(f,noWriters),/cannot be chained/);
+});
+for(const [name,mutate] of [
+ ['unconfirmed closure',f=>{const e=JSON.parse(readFileSync(f.executionPath));e.termination_confirmed=false;writeFileSync(f.executionPath,JSON.stringify(e));}],
+ ['model activity',f=>{const e=JSON.parse(readFileSync(f.executionPath));e.stdout={text:'{}',total_bytes:2,truncated:false};writeFileSync(f.executionPath,JSON.stringify(e));}],
+ ['original journal advanced',f=>{const h=readRunJournal(f.original.root);appendRunJournal(f.original.root,'changed',h.state);}],
+ ['original late receipt',f=>writeFileSync(f.original.executionPath,JSON.stringify(f.original.execution))],
+ ['original claim missing',f=>rmSync(join(f.original.root,'.authoring-initialization-retry/claim.json'))],
+ ['prepared receipt changed',f=>writeFileSync(join(f.original.outputRoot,'recovery-prepared.json'),'{}')],
+])test(`interrupted initialization recovery rejects ${name}`,async t=>{
+ const f=await interruptedInitializationFixture(t);mutate(f);
+ assert.throws(()=>f.api.prepareFullAuthoringInitializationRetry(f,noWriters));assert.equal(existsSync(f.outputRoot),false);
+});
+
+test('interrupted initialization recovery rejects writers in either generation and original session destinations',async t=>{
+ for(const oldWriter of [true,false]){
+  const f=await interruptedInitializationFixture(t);
+  assert.throws(()=>f.api.prepareFullAuthoringInitializationRetry(f,args=>({...noWriters(args),matching_writers:(args.assessRoot===f.original.root)===oldWriter?[{pid:123}]:[]})));
+  assert.equal(existsSync(f.outputRoot),false);
+ }
+ const f=await interruptedInitializationFixture(t,{siblingSession:true});
+ assert.throws(()=>f.api.prepareFullAuthoringInitializationRetry({...f,sessionRoot:f.original.p.generator.candidateRoot},noWriters),/overlaps/);
+ assert.equal(existsSync(f.outputRoot),false);
+});
+test('a second operation wrapper cannot fork the original interruption initialization slot',async t=>{
+ const f=await interruptedInitializationFixture(t);f.api.prepareFullAuthoringInitializationRetry(f,noWriters);
+ const operationRoot=join(f.original.base,'alternate-operation'),root=join(operationRoot,'first-run');mkdirSync(root,{recursive:true});
+ appendRunJournal(root,'operation_uncertain',readRunJournal(f.root).state);
+ const o=readRunJournal(f.operationRoot).state;o.current.root=root;appendRunJournal(operationRoot,'operation_uncertain',o);
+ assert.throws(()=>f.api.prepareFullAuthoringInitializationRetry({...f,operationRoot,outputRoot:join(f.original.base,'fork'),id:'fork'},noWriters),/reserved|different/);
+ assert.equal(existsSync(join(f.original.base,'fork')),false);
+});
+test('initialization retry origins and completed two-step origins cannot chain',async t=>{
+ for(const extra of [{kind:'full_authoring_initialization_retry_v1'},{prior_origin:{kind:'full_authoring_interruption_retry_v1'}}]){
+  const f=await interruptedInitializationFixture(t),o=readRunJournal(f.operationRoot),profilePath=o.state.current.profile_path,configPath=o.state.current.config_path;
+  const p=JSON.parse(readFileSync(profilePath));Object.assign(p.generator.initializationRetry,extra);writeFileSync(profilePath,JSON.stringify(p));
+  const config=createNativeInstructionLoopConfiguration(profilePath);writeFileSync(configPath,JSON.stringify(config));
+  const h=readRunJournal(f.root);h.state.policy=config.policy;appendRunJournal(f.root,'rebind_fixture',h.state);
+  o.state.current.profile_digest=hash(readFileSync(profilePath));o.state.current.config_digest=canonicalDigest(config);appendRunJournal(f.operationRoot,'rebind_fixture',o.state);
+  assert.throws(()=>f.api.prepareFullAuthoringInitializationRetry(f,noWriters),/cannot be chained/);assert.equal(existsSync(f.outputRoot),false);
+ }
+});
+
+test('late original evidence during the current writer inspection refuses recovery',async t=>{
+ const f=await interruptedInitializationFixture(t);
+ assert.throws(()=>f.api.prepareFullAuthoringInitializationRetry(f,args=>{
+  if(args.taskRoot===f.p.generator.provider.sessionRoot)writeFileSync(f.original.executionPath,JSON.stringify(f.original.execution));
+  return noWriters(args);
+ }),/interrupted evidence appeared/);assert.equal(existsSync(f.outputRoot),false);
+});

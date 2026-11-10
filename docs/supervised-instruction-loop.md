@@ -362,7 +362,7 @@ open descriptors from another cwd. Remote closure stays **Unknown**.
 
 A canonical slot in the original cycle reserves at most one additional authoring
 job, including across different output roots. The same preparation is idempotent;
-changed intent, chained retries, drift, unknown executions and other diagnostics
+changed intent, unsupported retry chains, drift, unknown executions and other diagnostics
 are refused. A partial reservation remains consumed/preserved for inspection.
 This is not a general retry policy or permission to replay Task/Eval/owner work.
 If a saved authoring answer exists, use `recover-authoring` to retain it instead.
@@ -382,7 +382,16 @@ This prepares at most one fresh read-only authoring job from the exact pinned
 input. It does not start model work. Both recovery commands support a null owner
 or the validated `ask_source_repository_v1` owner, preserving its destination.
 Case selection and application still require fresh human decisions. They share
-one retry slot; a retry cannot itself request another retry.
+one retry slot. An initialization retry cannot itself request another retry.
+The only bounded exception is an interruption retry whose separate local child
+then produces the exact positive initialization-failure receipt described above.
+`recover-authoring-initialization` may prepare one further isolated job from that
+failed operation. It verifies the original interruption claim, prepared inputs,
+unchanged original journals and absent original writers/late evidence, preserves
+that origin in `prior_origin`, and reserves a distinct canonical slot in the
+original interrupted cycle. Repeated preparation is idempotent; alternate output
+roots or operation wrappers cannot fork that slot. Neither failure evidence nor
+human approval is rewritten or inferred. This exception cannot be chained again.
 
 Admission is limited to pre-case `generate`, with no answer, no provider receipt,
 no case approval, trial, or owner effect. The parent and cycle must be `advancing`
@@ -417,3 +426,11 @@ create another retry. Preparation does not create the session or change the
 provider executable, permissions, prompt, or input digest. Without this option,
 the session remains `FRESH/generation-session`. Use a name accepted by the pinned
 provider; the option does not relax that provider's own checks.
+
+Formal Verification Contract `interrupted-initialization-recovery@1` extends the
+above regression obligations: admit only the interruption -> known initialization
+failure sequence; retain both origins and immutable old claims; reject missing or
+drifted lineage, late evidence, active writers, changed inputs/owner, further
+chains and canonical-slot forks. Evidence is the model-free retained-authoring
+suite and repository validation. Live provider execution and model quality are
+not established by these checks.
