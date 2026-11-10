@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {canonicalDigest} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
-import {fullGenerationInput,generateFullInstructionCandidate,codexFullInstructionProvider,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
+import {fullInstructionInventory,fullGenerationInput,generateFullInstructionCandidate,codexFullInstructionProvider,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
 
 test('authorized inline Full generation passes a scoped child grant without changing the parent environment',async t=>{
  const root=fixture(t),executable=join(root,'grant-provider.mjs');writeFileSync(executable,'#!'+process.execPath+'\n'+`import{writeFileSync}from'node:fs';if(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED!=='1'){console.error('child model grant missing');process.exit(41);}const a=process.argv.slice(2);writeFileSync(a[a.indexOf('-o')+1],'{"changes":[]}');`);chmodSync(executable,0o700);
@@ -127,7 +127,7 @@ test('Full authoring executable pin rejects malformed digests, non-regular paths
 // Full registration must separate complete environment refs from owned edits.
 import {fullPartialFixture} from './test-helpers-full-partial-assets.mjs';
 import {registerFullInstructionCandidate} from './instruction-loop-full-candidate.mjs';
-import {verifyInstructionEnvironment} from './instruction-environment.mjs';
+import {captureInstructionEnvironment,verifyInstructionEnvironment} from './instruction-environment.mjs';
 test('Full registration reuses an unchanged selected Skill and registers only the edited Skill',t=>{
  const f=fullPartialFixture(t),c=registerFullInstructionCandidate(f.p,f.candidate);
  assert.deepEqual(c.candidate_assets.map(a=>a.stable_id),['ask.skill.alpha']);assert.deepEqual(c.baseline_assets,[f.parents[0]]);assert.equal(c.environment_assets.length,2);assert.deepEqual(c.environment_assets[1],f.parents[1]);assert.equal(c.no_change,false);
@@ -176,13 +176,18 @@ test('Full no-op completes through the supervisor without case, trial or owner d
  for(const kind of ['select','trial','report','plan','apply','version','restore'])runtime[kind]=()=>assert.fail('unexpected no-op dispatch '+kind);
  const s=await advanceSupervisedInstructionLoop({root:join(f.root,'no-change-run'),policy,runtime});assert.equal(s.status,'completed');assert.equal(s.final.outcome,'no_change');assert.equal(s.pending_gate,null);assert.equal(s.completed_trials,0);assert.deepEqual(calls,['generate','register','cleanup']);assert.equal(existsSync(f.candidate.owned_version.archive),true);
 });
-for(const legacy of [false,true])test(`Full continuation preserves ${legacy?'legacy complete candidate refs':'reused plus new complete environment refs'}`,async t=>{
- const f=fullPartialFixture(t,{changed:legacy?'both':true,current:true}),target=join(f.root,'owner');mkdirSync(target);const profile={...f.profile,normal:{target},policy:fullFixturePolicy('old-full',target),report:{},selection:{}};
+for(const mode of ['partial','legacy','contract'])test(`Full continuation preserves ${mode} complete environment refs`,async t=>{
+ const legacy=mode==='legacy',f=fullPartialFixture(t,{changed:legacy?'both':true,current:true,reviewContract:mode==='contract'}),target=join(f.root,'owner');mkdirSync(target);const profile={...f.profile,normal:{target},policy:fullFixturePolicy('old-full',target),report:{},selection:{}};
  const profilePath=join(f.root,'profile.json'),configPath=join(f.root,'config.json');writeFileSync(profilePath,JSON.stringify(profile));const config=createNativeInstructionLoopConfiguration(profilePath);writeFileSync(configPath,JSON.stringify(config));
  const c=await executeNativeInstructionLoopStage(profile,{kind:'register',input:{candidate:f.candidate}}),expected=c.environment_assets;if(legacy)delete c.environment_assets;
  const runtime={digest:config.policy.runtime_digest,inspect:async()=>null};for(const kind of ['generate','register','select','trial','report','plan','apply','version','cleanup','restore'])runtime[kind]=async job=>({request_digest:canonicalDigest(job),status:'completed',output:kind==='generate'?f.candidate:kind==='register'?c:kind==='select'?{case_ids:['fixture']}:kind==='trial'?{ready_for_next_root:true}:kind==='report'?{conditions:{},rows:[]}:kind==='version'?await executeNativeInstructionLoopStage(profile,job):{}});
  const root=join(f.root,'run'),advance=extra=>advanceSupervisedInstructionLoop({root,policy:config.policy,runtime,...extra});let s=await advance();assert.equal(s.status,'awaiting_evaluation_approval');const approve=s=>({disposition:'approved',packet_digest:canonicalDigest(s.pending_gate),reason:'Synthetic fixture decision only.'});s=await advance({decision:approve(s)});assert.equal(s.status,'awaiting_change_approval');s=await advance({decision:approve(s)});assert.equal(s.final.outcome,'applied');
  const next=prepareNextNativeInstructionLoopConfiguration({root,profilePath,configPath,outputRoot:join(f.root,'next'),id:'next-full'}),nextProfile=JSON.parse(readFileSync(next.profile_path));assert.deepEqual(nextProfile.generator.parentAssets,expected);assert.equal(nextProfile.generator.parentAssets.length,2);assert.equal(next.models_started,false);
+ if(mode==='contract'){
+  assert.deepEqual(nextProfile.generator.reviewFindingContract,{skill:'alpha'});
+  const inherited=verifyAssetRegistry({storeRoot:nextProfile.generator.storeRoot,snapshotDigest:nextProfile.generator.registrySnapshotDigest,trustedAuthorityContexts:nextProfile.generator.trustedAuthorityContexts}).assets.find(a=>a.record_digest===expected[0].record_digest);
+  assert.equal(inherited.state,'current');assert.equal(inherited.content.files.find(f=>f.path==='docs/review-finding-contract.md').raw_digest,hash(readFileSync(join(nextProfile.generator.baselineSourceRoot,'docs/review-finding-contract.md'))));
+ }
 });
 for(const kind of ['full_native_reference_loop_profile_v1','full_practical_instruction_loop_profile_v1'])test(`${kind}: no-op admission still rejects changed supporting context`,async t=>{
  const f=fullPartialFixture(t,{changed:false});if(kind==='full_practical_instruction_loop_profile_v1'){f.profile.kind=kind;delete f.profile.native;f.profile.practical={root:join(f.root,'eval'),baselineRoot:f.baseFull};}writeFileSync(join(f.p.fullRoot,'AGENTS.md'),'Unexpected supporting context.\n');await assert.rejects(executeNativeInstructionLoopStage(f.profile,{kind:'register',input:{candidate:f.candidate}}),/supporting-context change/);assert.equal(f.registry().assets.length,2);assert.equal(existsSync(f.p.candidateRoot),true);
@@ -190,4 +195,63 @@ for(const kind of ['full_native_reference_loop_profile_v1','full_practical_instr
 test('native selection retains bounded child preparation failure diagnostics without trial launch',async t=>{
  const f=fullPartialFixture(t),criteria=join(f.root,'criteria.json'),template=join(f.root,'template.json');writeFileSync(criteria,JSON.stringify([{fixture_id:'fixture',requirements:[{id:'R1'}]}]));writeFileSync(template,JSON.stringify({rows:[{fixture_id:'fixture',public_inventory:[]}]}));f.profile.report={criteria:{path:criteria,digest:hash(readFileSync(criteria))}};f.profile.policy=fullFixturePolicy('failed-child');f.profile.selection={limit:1};Object.assign(f.profile.native,{python:process.execPath,templateConfig:template,templateConfigDigest:hash(readFileSync(template))});const job={kind:'select',input:{candidate:f.candidate,observation:f.profile.policy.observation,catalog:[{id:'fixture',public_input_digest:canonicalDigest([]),tags:[],domain:'local'}]}};
  await assert.rejects(executeNativeInstructionLoopStage(f.profile,job),/native-preparation-failure.json/);const diagnostic=JSON.parse(readFileSync(join(f.profile.stateRoot,'native-preparation-failure.json')));assert.equal(diagnostic.job_digest,canonicalDigest(job));assert.ok(Number.isInteger(diagnostic.exit_code)&&diagnostic.exit_code!==0);assert.ok(diagnostic.stderr.text.includes('bad option'));assert.equal(diagnostic.stderr.truncated,false);assert.equal(diagnostic.models_started,0);assert.equal(existsSync(f.profile.native.root),false);assert.equal(existsSync(f.profile.native.workRoot),false);
+});
+
+const reviewContractPath='docs/review-finding-contract.md';
+test('paired review contract is exact Skill content, not unowned support, in native and practical Full',async t=>{
+ for(const kind of ['full_native_reference_loop_profile_v1','full_practical_instruction_loop_profile_v1']){
+  const f=fullPartialFixture(t,{reviewContract:true});f.profile.kind=kind;
+  if(kind==='full_practical_instruction_loop_profile_v1')f.profile.practical={root:join(f.root,'eval'),baselineRoot:f.baseFull};
+  const c=await executeNativeInstructionLoopStage(f.profile,{kind:'register',input:{candidate:f.candidate}});
+  assert.equal(c.no_change,false);assert.deepEqual(c.candidate_assets.map(a=>a.stable_id),['ask.skill.alpha']);
+  assert.deepEqual(c.full_context_comparison.canonical_contract_changes,[reviewContractPath]);
+  assert.deepEqual(c.full_context_comparison.supporting_context_excludes,[reviewContractPath]);
+  const assets=verifyAssetRegistry({storeRoot:f.p.storeRoot,snapshotDigest:c.registry.snapshot_digest}).assets;
+  const asset=assets.find(a=>a.record_digest===c.candidate_assets[0].record_digest),file=asset.content.files.find(f=>f.path===reviewContractPath);
+  assert.equal(file.raw_digest,hash(readFileSync(join(f.p.candidateRoot,reviewContractPath))));
+  assert.equal(Buffer.from(file.bytes_base64,'base64').toString(),'Revised canonical contract.\n');
+  const env=verifyInstructionEnvironment({storeRoot:f.p.storeRoot,environmentObjectDigest:c.environment_object_digest});
+  assert.equal(env.environment.support.some(f=>f.path===reviewContractPath),false);
+  assert.deepEqual(env.environment.bindings.find(b=>b.asset.stable_id==='ask.skill.alpha').files.find(f=>f.source===reviewContractPath),{source:reviewContractPath,target:reviewContractPath});
+  assert.equal(env.files.filter(f=>f.path===reviewContractPath).length,1);
+ }
+});
+for(const mode of ['no opt-in','doc-only','different owner','source mismatch','mirror mismatch','layout mismatch'])test('paired contract '+mode+' is refused before Registry writes',async t=>{
+ const f=fullPartialFixture(t,{reviewContract:true,changed:mode==='doc-only'?false:true});
+ if(mode==='no opt-in')delete f.p.reviewFindingContract;
+ if(mode==='different owner')f.p.reviewFindingContract={skill:'beta'};
+ if(mode==='source mismatch')writeFileSync(join(f.p.fullRoot,reviewContractPath),'Installed contract drift.');
+ if(mode==='layout mismatch')f.candidate.layout_object_digest=canonicalDigest('absent layout');
+ if(mode==='mirror mismatch')writeFileSync(join(f.p.fullRoot,'.agents/skills/alpha/SKILL.md'),'Mirror drift.');
+ const before=fullInstructionInventory(f.p.storeRoot);
+ await assert.rejects(executeNativeInstructionLoopStage(f.profile,{kind:'register',input:{candidate:f.candidate}}),/contract|mirror|layout|content-addressed object does not exist/);
+ assert.deepEqual(fullInstructionInventory(f.p.storeRoot),before);
+});
+test('opt-in alone does not invent a revision or turn identical writes into a change',t=>{
+ const f=fullPartialFixture(t,{reviewContract:true,changed:false,contractChanged:false}),c=registerFullInstructionCandidate(f.p,f.candidate);
+ assert.equal(c.no_change,true);assert.deepEqual(c.environment_assets,f.parents);assert.deepEqual(c.candidate_assets,[]);
+});
+test('inherited paired Asset retains exact contract content and cannot drop its owner binding',t=>{
+ const f=fullPartialFixture(t,{reviewContract:true}),first=registerFullInstructionCandidate(f.p,f.candidate);
+ const next={...f.p,baselineSourceRoot:f.p.candidateRoot,baselineRevision:first.source_revision,parentAssets:first.environment_assets,registrySnapshotDigest:first.registry.snapshot_digest};
+ const c=registerFullInstructionCandidate(next,f.candidate);
+ assert.equal(c.no_change,true);assert.deepEqual(c.environment_assets,first.environment_assets);
+ const bytes=fullInstructionInventory(f.p.storeRoot);delete next.reviewFindingContract;
+ assert.throws(()=>registerFullInstructionCandidate(next,f.candidate),/unconfigured.*binding/);
+ assert.deepEqual(fullInstructionInventory(f.p.storeRoot),bytes);
+});
+
+import {resolveInstructionComponents} from './instruction-environment-compiler.mjs';
+test('paired Full contract does not expand ordinary projections or component compiler authority',t=>{
+ const f=fullPartialFixture(t,{reviewContract:true}),c=registerFullInstructionCandidate(f.p,f.candidate);
+ const env=verifyInstructionEnvironment({storeRoot:f.p.storeRoot,environmentObjectDigest:c.environment_object_digest}).environment;
+ const options={storeRoot:f.p.storeRoot,sourceRoot:f.p.fullRoot,environmentId:'ordinary-contract-refusal',adapter:'codex',runtime:f.p.runtime,
+  registrySnapshotDigest:c.registry.snapshot_digest,selectionObjectDigest:null,bindings:env.bindings,supportPaths:[]};
+ const before=fullInstructionInventory(f.p.storeRoot);
+ assert.throws(()=>captureInstructionEnvironment(options),/unsupported.*instruction path/);
+ assert.throws(()=>resolveInstructionComponents({...options,components:env.bindings}),/unsupported.*instruction path/);
+ const foreign=structuredClone(options);foreign.retainedLayoutObjectDigest=c.layout_object_digest;
+ foreign.bindings[0].files.find(f=>f.source===reviewContractPath).target='docs/another-contract.md';
+ assert.throws(()=>captureInstructionEnvironment(foreign),/unsupported.*instruction path/);
+ assert.deepEqual(fullInstructionInventory(f.p.storeRoot),before);
 });

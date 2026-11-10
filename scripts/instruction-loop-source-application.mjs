@@ -8,7 +8,7 @@ import {devNull} from 'node:os';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {bindMeasuredNormalOwnerSource,verifyNormalOwnerSourceBinding} from './instruction-loop-source-binding.mjs';
-import {FULL_SOURCE_DERIVED_PATHS} from './instruction-loop-full-candidate.mjs';
+import {FULL_SOURCE_DERIVED_PATHS,reviewFindingContractScope} from './instruction-loop-full-candidate.mjs';
 import {readRunJournal} from './instruction-run-journal.mjs';
 const keys=(v,names)=>assert.deepEqual(Object.keys(v).sort(),[...names].sort());
 const sha=v=>assert.match(v??'',/^[a-f0-9]{40}$/u);
@@ -39,9 +39,14 @@ export function planSourceApplication(p,job){assert.equal(job.kind,'plan');asser
  const baseTree=git(n.target,['rev-parse',n.base_revision+'^{tree}']);assert.equal(git(c.source_root,['rev-parse',c.baseline_revision+'^{tree}']),baseTree,'source base differs from measured environment; re-plan against the current base');
  const paths=git(c.source_root,['diff','--name-only',c.baseline_revision,c.source_revision]).split('\n').filter(Boolean);assert.ok(paths.length>0&&paths.length<=256);
  assert.deepEqual([...c.changed_paths].sort(),[...paths].sort(),'candidate change inventory drift');assert.ok(paths.some(canonical),'source plan requires a canonical Skill change');
- for(const path of paths)assert.ok(canonical(path)||FULL_SOURCE_DERIVED_PATHS.includes(path),'non-instruction source change refused');
+ const scope=reviewFindingContractScope(p.generator),contractChanged=scope&&paths.includes(scope.path);
+ if(contractChanged){
+  assert.ok(blob(c.source_root,c.baseline_revision,scope.path)&&blob(c.source_root,c.source_revision,scope.path),'review contract must remain an existing canonical file');
+  assert.ok(paths.some(path=>canonical(path)&&path.startsWith(`skills/${scope.skill}/`)&&blob(c.source_root,c.baseline_revision,path)!==blob(c.source_root,c.source_revision,path)),'review contract change requires an actual owner Skill Markdown change');
+ }
+ for(const path of paths)assert.ok(canonical(path)||scope&&path===scope.path||FULL_SOURCE_DERIVED_PATHS.includes(path),'non-instruction source change refused');
  const plan={kind:'ask_source_application_plan_v1',destination:structuredClone(n),candidate_binding:binding,base_tree:baseTree,result_tree:git(c.source_root,['rev-parse','HEAD^{tree}']),
-  changes:paths.map(path=>({path,kind:canonical(path)?'canonical':'generated',before:blob(c.source_root,c.baseline_revision,path),after:blob(c.source_root,c.source_revision,path)})),
+  changes:paths.map(path=>({path,kind:canonical(path)||scope&&path===scope.path?'canonical':'generated',before:blob(c.source_root,c.baseline_revision,path),after:blob(c.source_root,c.source_revision,path)})),
   allowed_operations:['push_new_branch','open_pull_request','inspect_ci_and_review','normal_merge'],formal_admission_implied:false};
  mkdirSync(plans(p),{recursive:true,mode:0o700});save(planPath(p,job),plan);return plan;
 }

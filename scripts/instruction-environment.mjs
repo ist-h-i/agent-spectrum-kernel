@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path';
 import { assertNoSymlinkPathSegments, canonicalDigest, putContentAddressedJson, readContentAddressedJson, readStableBytes } from './content-addressed-store.mjs';
 import { verifyAssetRegistry } from './asset-registry.mjs';
 import { verifyPortfolioSelection } from './portfolio-manager.mjs';
-import { instructionPath, instructionTargetPath as targetPath } from './instruction-projection-paths.mjs';
+import { FULL_REVIEW_FINDING_CONTRACT_PATH, instructionPath, instructionTargetPath as targetPath } from './instruction-projection-paths.mjs';
 import { inspectCompiledInstructionComponents } from './instruction-environment-compiler.mjs';
 import { retainedInstructionPath, verifyRetainedInstructionLayout, verifyRetainedEnvironmentClosure } from './retained-instruction-layout.mjs';
 export { instructionPath };
@@ -63,7 +63,9 @@ function body(options, support) {
     components.push(...inspectCompiledInstructionComponents(options, asset, binding.files));
     for (const mapping of binding.files) {
       assert.deepEqual(Object.keys(mapping).sort(), ['source', 'target']);
-      targetPath(options.adapter, mapping.target);
+      const boundReviewContract=options.retainedLayoutObjectDigest&&options.adapter==='codex'&&asset.asset_type==='skill'
+        &&mapping.source===FULL_REVIEW_FINDING_CONTRACT_PATH&&mapping.target===mapping.source;
+      targetPath(options.adapter, mapping.target,Boolean(boundReviewContract));
       const file = asset.content.files.find(f => f.path === mapping.source);
       files.push({ path: mapping.target, raw_digest: file.raw_digest, bytes_base64: file.bytes_base64 });
     }

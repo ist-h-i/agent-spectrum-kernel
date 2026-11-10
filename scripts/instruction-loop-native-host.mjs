@@ -88,9 +88,9 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     return {...generated,owned_version:{path:version.path,source_revision:version.source_revision,archive:version.archive,
       archive_digest:version.archive_digest,manifest,manifest_digest:canonicalDigest(version)}};
   }
-  if(job.kind==='register'){const context=compareFullInstructionContext({baselineRoot:p.kind==='full_practical_instruction_loop_profile_v1'?p.practical.baselineRoot:p.native.baselineFullRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills});return {...registerFullInstructionCandidate(p.generator,job.input.candidate),full_context_comparison:context};}
+  if(job.kind==='register'){const context=compareFullInstructionContext({baselineRoot:p.kind==='full_practical_instruction_loop_profile_v1'?p.practical.baselineRoot:p.native.baselineFullRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills,reviewFindingContract:p.generator.reviewFindingContract});return {...registerFullInstructionCandidate(p.generator,job.input.candidate),full_context_comparison:context};}
   if(job.kind==='select'){
-    const fairness=compareFullInstructionContext({baselineRoot:p.native.baselineFullRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills});
+    const fairness=compareFullInstructionContext({baselineRoot:p.native.baselineFullRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills,reviewFindingContract:p.generator.reviewFindingContract});
     const feedback=projectInstructionLoopObservation(job.input.observation);
     const selected=selectInstructionLoopCases({...p.selection,catalog:job.input.catalog,
       changedTags:[...new Set([...(p.selection.changedTags??[]),...feedback.tags])]});
