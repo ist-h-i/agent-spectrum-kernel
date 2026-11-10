@@ -177,6 +177,7 @@ export async function advanceSupervisedInstructionLoop({root,policy,runtime,deci
     if(!s){
       s={policy:copy(policy),status:'advancing',outputs:{},trials:[],rows:[],pending:null,gate:null};
       if(completedImport){
+        if(completedImport.kind==='measured_source_adoption_import_v1'){assert.equal(typeof runtime.validateCompletedImport,'function','measured adoption requires a verifying runtime');await runtime.validateCompletedImport(completedImport,{policy});}
         assert.equal(completedImport.host_verified_prior_approval,true,'historical import requires host-verified prior evaluation approval');
         assert.ok(typeof completedImport.evidence_ref==='string'&&completedImport.evidence_ref.trim());
         for(const key of ['generate','register','select','report'])assert.ok(completedImport.outputs[key]);
