@@ -1,0 +1,66 @@
+{
+  "kind": "review_challenge_calibration_summary_v1",
+  "date": "2026-11-10",
+  "task_id": "rc01-shared-review-platform",
+  "ask_commit": "b301be6dea83738fbbf0a30b150aaf160c608f29",
+  "ask_profile": "full",
+  "rubric_sha256": "aa897375e1c594cc84aff896a2a5f405133014f6cdfffb79f75e4dc542aeeb95",
+  "input_manifest_sha256": "88622054a565fdbbe910454b1927a78f1bb4d8e81f573307b2089fbfe1d93a55",
+  "runs": [
+    {
+      "model": "gpt-6.1-sol",
+      "reasoning": "low",
+      "trials": 1,
+      "stages": 2,
+      "score": 83.5,
+      "maximum": 100,
+      "generation_seconds": 1212.561,
+      "input_tokens": 6534302,
+      "cached_input_tokens": 6292352,
+      "uncached_input_tokens": 241950,
+      "output_tokens": 33789,
+      "child_sessions": 3,
+      "child_abort_observed": true,
+      "transport_reconnect_observed": false,
+      "answer_sha256": {
+        "INITIAL.md": "632d719a6d23fa90cfb32b87c43753e277bae8dd36eff360b13703bba864ccb3",
+        "REVIEW.md": "cc181c5817106dd542c1f437bcf52312001de828988e10bd009b2bd640057458",
+        "REASSESSMENT.md": "97c62c18966808a47ee323c00066809b4786db566be8232648b1046e9ba860a0"
+      }
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "reasoning": "max",
+      "trials": 1,
+      "stages": 2,
+      "score": 89,
+      "maximum": 100,
+      "generation_seconds": 3944.999,
+      "input_tokens": 13624936,
+      "cached_input_tokens": 13176832,
+      "uncached_input_tokens": 448104,
+      "output_tokens": 119529,
+      "child_sessions": 3,
+      "child_abort_observed": false,
+      "transport_reconnect_observed": true,
+      "answer_sha256": {
+        "INITIAL.md": "3a9d1b99f08644c632ab4b25ed1b36bd68c2f100076d419517b1ee4fd0a9cd2b",
+        "REVIEW.md": "2241da068992ebd279db0989078ff53eab6c7b036e2ecd930c9da1f113f26ce7",
+        "REASSESSMENT.md": "07710676183c979dbf64e0a48f4ac2a8d89a86c92f69d464449ff3874fa637d4"
+      }
+    }
+  ],
+  "method": "Independent semantic assessment against frozen 34-criterion/100-point rubric and deterministic aggregation. Child usage included; resume cumulative values not double-counted.",
+  "limitations": [
+    "One trial per condition, not statistical significance or future-model lifetime proof.",
+    "Both trials lack actual HTTP/browser execution; module/VM/process probes and static evidence distinguished.",
+    "Max duration includes websocket timeout/reconnection; transport delay not independently measured.",
+    "Low child interruption recorded; root completed. Max root and all children completed.",
+    "Low preparation/grading times unmeasured. Max grading wall time includes phase-two wait."
+  ],
+  "max_grading": {
+    "elapsed_seconds": 1687.249,
+    "included_phase_two_wait_seconds": 1292.335
+  },
+  "model_runs_required_for_registration": false
+}

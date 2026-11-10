@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'benchmarks/challenge-candidates/ceiling-v1/**'
+      - 'benchmarks/challenge-candidates/review-ceiling-v1/**'
+      - 'benchmarks/practical-challenges.json'
       - 'benchmarks/challenge-candidates/ceiling-v2-debt/**'
       - 'benchmarks/challenge-candidates/ceiling-v3-causal/**'
       - 'benchmarks/challenge-candidates/business-five-v1/**'
@@ -38,3 +40,10 @@ jobs:
 
       - name: Check business decision public inputs
         run: node --test benchmarks/challenge-candidates/business-five-v3-decisions/tools/public-package.test.mjs
+
+      - name: Check registered review challenge and shared staged execution
+        run: |
+          node benchmarks/challenge-candidates/review-ceiling-v1/tools/manifest.mjs --check
+          node benchmarks/challenge-candidates/review-ceiling-v1/tools/validate.mjs
+          node --test benchmarks/challenge-candidates/review-ceiling-v1/workspace/packages/portal/test/*.test.mjs
+          node --test scripts/test-challenge-evaluation.mjs

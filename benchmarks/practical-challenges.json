@@ -1,0 +1,74 @@
+{
+  "kind": "practical_challenge_catalog_v1",
+  "challenges": [
+    {
+      "kind": "practical_challenge_registration_v1",
+      "id": "rc01-shared-review-platform",
+      "series": "review-ceiling-v1",
+      "input_version": "review-public-v1",
+      "workspace": "benchmarks/challenge-candidates/review-ceiling-v1/workspace",
+      "input_manifest": {
+        "path": "benchmarks/challenge-candidates/review-ceiling-v1/input-manifests/rc01-shared-review-platform.json",
+        "digest": "sha256:88622054a565fdbbe910454b1927a78f1bb4d8e81f573307b2089fbfe1d93a55"
+      },
+      "stages": [
+        {
+          "id": "initial",
+          "outputs": [
+            "INITIAL.md",
+            "REVIEW.md"
+          ],
+          "prompt": "Read and follow task.md. Complete steps 1 and 2 only: save INITIAL.md before investigation, then REVIEW.md. Do not invent the optional operational update. Keep original application, tests, contracts and evidence unchanged. Use only local workspace and localhost endpoints, never external network services. Work only in this workspace and system toolchains; do not inspect unrelated directories, user repositories or host history. Use only synthetic data and localhost services. Save reproducible probes and observations. If UI access or dependencies are unavailable, preserve explicit missing evidence. Stop after the initial review."
+        },
+        {
+          "id": "reassessment",
+          "outputs": [
+            "REASSESSMENT.md"
+          ],
+          "update": {
+            "target": "OPERATIONAL-UPDATE.md",
+            "digest": "sha256:53b2659fe1eab7da432a39821f3eec29daded27d4f243bf06b859245ecba7bbf",
+            "path": "benchmarks/challenge-candidates/review-ceiling-v1/stages/reassessment.md"
+          },
+          "prompt": "Continue this same trial with the fixed operational update in OPERATIONAL-UPDATE.md. Read that file and add REASSESSMENT.md only, explaining which judgments remain or change and why. INITIAL.md and REVIEW.md are frozen: do not modify them. Do not modify application, original tests, contracts or existing evidence. This is a bounded reassessment, not a new task or a full review restart. Do not invent additional updates. Retain the original execution boundaries, tools, model and settings. Stop when REASSESSMENT.md is saved."
+        }
+      ],
+      "evaluator": {
+        "kind": "external_semantic_assessment",
+        "maximum": 100,
+        "automatic_semantic_scoring": false,
+        "files": [
+          {
+            "path": "rubric.json",
+            "digest": "sha256:aa897375e1c594cc84aff896a2a5f405133014f6cdfffb79f75e4dc542aeeb95"
+          },
+          {
+            "path": "score.mjs",
+            "digest": "sha256:5caef5fd7e63dae9bb1677ea83c4e013698840763cd1cd5ac7537c6c8f2d93d0"
+          },
+          {
+            "path": "README.md",
+            "digest": "sha256:e18ac5d88b40f5d3e1667e4752441f7ed7654b00016cbc89a445f806c0bac091"
+          }
+        ]
+      },
+      "primary_catalog_member": false,
+      "formal_primary_admission": false,
+      "calibration": {
+        "status": "pilot_observed",
+        "model": "gpt-6.1-sol",
+        "conditions": [
+          {
+            "reasoning": "low",
+            "quality_score": 83.5
+          },
+          {
+            "reasoning": "max",
+            "quality_score": 89
+          }
+        ],
+        "limits": "One trial per effort; semantic assessor decisions, not a difficulty or comparative significance guarantee."
+      }
+    }
+  ]
+}

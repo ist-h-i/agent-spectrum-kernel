@@ -1,0 +1,21 @@
+{
+  "name": "@reviewops/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local ReviewOps core engine without VS Code or AI API dependencies.",
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "format_version": "1.0.0",
+  "artifact_kind": "challenge_design_catalog",
+  "catalog_id": "review-ceiling-v1",
+  "candidate_count": 1,
+  "existing_primary_count_unchanged": 24,
+  "status": "registered_staged_runner_synthetic_verified",
+  "runtime_config": true,
+  "ready_for_measurement": false,
+  "model_calibration_run": true,
+  "candidates": [
+    {
+      "id": "rc01-shared-review-platform",
+      "title": "大規模レビュー運用基盤のリリース診断",
+      "task_class": "review_investigation_decision",
+      "workspace_path": "workspace",
+      "task_path": "workspace/task.md",
+      "difficulty_status": "pilot_observed_not_established",
+      "quality_maximum": 100,
+      "evaluator_reference_path": "../../practical-challenges.json#/challenges/0/evaluator",
+      "formal_admission": false
+    }
+  ],
+  "runtime_registration": "../../practical-challenges.json",
+  "calibration_reference": "calibration-summary.json",
+  "runtime_verification": "synthetic_only; real staged CLI execution unverified"
+}

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ReviewOps · Review workspace</title><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
+<body>
+<a class="skip-link" href="#main">Skip to review queue</a>
+<div class="app-shell">
+<aside class="sidebar" aria-label="Workspace navigation">
+<a href="/" class="brand"><span class="brand-mark">R</span> ReviewOps</a>
+<div class="workspace-label">ENGINEERING WORKSPACE</div>
+<nav><button class="nav-item active" data-view="queue"><span>▤</span> Review queue <span class="nav-count" id="nav-count">—</span></button><button class="nav-item" data-view="history"><span>◷</span> Activity</button><button class="nav-item" data-view="settings"><span>⚙</span> Workspace settings</button></nav>
+<div class="sidebar-bottom"><div class="avatar">AL</div><div><strong>Alex Lin</strong><small>Review coordinator</small></div></div>
+</aside>
+<div class="main-shell">
+<header class="topbar"><div><span class="workspace-dot"></span> Northstar engineering <span class="slash">/</span> Review operations</div><span class="local-pill">Local workspace</span></header>
+<main id="main" tabindex="-1">
+<section id="queue-view" class="view">
+<div class="page-heading"><div><p class="eyebrow">REVIEW OPERATIONS</p><h1>Keep every review moving.</h1><p class="subtitle">Resolve findings, collect evidence, and publish with context.</p></div><button id="refresh" class="button secondary">↻ Refresh workspace</button></div>
+<div id="metrics" class="metrics" aria-label="Review overview"><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div></div>
+<div class="queue-heading"><div><h2>Review queue <span id="result-count" class="count">—</span></h2><p class="muted">Your team's next decisions, in one place.</p></div><div class="segmented" aria-label="Queue display"><button id="table-view" class="selected" aria-pressed="true">List</button><button id="card-view" aria-pressed="false">Cards</button></div></div>
+<form id="filters" class="filters" role="search"><label class="search-label"><span class="sr-only">Search reviews</span><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search titles or repositories" autocomplete="off"></label><label><span class="sr-only">Team</span><select id="team-filter"><option value="">All teams</option></select></label><label><span class="sr-only">Status</span><select id="status-filter"><option value="">All statuses</option><option value="open">Open</option><option value="approved">Approved</option><option value="published">Published</option><option value="archived">Archived</option></select></label><button type="button" id="clear-filters" class="button quiet">Clear filters</button></form>
+<section id="pinned-section" class="pinned-section" hidden aria-label="Pinned reviews"><div class="pinned-heading"><h3>Pinned for next review</h3><span class="small muted">Drag to arrange your working order</span></div><div id="pinned-list"></div><p id="pin-status" class="small muted" role="status"></p></section>
+<div id="queue-error" class="region-error" hidden></div>
+<div id="bulkbar" class="bulkbar" hidden><span id="selection-count"></span><button id="clear-selection" class="button quiet">Clear selection</button><button id="bulk-publish" class="button primary">Publish selected</button></div>
+<div id="queue" class="queue" aria-live="polite"></div>
+<div class="queue-footer"><span id="queue-updated">Loading workspace…</span><span>Evidence stays in this workspace.</span></div>
+</section>
+<section id="history-view" class="view" hidden><div class="page-heading"><div><p class="eyebrow">AUDIT TRAIL</p><h1>Workspace activity</h1><p class="subtitle">Decisions and delivery events across your teams.</p></div><button id="history-refresh" class="button secondary">Refresh activity</button></div><div id="history-content"></div></section>
+<section id="settings-view" class="view" hidden><div class="page-heading"><div><p class="eyebrow">WORKSPACE</p><h1>Review preferences</h1><p class="subtitle">Set the defaults for your team's review workflow.</p></div></div><form id="settings-form" class="settings-panel"><h2>Review delivery</h2><p class="muted">Changes apply to new reviews in this workspace.</p><label class="field">Workspace name<input name="workspaceName" required maxlength="80" value="Northstar engineering"></label><label class="field">Digest recipient<input name="digestEmail" type="email" placeholder="team@example.test"></label><label class="check-field"><input name="requireApproval" type="checkbox" checked><span>Require approval before publishing<small>A coordinator must approve provider-bound replies.</small></span></label><label class="check-field"><input name="compactRows" type="checkbox"><span>Use compact queue rows<small>Show more reviews without changing their content.</small></span></label><label class="field">Reminder interval<select name="reminderHours"><option value="24">Every 24 hours</option><option value="48">Every 48 hours</option><option value="72">Every 72 hours</option></select></label><div class="form-actions"><button type="submit" class="button primary">Save preferences</button><span id="settings-status" role="status"></span></div></form></section>
+</main>
+<footer class="app-footer">ReviewOps <span>Human decisions. Traceable evidence.</span></footer>
+</div></div>
+<div id="drawer-overlay" class="drawer-overlay" hidden><section id="drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="detail-title" tabindex="-1"><div id="detail-content"></div></section></div>
+<div id="confirm-overlay" class="confirm-overlay" hidden><section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description"><span class="dialog-icon">↗</span><h2 id="confirm-title">Publish selected reviews?</h2><p id="confirm-description"></p><div id="confirm-targets"></div><div class="form-actions"><button id="confirm-cancel" class="button secondary">Cancel</button><button id="confirm-submit" class="button primary">Publish now</button></div><p class="muted small">Delivery events are recorded in workspace activity.</p></section></div>
+<div id="toast" class="toast" role="status" hidden></div>
+</body></html>
