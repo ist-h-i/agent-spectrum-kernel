@@ -92,4 +92,12 @@ if (JSON.stringify(localizedRoute.additional_gates) !== JSON.stringify(["review-
 if (!deriveReviewSignalGateRoute(runtimeRegistry, ["untrusted_input", "untrusted_input"]).issues.includes("observed_signals:duplicate")) throw new Error("runtime review signal derivation must reject duplicate signals");
 if (!deriveReviewSignalGateRoute(runtimeRegistry, ["unknown_signal"]).issues.includes("observed_signal:unknown:unknown_signal")) throw new Error("runtime review signal derivation must reject unknown signals");
 
+// Static instruction coverage only: this does not establish model adherence.
+const evidenceCalibrationGuidance = "For each material evidence gap, briefly retain the related behavior already verified and its source in the existing evidence summary. Distinguish the verified layer from the unverified layer; a passing test count alone is not that conclusion. Do not repeat it under Suggestions.";
+for (const path of ["skills/review-ai-quality/SKILL.md", "skills/review-router/SKILL.md", "docs/review-finding-contract.md"]) {
+  if (!readFileSync(resolve(root, path), "utf8").includes(evidenceCalibrationGuidance)) {
+    throw new Error(`${path}: preserve related verified behavior beside material evidence gaps`);
+  }
+}
+
 console.log("Review route contract tests passed");

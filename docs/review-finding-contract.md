@@ -47,6 +47,8 @@ This ordering is a decision-impact presentation rule. It does not infer severity
 
 Ordinary review output uses one Findings section. It omits empty category sections and skipped-heavy-gate boilerplate. Complete gate applicability and skipped-layer details are emitted only for explicit diagnostic/debug requests.
 
+For each material evidence gap, briefly retain the related behavior already verified and its source in the existing evidence summary. Distinguish the verified layer from the unverified layer; a passing test count alone is not that conclusion. Do not repeat it under Suggestions.
+
 ## Compatibility
 
 Historical review text remains readable. New Prompt v2 projections use this contract prospectively and do not rewrite benchmark oracles, private evaluator artifacts, historical metrics, or immutable pre-compact prompt fixtures.

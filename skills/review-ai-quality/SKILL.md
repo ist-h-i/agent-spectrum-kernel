@@ -44,6 +44,7 @@ Be specific and evidence-backed. Passing tests prove only their observed behavio
    - applicable output and CI/test evidence.
 
 2. If any evidence required for the concrete judgment is absent, return insufficient evidence and name the exact next check. Do not treat an inapplicable evidence class as missing.
+   For each material evidence gap, briefly retain the related behavior already verified and its source in the existing evidence summary. Distinguish the verified layer from the unverified layer; a passing test count alone is not that conclusion. Do not repeat it under Suggestions.
 
 3. Review the baseline semantic surface.
    - Logic and edge cases.
