@@ -10,6 +10,7 @@ import {verifyInstructionEnvironment,instructionBytesDigest as hash} from './ins
 import {verifyAssetRegistry} from './asset-registry.mjs';
 import {readRunJournal} from './instruction-run-journal.mjs';
 import {transitionInstructionLoopAssets} from './instruction-loop-assets.mjs';
+import {practicalReportingGraderPins} from './practical-reporting-grader.mjs';
 import {createPracticalLifecycleRuntime,prepareFullPracticalInstructionSelection} from './instruction-loop-practical-runtime.mjs';
 import {generateComponentInstructionCandidate,resumeHostComponentInstructionCandidate,componentEnvironmentOptions} from './instruction-loop-component-candidate.mjs';
 import {readHostInstructionAuthoringRequest,claimHostInstructionAuthoring,completeHostInstructionAuthoring} from './instruction-loop-host-authoring.mjs';
@@ -43,7 +44,7 @@ function checkedPaths(p){
 export function createComponentInstructionLoopConfiguration(profilePath){
   profilePath=resolve(profilePath);const p=readJsonFileStrict(profilePath,'component profile',16*1024*1024);checkedPaths(p);
   const runtime={kind:'component_practical_instruction_loop_runtime_v1',profile_path:profilePath,profile_digest:pin(profilePath).digest,
-    source_pins:sourceNames.map(name=>pin(join(import.meta.dirname,name)))};
+    source_pins:[...new Map([...sourceNames.map(name=>pin(join(import.meta.dirname,name))),...practicalReportingGraderPins()].map(p=>[p.path,p])).values()]};
   return {policy:{...p.policy,runtime_digest:canonicalDigest(runtime)},runtime};
 }
 function checkedProfile(d){
