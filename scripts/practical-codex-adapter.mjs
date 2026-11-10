@@ -11,6 +11,7 @@ import {parseUserCodexTelemetry,sanitizeComparisonLog} from './ask-user-comparis
 import {readStableFile} from './ask-benchmark-stable-file.mjs';
 const digest=/^sha256:[a-f0-9]{64}$/u;
 const counters=['input_tokens','output_tokens','cached_tokens'];
+const toml=value=>value&&typeof value==='object'?'{'+Object.entries(value).map(([k,v])=>JSON.stringify(k)+'='+toml(v)).join(',')+'}':JSON.stringify(value);
 const pin=path=>({path,digest:hash(readStableBytes(path,'standard Codex adapter source',16*1024*1024))});
 export function validateCodexPracticalOptions(o){
  assert.ok(o&&Object.keys(o).every(k=>['executable','model','reasoning','task_file','timeout_ms'].includes(k)));
@@ -57,7 +58,7 @@ function recoveredReconnects(stdout,telemetry){
  }
  return notices===telemetry.errors.length&&lastType==='turn.completed'?[...telemetry.errors]:[];
 }
-export async function executeCodexPracticalAdapter({settings,controlRoot,requestDigest,commandDigest,invocationDigest,role},session=executeCodexSession){
+export async function executeCodexPracticalAdapter({settings,controlRoot,requestDigest,commandDigest,invocationDigest,role},session=executeCodexSession,staged=null){
  assert.equal(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED,'1','standard Codex model calls not authorized');
  assert.equal(settings.kind,'practical_codex_settings_v1');validateCodexPracticalOptions(Object.fromEntries(['executable','model','reasoning','task_file','timeout_ms'].map(k=>[k,settings[k]])));
  assert.ok(['synthetic','observed'].includes(settings.evidence_kind));assert.ok(['task','grade'].includes(role));
@@ -66,10 +67,17 @@ export async function executeCodexPracticalAdapter({settings,controlRoot,request
  mkdirSync(join(controlRoot,role+'-codex-dispatch'),{mode:0o700});
  let attempted=false,r;
  try{
-  const input=readStableBytes(join(process.cwd(),settings.task_file),'approved public task',2*1024*1024).toString('utf8');
-  const argv=['exec','--sandbox','workspace-write','--json','--skip-git-repo-check','--output-last-message',join(controlRoot,role+'-codex-last-message.txt'),
-   ...(settings.model===null?[]:['--model',settings.model]),...(settings.reasoning===null?[]:['--config','model_reasoning_effort='+JSON.stringify(settings.reasoning)]),'-'];
-  attempted=true;r=await session({executable:settings.executable,argv,cwd:process.cwd(),input,timeoutMs:settings.timeout_ms,terminationScope:'direct_child'});
+  const workspace=staged?.workspace??process.cwd();
+  const input=staged?.prompt??readStableBytes(join(workspace,settings.task_file),'approved public task',2*1024*1024).toString('utf8');
+  if(staged){
+   assert.equal(resolve(workspace),workspace);
+   assert.ok(typeof input==='string'&&input.length>0);
+   assert.ok(staged.resume_session_id===null||/^[A-Za-z0-9-]{1,100}$/u.test(staged.resume_session_id));
+  }
+  const isolation=staged?['--ignore-user-config','-c','features.network_proxy=true','--enable','code_mode_host','--disable','apps','--disable','browser_use','--disable','computer_use','--disable','hooks','--disable','memories','--disable','remote_plugin','--enable','skip_host_skill_discovery','-c','skills.bundled.enabled=false','-c','shell_environment_policy='+toml({inherit:'none',set:{PATH:staged.toolchain_roots.map(p=>p+'/bin').join(':')+':/usr/bin:/bin:/usr/sbin:/sbin',HOME:workspace,TMPDIR:workspace,npm_config_audit:'false',npm_config_fund:'false'}}),'-c','permissions.challenge='+toml({filesystem:{':root':'deny',':minimal':'read',...Object.fromEntries(staged.toolchain_roots.map(p=>[p,'read'])),[workspace]:'write'},network:{enabled:true}}),'-c','default_permissions="challenge"','-c','approval_policy="never"']:['--sandbox','workspace-write'];
+  const argv=['exec',...(staged?.resume_session_id?['resume']:[]),...isolation,'--json','--skip-git-repo-check','--output-last-message',join(controlRoot,role+'-codex-last-message.txt'),
+   ...(settings.model===null?[]:['--model',settings.model]),...(settings.reasoning===null?[]:['--config','model_reasoning_effort='+JSON.stringify(settings.reasoning)]),...(staged?.resume_session_id?[staged.resume_session_id]:[]),'-'];
+  attempted=true;r=await session({executable:settings.executable,argv,cwd:workspace,input,timeoutMs:settings.timeout_ms,terminationScope:'direct_child'});
  }catch(error){r={spawnObserved:attempted?null:false,terminationConfirmed:!attempted,exitCode:null,error:{message:sanitizeComparisonLog(error.message).slice(0,2048)},stdout:Buffer.alloc(0),stderr:Buffer.alloc(0),durationMs:null};}
  const stdout=Buffer.from(r.stdout??'').toString('utf8'),telemetry=parseUserCodexTelemetry(stdout);
  const clean=r.spawnObserved===true&&r.terminationConfirmed===true&&r.exitCode===0&&!r.error&&!r.timedOut&&!r.interrupted&&!r.outputLimited;

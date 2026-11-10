@@ -22,7 +22,7 @@ Release-blocking data exposure/loss, unauthorized external action, or unverifiab
 
 Only `workspace/` and the staged public update are reviewer inputs. No authoring ledger, reference reviews, scoring matcher, reproduction oracle, source derivation notes, Git history or previous answers are included. The benchmark author may validate a fixture using private oracles, but that does not make a model answer correct.
 
-Detailed assessor checks are stored outside the repository. Review assessment is evidence-based and may require human/independent semantic adjudication. A deterministic calculator only validates and totals those decisions; it does not infer correctness from keywords or score a finding by its count. If this package is later wired to the standard runner, preserve this distinction in its adapter/result labels.
+Detailed assessor checks are stored outside the repository. Review assessment is evidence-based and may require human/independent semantic adjudication. A deterministic calculator only validates and totals those decisions; it does not infer correctness from keywords or score a finding by its count. The registered staged path preserves this distinction in its adapter/result labels; see `docs/practical-challenge-evaluation.md` from the repository root.
 
 ## Reassessment
 
@@ -43,7 +43,7 @@ Human approval of cases/conditions precedes model runs. Fix model/effort, ASK ve
 
 Measure task elapsed time, setup/grading time and input/output/cache usage separately. Cache is an input subset, not another summand. Include child usage when available, disclose missing usage and interrupted runs. An execution fault is not a quality score of zero. Preserve failed attempts; retry only affected runs where justified, without selecting results for a desired score.
 
-CH01-level difficulty is a design goal, not a verified fact. No paid/model calibration has been run. Scores near a ceiling should trigger inspection of task coverage and grader discrimination, not retrospective harsher grading.
+CH01-level difficulty is a design goal, not a verified fact. Two pilot model trials are recorded in `calibration-summary.json`; they do not establish comparative difficulty or readiness of the new staged entry point. Scores near a ceiling should trigger inspection of task coverage and grader discrimination, not retrospective harsher grading.
 
 ### One-phase score handling
 
