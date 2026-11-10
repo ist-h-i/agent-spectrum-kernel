@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+export const FULL_REVIEW_FINDING_CONTRACT_PATH='docs/review-finding-contract.md';
 export function instructionPath(path) {
   assert.equal(typeof path, 'string', 'instruction path required');
   assert.ok(path.length <= 512 && /^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/.test(path)

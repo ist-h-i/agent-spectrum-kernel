@@ -1,5 +1,5 @@
 // Full candidates reuse the normal source/installers and existing Registry.
-// Only canonical Skill Markdown reaches the generator; mirrors/state are built
+// Only selected canonical Markdown reaches the generator; mirrors/state are built
 // by the existing installers, never authored by the model.
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
@@ -8,10 +8,11 @@ import {join,resolve,dirname} from 'node:path';
 import {devNull} from 'node:os';
 import {canonicalDigest,readStableBytes,readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash,captureInstructionEnvironment} from './instruction-environment.mjs';
-import {captureRetainedInstructionLayout,retainedInstructionPath} from './retained-instruction-layout.mjs';
+import {captureRetainedInstructionLayout,verifyRetainedInstructionLayout,retainedInstructionPath} from './retained-instruction-layout.mjs';
 import {verifyAssetRegistry,registerAsset} from './asset-registry.mjs';
 import {executeCodexSession} from './codex-exec-runner.mjs';
 import {readStableFile} from './ask-benchmark-stable-file.mjs';
+import {FULL_REVIEW_FINDING_CONTRACT_PATH} from './instruction-projection-paths.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
 
 const gitEnv=()=>({...Object.fromEntries(['PATH','TMPDIR','LANG','TZ'].filter(k=>process.env[k]).map(k=>[k,process.env[k]])),
@@ -28,6 +29,27 @@ export function fullInstructionInventory(root,relative=''){
   }).sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
 }
 function allowed(path,skills){return typeof path==='string'&&skills.some(s=>path===`skills/${s}/SKILL.md`||new RegExp(`^skills/${s}/references/[A-Za-z0-9._/-]+\\.md$`,'u').test(path))&&path.split('/').every(x=>/^[A-Za-z0-9_][A-Za-z0-9._-]*$/u.test(x));}
+// This opt-in names a Skill owner, never an arbitrary supporting-document path.
+export function reviewFindingContractScope(p){
+  if(p.reviewFindingContract===undefined)return null;
+  const scope=p.reviewFindingContract;
+  assert.ok(scope&&typeof scope==='object'&&!Array.isArray(scope),'review contract scope required');
+  assert.deepEqual(Object.keys(scope),['skill'],'closed review contract scope required');
+  assert.ok(p.skills?.includes(scope.skill)&&/^[a-z0-9-]+$/u.test(scope.skill),'review contract owner must be a selected Skill');
+  return {path:FULL_REVIEW_FINDING_CONTRACT_PATH,skill:scope.skill};
+}
+const inventoryMap=root=>new Map(fullInstructionInventory(root).map(f=>[f.path,f]));
+function actualSkillChange(before,after,skill){
+  return [...new Set([...before.keys(),...after.keys()])].some(path=>allowed(path,[skill])&&before.get(path)?.sha256!==after.get(path)?.sha256);
+}
+function assertReviewContractDelta(before,after,scope){
+  const path=FULL_REVIEW_FINDING_CONTRACT_PATH,a=before.get(path),b=after.get(path);
+  if(scope)assert.ok(a&&b,'review contract must remain an existing canonical file');
+  if(a?.sha256===b?.sha256)return false;
+  assert.ok(scope&&a&&b,'review contract change requires explicit scope and an existing canonical file');
+  assert.ok(actualSkillChange(before,after,scope.skill),'review contract change requires an actual owner Skill Markdown change');
+  return true;
+}
 export const FULL_SOURCE_DERIVED_PATHS=['docs/fixtures/adapter-runtime-bundle.json','docs/fixtures/adapter-runtime-evidence.json','docs/fixtures/adapter-runtime-profiles.json','docs/fixtures/verification-proof-policy-cases.json','docs/verification-proof-policy-contract.md','docs/validation-report.md',
   ...['implement','investigate','review-pr','verify','handoff'].map(name=>`adapters/claude-code/plugin/skills/${name}/SKILL.md`)];
 function sourceValidation(p){
@@ -67,13 +89,15 @@ function validateGeneratedSource(p,expectedValidatorDigest){
   return {status:'passed',kind:'ask_repository_v1',record:receipt,receipt:{path,digest:hash(readStableBytes(path,'source validation receipt'))},
     report_digest:hash(readStableBytes(join(p.candidateRoot,'docs/validation-report.md'),'generated validation report',16*1024*1024)),runtime_or_effectiveness_implied:false};
 }
-export function compareFullInstructionContext({baselineRoot,candidateRoot,skills}){
+export function compareFullInstructionContext({baselineRoot,candidateRoot,skills,reviewFindingContract}){
   const before=new Map(fullInstructionInventory(baselineRoot).map(f=>[f.path,f])),after=new Map(fullInstructionInventory(candidateRoot).map(f=>[f.path,f]));
+  const scope=reviewFindingContractScope({skills,reviewFindingContract}),contractChanged=assertReviewContractDelta(before,after,scope);
   const changed=[];
   for(const path of [...new Set([...before.keys(),...after.keys()])].sort()){
     const a=before.get(path),b=after.get(path);if(a&&b)assert.equal(a.mode,b.mode,'Full context file mode changed: '+path);
     if(a?.sha256===b?.sha256)continue;
-    changed.push(path);if(allowed(path,skills)||path.startsWith('.agents/')&&allowed(path.slice(8),skills))continue;
+    changed.push(path);if(scope&&path===scope.path)continue;
+    if(allowed(path,skills)||path.startsWith('.agents/')&&allowed(path.slice(8),skills))continue;
     assert.ok(a&&b,'unexpected Full context addition/removal: '+path);
     if(['.agent-spectrum-kernel/install-state.json','.agent-spectrum-kernel/codex-install-state.json'].includes(path)){
       const old=readJsonFileStrict(join(baselineRoot,path)),next=readJsonFileStrict(join(candidateRoot,path));
@@ -86,25 +110,30 @@ export function compareFullInstructionContext({baselineRoot,candidateRoot,skills
     }
     assert.fail('unexpected Full supporting-context change: '+path);
   }
-  return {changed_paths:changed,supporting_context_preserved:true,capability_selection_preserved:true,
+  return {changed_paths:changed,...(scope?{canonical_contract_changes:contractChanged?[scope.path]:[],supporting_context_excludes:[scope.path]}:{}),supporting_context_preserved:true,capability_selection_preserved:true,
     owner_metadata_regenerated:true,prompt_changes_only_hash_bindings:true};
 }
 export function fullGenerationInput(p){
   assert.equal(resolve(p.baselineSourceRoot),p.baselineSourceRoot);assertNoSymlinkPathSegments(p.baselineSourceRoot,'baseline source');
   assert.equal(git(p.baselineSourceRoot,['rev-parse','HEAD']),p.baselineRevision,'baseline revision drift');
   assert.equal(git(p.baselineSourceRoot,['status','--porcelain','--untracked-files=no']),'','baseline source must be clean');
-  const validation=sourceValidation(p);
+  const validation=sourceValidation(p),scope=reviewFindingContractScope(p);
   assert.ok(p.skills.length>0&&p.skills.length<=64&&new Set(p.skills).size===p.skills.length);
   for(const s of p.skills)assert.match(s,/^[a-z0-9-]+$/u);
   assert.ok(typeof p.goal==='string'&&p.goal.length>0&&p.goal.length<=8192);
   const files=p.skills.flatMap(s=>fullInstructionInventory(join(p.baselineSourceRoot,'skills',s)).map(f=>({...f,path:`skills/${s}/`+f.path})))
     .filter(f=>allowed(f.path,p.skills)).map(f=>({path:f.path,raw_digest:f.sha256,text:readStableBytes(join(p.baselineSourceRoot,f.path),'public Skill').toString('utf8')}));
+  if(scope){
+    assert.equal(git(p.baselineSourceRoot,['ls-files','--error-unmatch','--',scope.path]),scope.path,'review contract must be tracked');
+    const bytes=readStableBytes(join(p.baselineSourceRoot,scope.path),'public review contract');
+    files.push({path:scope.path,raw_digest:hash(bytes),text:new TextDecoder('utf-8',{fatal:true}).decode(bytes)});
+  }
   assert.ok(files.reduce((n,f)=>n+Buffer.byteLength(f.text),0)<=2*1024*1024,'bounded public generation input');
   const feedback=p.observation===undefined?null:projectInstructionLoopObservation(p.observation);
   return {kind:'full_skill_revision_request_v1',goal:feedback?.goal??p.goal,baseline_revision:p.baselineRevision,skills:p.skills,files,
     ...(feedback?{work_feedback:feedback,host_goal:p.goal}:{}),
-    ...(validation?{source_validation:validation}:{}),
-    response_contract:{changes:'write/delete canonical skills/<selected>/SKILL.md or references/*.md only',entrypoints_must_remain:true},
+    ...(validation?{source_validation:validation}:{}),...(scope?{review_finding_contract:scope}:{}),
+    response_contract:{changes:'write/delete canonical skills/<selected>/SKILL.md or references/*.md only'+(scope?'; also write '+scope.path+' together with an actual Markdown change to its owner Skill '+scope.skill:''),entrypoints_must_remain:true},
     raw_logs_included:false,private_answers_included:false,formal_admission_implied:false};
 }
 export async function codexFullInstructionProvider(p,input){
@@ -112,7 +141,7 @@ export async function codexFullInstructionProvider(p,input){
   if(p.executableDigest!==undefined){assert.equal(resolve(p.executable),p.executable,'absolute pinned Full authoring executable required');assert.match(p.executableDigest,/^sha256:[a-f0-9]{64}$/u);assert.equal(hash(readStableBytes(p.executable,'pinned Full authoring executable',16*1024*1024)),p.executableDigest,'Full authoring executable drift');}
   assertNoSymlinkPathSegments(p.sessionRoot,'generation session',{allowMissingLeaf:true});mkdirSync(p.sessionRoot,{mode:0o700});
   const final=join(p.sessionRoot,'last-message.json');
-  const prompt='Revise the supplied public Skill source for the stated goal. Return only JSON {"changes":[{"operation":"write","path":"...","text":"..."}]} (or operation delete for an existing reference). Preserve essential safety and capability boundaries. Do not edit executable code, test cases, scoring, owner state or mirrors.\n'+JSON.stringify(input);
+  const prompt='Revise the supplied public '+(input.review_finding_contract?'canonical':'Skill')+' source for the stated goal. Return only JSON {"changes":[{"operation":"write","path":"...","text":"..."}]} (or operation delete for an existing reference). Preserve essential safety and capability boundaries. Do not edit executable code, test cases, scoring, owner state or mirrors.\n'+JSON.stringify(input);
   const argv=['exec','--json','--skip-git-repo-check','--sandbox','read-only','-o',final,...(p.model?['--model',p.model]:[]),'-'];
   const result=await executeCodexSession({executable:p.executable,argv,cwd:p.sessionRoot,input:prompt,timeoutMs:p.timeoutMs,terminationScope:'direct_child',
     env:{...process.env,ASK_LOOP_MODEL_CALLS_AUTHORIZED:'1'}});
@@ -131,16 +160,21 @@ export async function codexFullInstructionProvider(p,input){
 export async function generateFullInstructionCandidate(p,provider){
   const roots=[p.baselineSourceRoot,p.storeRoot,p.candidateRoot,p.fullRoot,p.stagingRoot];
   for(const [i,a] of roots.entries())for(const b of roots.slice(i+1))assert.ok(a!==b&&!a.startsWith(b+'/')&&!b.startsWith(a+'/'),'separate source, CAS and materialization roots required');
-  const input=fullGenerationInput(p),provided=await provider(input);assert.deepEqual(Object.keys(provided.response).sort(),['changes'],'Full generator returns only changes');const changes=provided.response.changes;
+  const input=fullGenerationInput(p),scope=reviewFindingContractScope(p),provided=await provider(input);assert.deepEqual(Object.keys(provided.response).sort(),['changes'],'Full generator returns only changes');const changes=provided.response.changes;
   assert.ok(Array.isArray(changes)&&changes.length<=256);const seen=new Set();let bytes=0;
   for(const c of changes){
-    assert.ok(c&&allowed(c.path,p.skills)&&!seen.has(c.path),'generated path outside allowed Skill source');seen.add(c.path);
+    assert.ok(c&&(allowed(c.path,p.skills)||scope&&c.path===scope.path)&&!seen.has(c.path),'generated path outside allowed Skill source');seen.add(c.path);
     assert.ok(['write','delete'].includes(c.operation));
     assert.deepEqual(Object.keys(c).sort(),(c.operation==='write'?['operation','path','text']:['operation','path']).sort());
     if(c.operation==='write'){assert.ok(typeof c.text==='string'&&c.text.length&&!c.text.includes('\0'));bytes+=Buffer.byteLength(c.text);}
     else assert.ok(c.path.includes('/references/')&&existsSync(join(p.baselineSourceRoot,c.path)),'only existing references may be deleted');
   }
   assert.ok(bytes<=2*1024*1024);
+  if(scope){
+    const before=new Map(input.files.map(f=>[f.path,{sha256:f.raw_digest}])),after=new Map(before);
+    for(const c of changes)if(c.operation==='delete')after.delete(c.path);else after.set(c.path,{sha256:hash(Buffer.from(c.text))});
+    assertReviewContractDelta(before,after,scope);
+  }
   for(const dir of [p.candidateRoot,p.fullRoot,p.stagingRoot]){assertNoSymlinkPathSegments(dir,'fresh owned materialization',{allowMissingLeaf:true});assert.ok(!existsSync(dir),'fresh owned materialization required');mkdirSync(dir,{mode:0o700});}
   git(p.candidateRoot,['init','--quiet','--template=']);
   git(p.candidateRoot,['fetch','--quiet',...(p.sourceValidation?[]:['--depth=1']),'--no-tags',p.baselineSourceRoot,p.baselineRevision]);
@@ -151,7 +185,7 @@ export async function generateFullInstructionCandidate(p,provider){
   const pluginWriter=join(p.candidateRoot,'scripts/claude-plugin-fixed-entries.mjs');
   const derivedPaths=FULL_SOURCE_DERIVED_PATHS.filter(path=>path!=='docs/validation-report.md'&&(!path.startsWith('adapters/')||existsSync(pluginWriter)));
   if(p.sourceValidation)derivedPaths.push('docs/validation-report.md');
-  const authored=p.sourceValidation?fullInstructionInventory(p.candidateRoot):null;
+  const authored=p.sourceValidation||scope?fullInstructionInventory(p.candidateRoot):null;
   const refresh=spawnSync(process.execPath,[join(p.candidateRoot,'scripts/update-adapter-runtime-fixtures.mjs')],{encoding:'utf8',maxBuffer:4*1024*1024});
   assert.equal(refresh.status,0,'existing adapter fixture writer failed');
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
@@ -167,11 +201,11 @@ export async function generateFullInstructionCandidate(p,provider){
   }
   const validation=p.sourceValidation?validateGeneratedSource(p,input.source_validation.validator_digest):null;
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
-  git(p.candidateRoot,['add','--','skills',...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
+  git(p.candidateRoot,['add','--','skills',...(scope?[scope.path]:[]),...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
   git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
   const revision=git(p.candidateRoot,['rev-parse','HEAD']);
   const changed=git(p.candidateRoot,['diff','--name-only',p.baselineRevision,'HEAD']).split('\n').filter(Boolean);
-  assert.ok(changed.every(path=>allowed(path,p.skills)||derivedPaths.includes(path)),'non-instruction/non-derived source changed');
+  assert.ok(changed.every(path=>allowed(path,p.skills)||scope&&path===scope.path||derivedPaths.includes(path)),'non-instruction/non-derived source changed');
   for(const script of ['install-kernel.mjs','install-codex-adapter.mjs']){
     const r=spawnSync(process.execPath,[join(p.candidateRoot,'scripts',script),'--target',p.fullRoot,...(script.includes('codex')?['--profile','full']:[])],{encoding:'utf8',maxBuffer:16*1024*1024});
     assert.equal(r.status,0,'existing Full installer failed');
@@ -198,13 +232,36 @@ export function registerFullInstructionCandidate(p,candidate){
   assert.equal(git(p.candidateRoot,['rev-parse','HEAD']),candidate.source_revision);
   assert.equal(git(p.candidateRoot,['status','--porcelain']),'','generated source drift');
   const trusted=p.trustedAuthorityContexts??[],parents=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:p.registrySnapshotDigest,trustedAuthorityContexts:trusted});
+  const scope=reviewFindingContractScope(p),source=inventoryMap(p.candidateRoot),baseline=inventoryMap(p.baselineSourceRoot),installed=inventoryMap(p.fullRoot);
+  assertReviewContractDelta(baseline,source,scope);
+  assertReviewContractDelta(baseline,installed,scope);
+  if(scope){
+    const retained=verifyRetainedInstructionLayout({storeRoot:p.storeRoot,layoutObjectDigest:candidate.layout_object_digest});
+    assert.deepEqual([...installed.values()],retained.layout.files.map(f=>({path:f.path,bytes:f.bytes,mode:f.mode,sha256:f.raw_digest})),'paired Full layout drift');
+    assert.equal(installed.get(scope.path)?.sha256,source.get(scope.path)?.sha256,'installed review contract differs from candidate source');
+    assert.ok(p.parentAssets.some(ref=>parents.assets.some(a=>a.record_digest===ref.record_digest&&a.record.type_extension.entrypoint===`skills/${scope.skill}/SKILL.md`)),'review contract owner Asset missing');
+  }
+  // Check all parents before any Registry write, including an inherited binding.
+  for(const parent of p.parentAssets){
+    const found=parents.assets.find(a=>a.record_digest===parent.record_digest&&a.content_digest===parent.content_digest);assert.ok(found,'parent Asset missing');
+    const prefix=found.record.type_extension.entrypoint.replace(/SKILL\.md$/u,'');
+    for(const f of found.content.files)if(f.path===FULL_REVIEW_FINDING_CONTRACT_PATH)
+      assert.ok(scope&&prefix===`skills/${scope.skill}/`,'unconfigured canonical contract Asset binding');
+    if(scope&&prefix===`skills/${scope.skill}/`){
+      for(const f of found.content.files)assert.equal(f.raw_digest,baseline.get(f.path)?.sha256,'review contract owner baseline Asset drift');
+      const project=(files,prefix)=>[...files.values()].filter(f=>f.path.startsWith(prefix)).map(f=>({path:f.path.slice(prefix.length),sha256:f.sha256}));
+      assert.deepEqual(project(installed,prefix),project(source,prefix),'installed owner Skill differs from source');
+      assert.deepEqual(project(installed,'.agents/'+prefix),project(source,prefix),'installed owner Skill mirror differs from source');
+    }
+  }
   let snapshot=p.registrySnapshotDigest;const refs=[],environmentAssets=[],baselineAssets=[];
   for(const parent of p.parentAssets){
     const found=parents.assets.find(a=>a.record_digest===parent.record_digest&&a.content_digest===parent.content_digest);assert.ok(found,'parent Asset missing');
     const d=structuredClone(found.record);delete d.object_kind;const prefix=d.type_extension.entrypoint.replace(/SKILL\.md$/u,'');
     d.version='git:'+candidate.source_revision;d.source.revision=candidate.source_revision;
     const oldTypes=new Map(found.content.files.map(f=>[f.path,f.media_type]));
-    const files=fullInstructionInventory(p.fullRoot).filter(f=>f.path.startsWith(prefix)).map(f=>({path:f.path,raw_digest:f.sha256,media_type:oldTypes.get(f.path)??(f.path.endsWith('.md')?'text/markdown; charset=utf-8':'application/octet-stream')}));
+    const bindContract=scope&&prefix===`skills/${scope.skill}/`&&(found.content.files.some(f=>f.path===scope.path)||actualSkillChange(baseline,source,scope.skill));
+    const files=[...installed.values()].filter(f=>f.path.startsWith(prefix)||bindContract&&f.path===scope.path).map(f=>({path:f.path,raw_digest:f.sha256,media_type:oldTypes.get(f.path)??(f.path.endsWith('.md')?'text/markdown; charset=utf-8':'application/octet-stream')}));
     const projection=files.map(({path,raw_digest})=>({path,raw_digest}));
     if(canonicalDigest(projection)===canonicalDigest(found.record.content.files)){environmentAssets.push(parent);continue;}
     d.content={package_format:'canonical_json_base64_files',files};
@@ -215,7 +272,8 @@ export function registerFullInstructionCandidate(p,candidate){
     const saved=registerAsset({storeRoot:p.storeRoot,sourceRoot:p.fullRoot,predecessorSnapshotDigest:snapshot,descriptor:d,trustedAuthorityContexts:trusted});snapshot=saved.snapshot_digest;
     const asset={asset_type:d.asset_type,stable_id:d.stable_id,version:d.version,record_digest:saved.record_digest,content_digest:saved.content_digest};refs.push(asset);environmentAssets.push(asset);baselineAssets.push(parent);
   }
-  const files=fullInstructionInventory(p.fullRoot),bindings=environmentAssets.map(asset=>({asset,files:files.filter(f=>f.path.startsWith('skills/'+asset.stable_id.split('.').at(-1)+'/')).map(f=>({source:f.path,target:'.agents/'+f.path}))}));
+  const files=fullInstructionInventory(p.fullRoot),registered=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:snapshot,trustedAuthorityContexts:trusted});
+  const bindings=environmentAssets.map(asset=>({asset,files:registered.assets.find(a=>a.record_digest===asset.record_digest).content.files.map(f=>({source:f.path,target:f.path===FULL_REVIEW_FINDING_CONTRACT_PATH?f.path:'.agents/'+f.path}))}));
   const mapped=new Set(bindings.flatMap(b=>b.files.map(f=>f.target)));
   const environment=captureInstructionEnvironment({storeRoot:p.storeRoot,sourceRoot:p.fullRoot,environmentId:p.environmentId,adapter:'codex',runtime:p.runtime,
     registrySnapshotDigest:snapshot,trustedAssetAuthorityContexts:trusted,selectionObjectDigest:null,bindings,supportPaths:files.filter(f=>!mapped.has(f.path)).map(f=>f.path),retainedLayoutObjectDigest:candidate.layout_object_digest});

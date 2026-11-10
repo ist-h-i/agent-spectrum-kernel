@@ -50,8 +50,9 @@ their Markdown references. It makes an independent local Git version, refreshes
 derived bindings through the existing adapter-fixture writer, and uses the normal
 kernel/Codex installers to render the entire Full layout. Mirrors, owner state,
 executables, tests and grading data cannot be model-authored changes. Only selected
-public Skill Markdown and a bounded goal enter the generator input; the executable
-checkout and private evaluation resources remain operator-side.
+public Skill Markdown, an explicitly opted-in review contract described below,
+and a bounded goal enter the generator input; the executable checkout and private
+evaluation resources remain operator-side.
 
 The Full provider uses the existing Codex process transport when separately
 authorized. The model-free provider reads a pinned response fixture. They are
@@ -129,8 +130,8 @@ checked before allocation so monitor rebasing cannot select another workspace.
 Use a sibling of the template preparation directory for `native.root`.
 Before allocating evaluation work, Full context comparison also checks that
 supporting files, file modes and selected capabilities agree. Only the selected
-canonical/mirrored Skill edits, regenerated owner metadata and prompt hash
-bindings may differ. Missing support files cannot silently become an efficiency
+canonical/mirrored Skill edits, the explicitly paired review contract, regenerated
+owner metadata and prompt hash bindings may differ. Missing support files cannot silently become an efficiency
 gain. The comparison summary is part of the first approval packet.
 
 The reference report worker verifies retained records and fixed judgments,
@@ -198,6 +199,33 @@ A worker interruption remains in the report even when the native root completed
 normally. CLI counters can remain usable when the runner's secondary counter copy
 is missing; absent components stay null, while contradictory or malformed records
 are still rejected.
+
+## Paired review contract opt-in
+
+A new Full profile may set `generator.reviewFindingContract: {skill: "review-router"}`.
+The named owner must be a selected Skill. This closed setting permits exactly
+`docs/review-finding-contract.md`, not other documents, schemas, executable files,
+or arbitrary supporting assets. Existing profiles and saved packets are not
+rewritten; leaving it unset retains Skill-only authoring.
+
+The existing tracked contract enters generation input with its exact bytes and
+digest. It can be rewritten, never deleted. A contract change requires an actual
+Markdown change in that same owner Skill. A contract-only response, including an
+identical Skill write, is refused before candidate, installation, staging, or
+Registry allocation. An unchanged response remains a real no-op.
+
+On a changed owner revision, the contract becomes part of that Skill Asset's
+content inventory and digest. The Full projection maps it once to its canonical
+`docs/` path rather than treating it as unowned support. Inherited owner revisions
+retain this binding across cycles; dropping the opt-in cannot silently strip it.
+All other supporting context remains fixed. Trusted derivation writers cannot
+alter this authored contract, even without source-validation opt-in.
+
+Source publication plans list the contract as a canonical change with exact
+before/after digests and the same base/tree pins as the Skill. Both human decisions,
+owned evidence, normal publication checks, and separate model-call authorization
+remain unchanged. This capability does not itself revise review policy, Finding
+schema, scoring, or judgments, and does not establish practical effectiveness.
 
 ## Full/native profile
 

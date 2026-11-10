@@ -15,6 +15,7 @@ function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false,plugin
  if(emptySupport){mkdirSync(join(base,'benchmarks'));writeFileSync(join(base,'benchmarks/.gitkeep'),Buffer.alloc(0));}
  const ancestor=prepareGitBaseline(base);mkdirSync(join(base,'scripts'));mkdirSync(join(base,'docs/fixtures'),{recursive:true});
  writeFileSync(join(base,'docs/validation-report.md'),'stale report');
+ writeFileSync(join(base,'docs/review-finding-contract.md'),'Original review contract.\n');
  for(const name of ['adapter-runtime-evidence.json','adapter-runtime-profiles.json'])writeFileSync(join(base,'docs/fixtures',name),'{}');
  writeFileSync(join(base,'docs/verification-proof-policy-contract.md'),'Synthetic fixed policy.\n');
  writeFileSync(join(base,'scripts/update-adapter-runtime-fixtures.mjs'),`import{writeFileSync,mkdirSync}from'node:fs';mkdirSync(new URL('../docs/fixtures/',import.meta.url),{recursive:true});writeFileSync(new URL('../docs/fixtures/adapter-runtime-bundle.json',import.meta.url),'{}');${writerSuffix}`);
@@ -28,7 +29,7 @@ function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false,plugin
  if(spawnSync('git',['cat-file','-e',${JSON.stringify(ancestor)}+'^{commit}'],{cwd:root}).status!==0)throw Error('historical object missing');
  writeFileSync(new URL('docs/validation-report.md',root),'current report: '+body);
  if(!body.includes('## Goal')){console.error('required Goal entrypoint contract');process.exitCode=1;}else console.log('Repository validation passed');${validatorSuffix}`);
- writeFileSync(join(base,'scripts/install-kernel.mjs'),`import{copyFileSync,mkdirSync}from'node:fs';import{join}from'node:path';const target=process.argv[process.argv.indexOf('--target')+1];copyFileSync(new URL('../AGENTS.md',import.meta.url),join(target,'AGENTS.md'));mkdirSync(join(target,'skills/demo'),{recursive:true});copyFileSync(new URL('../skills/demo/SKILL.md',import.meta.url),join(target,'skills/demo/SKILL.md'));`);
+ writeFileSync(join(base,'scripts/install-kernel.mjs'),`import{copyFileSync,mkdirSync}from'node:fs';import{join}from'node:path';const target=process.argv[process.argv.indexOf('--target')+1];copyFileSync(new URL('../AGENTS.md',import.meta.url),join(target,'AGENTS.md'));mkdirSync(join(target,'docs'),{recursive:true});copyFileSync(new URL('../docs/review-finding-contract.md',import.meta.url),join(target,'docs/review-finding-contract.md'));mkdirSync(join(target,'skills/demo'),{recursive:true});copyFileSync(new URL('../skills/demo/SKILL.md',import.meta.url),join(target,'skills/demo/SKILL.md'));`);
  writeFileSync(join(base,'scripts/install-codex-adapter.mjs'),`import{copyFileSync,mkdirSync}from'node:fs';import{join}from'node:path';const target=process.argv[process.argv.indexOf('--target')+1];mkdirSync(join(target,'.agents/skills/demo'),{recursive:true});copyFileSync(new URL('../skills/demo/SKILL.md',import.meta.url),join(target,'.agents/skills/demo/SKILL.md'));`);
  const git=args=>{const r=spawnSync('git',['-c','core.hooksPath='+devNull,...args],{cwd:base,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
  git(['add','--all']);git(['-c','user.name=Fixture','-c','user.email=fixture@invalid','-c','commit.gpgsign=false','commit','--quiet','-m','validator fixture']);
@@ -105,4 +106,46 @@ test('failed plugin synchronization retains the failure without commit or instal
 });
 test('plugin writer cannot change executable sources under derived-output authority',async t=>{
  const {p}=fixture(t,{pluginWriterSuffix:`writeFileSync(new URL('./install-kernel.mjs',import.meta.url),'throw Error("must not execute")');`});await assert.rejects(generateFullInstructionCandidate(p,provider('## Goal\nChanged.\n')),/source writer changed unexpected path: scripts\/install-kernel/);assert.equal(existsSync(join(p.fullRoot,'AGENTS.md')),false);
+});
+
+const contractPath='docs/review-finding-contract.md';
+const contractProvider=changes=>async()=>({response:{changes},execution:{kind:'fixture'}});
+const contractWrite={operation:'write',path:contractPath,text:'Revised review contract.\n'};
+const skillWrite={operation:'write',path:'skills/demo/SKILL.md',text:'## Goal\nRevised paired Skill.\n'};
+test('explicit review contract scope supplies and commits exact canonical bytes with its Skill',async t=>{
+ const {p}=fixture(t);p.reviewFindingContract={skill:'demo'};
+ const input=fullGenerationInput(p),file=input.files.find(f=>f.path===contractPath);
+ assert.equal(file.text,'Original review contract.\n');assert.equal(file.raw_digest,hash(Buffer.from(file.text)));
+ assert.deepEqual(input.review_finding_contract,{path:contractPath,skill:'demo'});
+ const c=await generateFullInstructionCandidate(p,contractProvider([skillWrite,contractWrite]));
+ assert.ok(c.changed_paths.includes(contractPath));assert.ok(!c.derived_binding_paths.includes(contractPath));
+ assert.equal(readFileSync(join(p.candidateRoot,contractPath),'utf8'),contractWrite.text);
+ assert.equal(readFileSync(join(p.fullRoot,contractPath),'utf8'),contractWrite.text);
+ assert.equal(spawnSync('git',['status','--porcelain'],{cwd:p.candidateRoot,encoding:'utf8'}).stdout,'');
+});
+for(const [name,scope,changes] of [
+ ['unconfigured contract',undefined,[skillWrite,contractWrite]],
+ ['another document',{skill:'demo'},[skillWrite,{...contractWrite,path:'docs/other.md'}]],
+ ['contract removal',{skill:'demo'},[skillWrite,{operation:'delete',path:contractPath}]],
+ ['contract-only',{skill:'demo'},[contractWrite]],
+ ['identical Skill write',{skill:'demo'},[{...skillWrite,text:'## Goal\nOriginal instruction.\n'},contractWrite]],
+])test('review contract rejects '+name+' before materialization or writers',async t=>{
+ const {p}=fixture(t);if(scope)p.reviewFindingContract=scope;
+ await assert.rejects(generateFullInstructionCandidate(p,contractProvider(changes)),/allowed|references|actual.*Skill/);
+ for(const path of [p.candidateRoot,p.fullRoot,p.stagingRoot,p.storeRoot])assert.equal(existsSync(path),false);
+ assert.equal(readFileSync(join(p.baselineSourceRoot,contractPath),'utf8'),'Original review contract.\n');
+});
+test('unknown contract scope is refused before provider dispatch',async t=>{
+ const {p}=fixture(t);let calls=0;
+ for(const scope of [{skill:'other'},{skill:'demo',path:'docs/other.md'}]){
+  await assert.rejects(generateFullInstructionCandidate({...p,reviewFindingContract:scope},async()=>{calls++;return {response:{changes:[]}};}),/contract|selected/);
+ }
+ assert.equal(calls,0);assert.equal(existsSync(p.candidateRoot),false);
+});
+test('trusted source writer cannot launder a contract edit when source validation is disabled',async t=>{
+ const {p}=fixture(t,{writerSuffix:`writeFileSync(new URL('../docs/review-finding-contract.md',import.meta.url),'writer replacement');`});
+ delete p.sourceValidation;p.reviewFindingContract={skill:'demo'};
+ await assert.rejects(generateFullInstructionCandidate(p,contractProvider([skillWrite,contractWrite])),/source writer changed unexpected path/);
+ assert.equal(existsSync(join(p.fullRoot,'AGENTS.md')),false);
+ assert.equal(spawnSync('git',['rev-parse','HEAD'],{cwd:p.candidateRoot,encoding:'utf8'}).stdout.trim(),p.baselineRevision);
 });
