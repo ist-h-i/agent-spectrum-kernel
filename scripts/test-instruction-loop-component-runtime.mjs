@@ -11,10 +11,18 @@ import {planEnvironmentTargetApply,applyEnvironmentTargetPlan} from './environme
 import {supervisedEnvironmentReceipt} from './instruction-loop-environment-approval.mjs';
 import {exportInstructionEnvironment} from './instruction-environment.mjs';
 import {writeFileSync} from 'node:fs';
+import {practicalReportingGraderPins} from './practical-reporting-grader.mjs';
+import {fullPracticalControllerPins} from './instruction-loop-practical-runtime.mjs';
 import {createComponentInstructionLoopConfiguration} from './instruction-loop-component-runtime.mjs';
 const approve=s=>({disposition:'approved',packet_digest:canonicalDigest(s.pending_gate),reason:'Synthetic exact human decision.'});
 test('component profiles pin the transitive isolated-grade controller',t=>{
   const f=componentLoopFixture(t),config=createComponentInstructionLoopConfiguration(f.profilePath);
+  assert.ok(f.profile.practical.cases.every(c=>!c.reporting_grader));
+  const fullPins=fullPracticalControllerPins();
+  for(const source of practicalReportingGraderPins()){
+    assert.ok(config.runtime.source_pins.some(p=>p.path===source.path&&p.digest===source.digest));
+    assert.ok(fullPins.some(p=>p.path===source.path&&p.digest===source.digest));
+  }
   for(const name of ['practical-isolated-grade-continuation.mjs','practical-isolated-grade-continuation-cli.mjs','instruction-loop-source-application.mjs','instruction-loop-source-binding.mjs','instruction-loop-full-candidate.mjs'])assert.ok(config.runtime.source_pins.some(p=>p.path.endsWith('/'+name)));
 });
 test('trust fields cannot override a component store or application identity',t=>{

@@ -1,3 +1,4 @@
+import {createPracticalReportingGraderCommand,practicalReportingGraderPins} from './practical-reporting-grader.mjs';
 import {readInstructionLoopJson} from './instruction-loop-artifact.mjs';
 // Existing Full generation/Registry/normal-owner lifecycle, with the practical
 // Eval engine in place of a private fixed-catalog grading dependency.
@@ -20,13 +21,13 @@ import {assertIsolatedEvaluationJob} from './practical-isolated-grade-continuati
 import {inspectSourceApplication,readSourceApplicationRequest,claimSourceApplication,completeSourceApplication,validateSourceApplicationOwner,verifyRetainedSourceApplication} from './instruction-loop-source-application.mjs';
 
 const stages=['generate','register','select','plan','apply','version','cleanup','restore'];
-const sourceNames=['instruction-projection-paths.mjs','instruction-loop-reference-preparation.mjs','instruction-loop-reference-evidence.mjs','practical-grade-report-revision.mjs','practical-retained-grade-report.mjs','practical-grade-supplement.mjs','practical-grade-source-binding.mjs','instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
+const sourceNames=['instruction-projection-paths.mjs','instruction-loop-reference-preparation.mjs','instruction-loop-reference-evidence.mjs','practical-grade-report-revision.mjs','practical-retained-grade-report.mjs','practical-grade-supplement.mjs','practical-grade-source-binding.mjs','instruction-loop-host-scoring.mjs','instruction-loop-reference-scoring-runtime.mjs','instruction-loop-artifact.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-fixed-scoring.py','instruction-loop-provider-policy.mjs','instruction-loop-practical-runtime.mjs','practical-reporting-grader.mjs','practical-primary-grading.mjs','practical-host-reporting-policy.mjs','practical-reporting-policy.mjs','practical-saved-command-observation.mjs','instruction-loop-native-host.mjs','instruction-loop-full-candidate.mjs','instruction-loop-retained-authoring.mjs','ask-benchmark-stable-file.mjs','ask-benchmark-atomic-publication.mjs','practical-codex-adapter.mjs','ask-user-comparison.mjs',
   'instruction-loop-feedback.mjs','instruction-loop-result-disposition.mjs','ask-personal-evolution-observation.mjs','instruction-loop-case-selection.mjs','instruction-loop-normal-owner-worker.mjs',
   'instruction-loop-assets.mjs','instruction-loop-source-binding.mjs','instruction-loop-source-application.mjs','instruction-environment.mjs','instruction-environment-compiler.mjs',
   'practical-evaluation-runner.mjs','practical-initialization-clearance.mjs','practical-quality-observation.mjs','practical-evaluation-worker.mjs','practical-evaluation-assessor.mjs','instruction-evaluation-recovery.mjs',
   'practical-isolated-grade-continuation.mjs','practical-isolated-grade-continuation-cli.mjs','instruction-loop-command-runtime.mjs','instruction-run-journal.mjs','ask-pragmatic-evaluation-report.mjs','content-addressed-store.mjs','asset-registry.mjs','codex-exec-runner.mjs'];
 const pin=path=>({path,digest:hash(readStableBytes(path,'practical runtime input',16*1024*1024))});
-export function fullPracticalControllerPins(){return [...new Set([...sourceNames,'supervised-instruction-loop.mjs'])].map(name=>pin(join(import.meta.dirname,name)));}
+export function fullPracticalControllerPins(){return [...new Map([...new Set([...sourceNames,'supervised-instruction-loop.mjs'])].map(name=>pin(join(import.meta.dirname,name))).concat(practicalReportingGraderPins()).map(p=>[p.path,p])).values()];}
 function validateProfilePaths(p){
   inspectInstructionLoopProviderSelection(p);
   validatePracticalModelConditions(p);
@@ -47,7 +48,7 @@ export function createFullPracticalInstructionLoopConfiguration(profilePath){
   if(p.normal.kind!==undefined){assert.equal(p.normal.kind,'ask_source_repository_v1');validateSourceApplicationOwner(p);}
   validateProfilePaths(p);
   const runtime={kind:'full_practical_instruction_loop_runtime_v1',profile_path:profilePath,profile_digest:pin(profilePath).digest,
-    source_pins:sourceNames.map(name=>pin(join(import.meta.dirname,name)))};
+    source_pins:[...new Map([...sourceNames.map(name=>pin(join(import.meta.dirname,name))),...practicalReportingGraderPins()].map(p=>[p.path,p])).values()]};
   return {policy:{...p.policy,runtime_digest:canonicalDigest(runtime)},runtime};
 }
 function checkedProfile(definition){
@@ -60,6 +61,7 @@ function checkedProfile(definition){
 function save(path,value){writeCanonicalJsonNoReplace({outputPath:path,artifact:value,label:'Full practical lifecycle result',maximumBytes:16*1024*1024});}
 function selectionPath(p){return join(p.stateRoot,'practical-selection.json');}
 export function prepareFullPracticalInstructionSelection(p,job){
+  assert.ok(p.kind==='full_practical_instruction_loop_profile_v1'||!p.practical.cases.some(c=>c.reporting_grader),'reporting grader requires Full practical profile');
   const fairness=p.kind==='full_practical_instruction_loop_profile_v1'?compareFullInstructionContext({baselineRoot:p.practical.baselineRoot,candidateRoot:job.input.candidate.full_root,skills:p.generator.skills,reviewFindingContract:p.generator.reviewFindingContract}):
     {comparison:'complete_declared_component_environments',ambient_context:'Unknown',per_asset_causality_implied:false};
   const feedback=projectInstructionLoopObservation(job.input.observation);
@@ -79,12 +81,14 @@ export function prepareFullPracticalInstructionSelection(p,job){
   const cases=selected.case_ids.map(id=>{const spec=p.practical.cases.find(c=>c.id===id),catalog=job.input.catalog.find(c=>c.id===id);assert.ok(spec,'selected case missing public local configuration');
     assert.equal(canonicalDigest(spec.files.map(({target,digest})=>({target,digest}))),catalog.public_input_digest,'case file inventory differs from approved catalog');return spec;});
   const worker=join(import.meta.dirname,'practical-evaluation-worker.mjs'),settingsPath=join(p.stateRoot,'practical-worker-settings.json');
-  const settings={cases:Object.fromEntries(cases.map(c=>[c.id,{files:c.files,...(c.grader?{grader:c.grader}:{})}])),
+  const gradedCases=cases.map((c,index)=>c.reporting_grader?{...c,grader:createPracticalReportingGraderCommand({
+    settingsPath:join(p.stateRoot,'reporting-grader-'+index+'-settings.json'),spec:c,conditions,evidenceKind:p.practical.evidence_kind})}:c);
+  const settings={cases:Object.fromEntries(gradedCases.map(c=>[c.id,{files:c.files,...(c.grader?{grader:c.grader}:{})}])),
     conditions:Object.fromEntries(conditions.map(c=>[c.id,{files:c.files,command:c.command,command_role:c.command_role}])),
     ...(p.practical.observation_path===undefined?{}:{observation_path:p.practical.observation_path})};
   save(settingsPath,settings);const settingsPin=pin(settingsPath);
   const runtime={commands:{trial:{argv:[process.execPath,worker,settingsPath,settingsPin.digest,'execute'],inspect_argv:[process.execPath,worker,settingsPath,settingsPin.digest,'inspect'],
-    pins:[settingsPin,pin(worker),pin(join(import.meta.dirname,'practical-quality-observation.mjs')),pin(join(import.meta.dirname,'instruction-loop-fixed-scoring.mjs'))],model_calls:conditions.some(c=>c.command.model_calls)||cases.some(c=>c.grader?.model_calls)}}};
+    pins:[settingsPin,pin(worker),pin(join(import.meta.dirname,'practical-quality-observation.mjs')),pin(join(import.meta.dirname,'instruction-loop-fixed-scoring.mjs'))],model_calls:conditions.some(c=>c.command.model_calls)||gradedCases.some(c=>c.grader?.model_calls)}}};
   if(p.practical.assessor){const settings=join(p.stateRoot,'practical-assessor-settings.json'),providerPins=[];
     if(p.practical.assessor.kind==='codex'&&p.practical.assessor.executableDigest!==undefined){
       assert.equal(resolve(p.practical.assessor.executable),p.practical.assessor.executable,'absolute pinned recovery executable required');
