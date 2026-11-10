@@ -1,3 +1,4 @@
+import {validateInstructionLoopAssetAuthority} from './instruction-loop-assets.mjs';
 import {validateMeasuredSourceAdoptionImport} from './instruction-loop-measured-adoption.mjs';
 import {createPracticalChallengeCommandDefinition} from './practical-challenge-worker.mjs';
 import {createPracticalReportingGraderCommand,practicalReportingGraderPins} from './practical-reporting-grader.mjs';
@@ -176,7 +177,7 @@ export function createPracticalLifecycleRuntime({definition,modelCallsAuthorized
         return {request_digest:canonicalDigest(job),status:'unknown',inspection_issue:issue};
       }
       return {request_digest:canonicalDigest(job),status:'unknown'};},
-    async preflight(job){readProfile();assert.ok(!existsSync(folder(job)),'stage already allocated; inspect instead of replay');
+    async preflight(job){readProfile();if(job.kind==='version')validateInstructionLoopAssetAuthority(p.assetAuthority);assert.ok(!existsSync(folder(job)),'stage already allocated; inspect instead of replay');
       if(job.kind==='generate'&&(p.generator?.provider.kind==='codex'||p.candidate?.authoring?.provider.kind==='codex'))assert.equal(modelCallsAuthorized,true,'generation model calls not authorized');
       assertNoSymlinkPathSegments(folder(job),'practical lifecycle stage',{allowMissingLeaf:true});}
   };

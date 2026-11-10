@@ -68,3 +68,21 @@ Model-free checks:
 ```sh
 node --experimental-test-module-mocks --test scripts/test-instruction-loop-measured-adoption.mjs scripts/test-instruction-loop-source-application.mjs scripts/test-supervised-instruction-loop.mjs scripts/test-instruction-loop-practical-runtime.mjs
 ```
+
+## Recover an omitted lifecycle authority after a verified merge
+
+New version operations validate lifecycle authority before reserving the stage.
+For an older frozen run that already stopped at the missing-authority error,
+`instruction-loop-version-recovery.mjs` offers a narrow host recovery. It does
+not rewrite the profile, journal, saved decision or runtime pins. Call
+`prepareMissingAssetAuthorityRecovery({root, configPath, authorization})` with a
+pinned authorization document, review its receipt, then call
+`recoverMissingAssetAuthorityVersion` with those inputs, `expectedReceiptDigest`
+and the authorized owner's `authorityId`. Preparation is read-only except for
+the temporary coordinator lock. Execution retains a host recovery intent before
+using the existing Registry transition API and writes the actual result for the
+original runtime inspector. Resume the original controller afterwards.
+
+A prior intent or result prevents replay. If execution stops after writing the
+intent, inspect Registry receipts and do not blindly repeat the operation. This
+is explicitly a host-assisted recovery, not an originally automatic success.

@@ -194,3 +194,24 @@ test('retained assessor answer keeps the existing semantic byte limit and duplic
   }
  }finally{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;}
 });
+
+
+test('missing or malformed lifecycle authority fails before reserving or allocating a version',async t=>{
+ const {createPracticalLifecycleRuntime}=await import('./instruction-loop-practical-runtime.mjs');
+ const f=environmentFixture(t),p={stateRoot:join(f.root,'state'),normal:{target:null}};
+ const runtime=createPracticalLifecycleRuntime({definition:{kind:'fixture'},readProfile:()=>p,executeStage:()=>{throw new Error('must not execute');},validateCoordinatorRoot:()=>{}});
+ const job={kind:'version',key:'activate',input:{action:'activate'}};
+ await assert.rejects(runtime.preflight(job),/authority is required/);assert.equal(existsSync(p.stateRoot),false);
+ p.assetAuthority={kind:'external_asset_lifecycle_authority',authority_id:'synthetic-owner',authority_revision:'fixture'};
+ await assert.rejects(runtime.preflight(job),/unsupported fields|evidence digest/);assert.equal(existsSync(p.stateRoot),false);
+ p.assetAuthority.authority_evidence_digest=canonicalDigest('synthetic owner decision');
+ await runtime.preflight(job);assert.equal(existsSync(p.stateRoot),false);
+});
+
+
+test('asset authority validation rejects schema-invalid identities before any reservation',async()=>{
+ const {validateInstructionLoopAssetAuthority}=await import('./instruction-loop-assets.mjs');
+ const good={kind:'external_asset_lifecycle_authority',authority_id:'owner',authority_revision:'rev',authority_evidence_digest:canonicalDigest('decision')};
+ for(const changed of [{authority_id:'bad space'},{authority_id:'a'.repeat(257)},{authority_revision:'   '},{authority_revision:'a'.repeat(255)},{extra:true}])assert.throws(()=>validateInstructionLoopAssetAuthority({...good,...changed}));
+ validateInstructionLoopAssetAuthority({...good,authority_revision:'a'.repeat(254)});
+});
