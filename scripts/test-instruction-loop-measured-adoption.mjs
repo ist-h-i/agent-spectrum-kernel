@@ -19,9 +19,9 @@ async function setup(t,kind='observed',badApproval=false,badProjection=false){
  const proof=join(root,'binding.json');save(proof,b);const candidate={source_root:published,source_revision:pr,baseline_revision:pb,changed_paths:paths,measured_adoption:pin(proof)};
  const p={normal:{kind:'ask_source_repository_v1',target:owner,repository:'github.com/example/ask',remote_url:'https://github.com/example/ask.git',base_branch:'main',base_revision:pb,publication_branch:'approved-review'},stateRoot:join(root,'state'),generator:{skills:['review-router','review-ai-quality'],candidateRoot:published,fullRoot:join(root,'full'),stagingRoot:join(root,'staging'),reviewFindingContract:{skill:'review-router'}}};
  t.mock.module('./practical-challenge-evaluation.mjs',{namedExports:{...challenge,inspectPracticalChallengeScoreHandoff:r=>read(join(r,'score-handoff.json'))}});
- const {planSourceApplication}=await import('./instruction-loop-source-application.mjs?'+root);
+ const api=await import('./instruction-loop-source-application.mjs?'+root);const {planSourceApplication}=api;
  const planApply=()=>planSourceApplication(p,{kind:'plan',input:{target:owner,candidate}});
- return{root,p,candidate,b,proof,planApply,measured,published};
+ return{root,p,candidate,b,proof,planApply,measured,published,api};
 }
 test('source plan accepts the exact measured review/test patch on new main without pretending same revision',async t=>{const f=await setup(t);const p=f.planApply();assert.equal(p.changes.length,5);assert.equal(p.changes.find(c=>c.path===paths[3]).kind,'verification');assert.deepEqual(p.measured_adoption,f.candidate.measured_adoption);assert.notEqual(f.b.measured_revision,f.b.publication_revision);});
 test('source plan boundary rejects synthetic measurements',async t=>{const f=await setup(t,'synthetic');assert.throws(f.planApply,/synthetic/);});
@@ -38,4 +38,18 @@ test('measured historical import cannot rely on an assertion boolean without a v
  const input={kind:'measured_source_adoption_import_v1',host_verified_prior_approval:true};
  await assert.rejects(advanceSupervisedInstructionLoop({root:join(root,'run'),policy,runtime,completedImport:input}),/verifying runtime/);
  runtime.validateCompletedImport=async()=>{throw Error('invalid frozen proof');};await assert.rejects(advanceSupervisedInstructionLoop({root:join(root,'run2'),policy,runtime,completedImport:input}),/invalid frozen proof/);
+});
+
+
+test('claimed measured adoption rechecks proof at completion and grade artifacts before activation',async t=>{
+ const f=await setup(t),plan=f.planApply();f.p.kind='full_practical_instruction_loop_profile_v1';f.p.policy={kind:'reference_instruction_loop_v1',id:'post-claim',normal_target:f.p.normal.target};
+ const job={kind:'apply',input:{plan,decision:{disposition:'approved',packet_digest:canonicalDigest('synthetic human decision'),reason:'Synthetic approval'}}},context={root:join(f.root,'controller')};fs.mkdirSync(context.root);
+ appendRunJournal(context.root,'synthetic approved source job',{status:'advancing',policy:f.p.policy,evaluation_decision:{disposition:'approved'},pending:job,change_decision:job.input.decision,outputs:{plan,register:f.candidate,select:{source_profile_digest:canonicalDigest(f.p)}}});
+ f.api.prepareSourceApplication(f.p,job,context);const request=f.api.readSourceApplicationRequest(f.p,job,context),claim=f.api.claimSourceApplication(f.p,job,{handoff_digest:request.handoff_digest,execution_id:'fixture',actor:'fixture'},context);
+ const original=fs.readFileSync(f.proof);fs.writeFileSync(f.proof,'{}');assert.throws(()=>f.api.completeSourceApplication(f.p,job,{},context),/binding changed/);fs.writeFileSync(f.proof,original);
+ const repo=request.request.publication_root,tree=git(repo,['rev-parse','HEAD^{tree}']),merge=git(repo,['commit-tree',tree,'-p',f.b.publication_base_revision,'-p',f.b.publication_revision,'-m','synthetic merge']);git(repo,['checkout','-q','--detach',merge]);const evidence=join(repo,'..','host-evidence.json');save(evidence,{synthetic:true});
+ const submission={handoff_digest:request.handoff_digest,claim_digest:claim.claim_digest,publication:{state:'merged',repository:f.p.normal.repository,base_branch:'main',branch:f.p.normal.publication_branch,head_commit:f.b.publication_revision,merge_commit:merge,merge_tree:tree,pull_request:1,ci_status:'passed',review_status:'approved'},evidence:[{path:'host-evidence.json',digest:pin(evidence).digest}]};
+ f.api.completeSourceApplication(f.p,job,submission,context);const app=f.api.inspectSourceApplication(f.p,job,context),version={kind:'version',input:{action:'activate',application:app,candidate:f.candidate}};
+ const state=readRunJournal(context.root).state;state.outputs.apply=app;state.pending=version;appendRunJournal(context.root,'synthetic pending activation',state);f.api.verifyRetainedSourceApplication(f.p,app,{root:context.root,job:version});
+ save(join(f.root,'candidate','challenge','grade.json'),{tampered:true});assert.throws(()=>f.api.verifyRetainedSourceApplication(f.p,app,{root:context.root,job:version}),/grading artifact drift/);
 });
