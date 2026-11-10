@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "ordinary-frontend-state-review",
+  "fixture_input_digest": "sha256:2980cc83afaf9e5d2e60d3882a4e2e24b0dbcb2ca2a787d4cbe76ee76b8e290e",
+  "commands": [
+    {
+      "command_id": "review-contract-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "npm run validate:review",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:988eaf33f788c1f36588943da3b54a02f7d13082e42e2c4d2e658672729ff695",
+      "rendered_event_command_digest": "sha256:3d7aebbde03b6efa595fd0546d4aceaeb8a228a381ba84118981975a7a60f562",
+      "command_contract_digest": "sha256:5e69dc648e805ab826ea459a499639f4c6ff810cd78e16f3af3465567129ade9"
+    },
+    {
+      "command_id": "state-unit-tests",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "npm test",
+      "requirement": "optional",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:38453632c6316ea50e03f5855a2f1fbeb7c5578d5e132729226e3451cebc503a",
+      "rendered_event_command_digest": "sha256:c27f1cb765159af990489ecb5e07a813edfc7147756f0ea7f04f5d9a15dcde48",
+      "command_contract_digest": "sha256:e27da2c167b3f21b5bca85bcdc5891baacfa3546af08bb67791e18c72022f16a"
+    },
+    {
+      "command_id": "list-detail-interaction-tests",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "npm run test:interaction",
+      "requirement": "optional",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:f0c90d939d092b53996f57a873c72e0b73bb1176a140cd2bba25ea66d820af86",
+      "rendered_event_command_digest": "sha256:b96095dd4c137c15b9543dc9745ed55b1c5185aed1fb2652896c9971c6e81be4",
+      "command_contract_digest": "sha256:a964dc1008c2214a8550760f7271d43166eff2eb714ba37d73e9e137d0e08b11"
+    }
+  ],
+  "contract_digest": "sha256:907aecca9e2a2eacb6ef6210e6db527d924e840ee777fc0ff9ed01e4273bc946"
+}

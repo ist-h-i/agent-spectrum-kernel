@@ -1,16 +1,17 @@
 import test from 'node:test';
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
-import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync} from 'node:fs';
+import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync,cpSync} from 'node:fs';
 import {join} from 'node:path';import {tmpdir} from 'node:os';
 import {canonicalDigest} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
 import {appendRunJournal,readRunJournal} from './instruction-run-journal.mjs';
-import {fullGenerationInput} from './instruction-loop-full-candidate.mjs';
+import {captureRetainedInstructionLayout} from './retained-instruction-layout.mjs';
+import {fullGenerationInput,fullInstructionInventory} from './instruction-loop-full-candidate.mjs';
 import {createNativeInstructionLoopConfiguration,prepareNextNativeInstructionLoopConfiguration} from './instruction-loop-native-configuration.mjs';
 import {prepareRetainedFullAuthoringConfiguration} from './instruction-loop-failed-preparation.mjs';
-import {inspectClosedFullAuthoring,readRetainedFullAuthoring,retainedFullAuthoringProvider} from './instruction-loop-retained-authoring.mjs';
+import {inspectClosedFullAuthoring,withClosedFullAuthoring,readRetainedFullAuthoring,retainedFullAuthoringProvider,verifyReselectedCandidate} from './instruction-loop-retained-authoring.mjs';
 function fixture(t,{bound=false}={}){
  const base=realpathSync(mkdtempSync(join(tmpdir(),'ask-retained-answer-')));t.after(()=>rmSync(base,{recursive:true,force:true}));
  const source=join(base,'source');mkdirSync(join(source,'skills/demo'),{recursive:true});writeFileSync(join(source,'skills/demo/SKILL.md'),'Original public instruction.\n');
@@ -248,6 +249,76 @@ for(const [name,session] of [
 ])test(`explicit retry session rejects ${name} before reserving work`,async t=>{
  const f=interruptedFixture(t),{prepareInterruptedFullAuthoringRetry:prepare}=await import('./instruction-loop-failed-preparation.mjs');
  assert.throws(()=>prepare({...f,sessionRoot:session(f)},noWriters));assert.equal(existsSync(f.outputRoot),false);assert.equal(existsSync(join(f.root,'.authoring-initialization-retry')),false);
+});
+
+function reselectionFixture(t){
+ const f=preparedCase(t);cpSync(f.p.generator.baselineSourceRoot,f.p.generator.candidateRoot,{recursive:true});
+ mkdirSync(f.p.generator.fullRoot);mkdirSync(join(f.p.generator.fullRoot,'skills/demo'),{recursive:true});
+ writeFileSync(join(f.p.generator.fullRoot,'skills/demo/SKILL.md'),'Frozen installed candidate.\n');
+ const files=fullInstructionInventory(f.p.generator.fullRoot),layout=captureRetainedInstructionLayout({storeRoot:f.p.storeRoot,sourceRoot:f.p.generator.fullRoot,expectedFiles:files,expectedInventoryDigest:canonicalDigest(files)});
+ const h=readRunJournal(f.root);h.state.outputs.register={source_root:f.p.generator.candidateRoot,source_revision:f.p.generator.baselineRevision,full_root:f.p.generator.fullRoot,layout_object_digest:layout.object_digest};
+ appendRunJournal(f.root,'frozen_candidate_fixture',h.state);return f;
+}
+test('locked retained inspection preserves reselection options and releases the original coordinator',t=>{
+ const f=reselectionFixture(t),before=readRunJournal(f.root).previous,options={...f,preEvaluation:true,reselectCases:true};
+ const unlocked=inspectClosedFullAuthoring(options);
+ withClosedFullAuthoring(options,inspected=>{
+  assert.equal(inspected.origin.kind,'retained_full_authoring_origin_v3');
+  assert.deepEqual(inspected.origin,unlocked.origin);
+  assert.equal(existsSync(join(f.root,'.advance-lock/pid')),true);
+  assert.throws(()=>inspectClosedFullAuthoring(options),/original coordinator lock/);
+ });
+ assert.equal(existsSync(join(f.root,'.advance-lock')),false);
+ assert.equal(readRunJournal(f.root).previous,before);
+ assert.throws(()=>withClosedFullAuthoring(options,()=>{throw Error('synthetic interrupted consumer');}),/synthetic interrupted consumer/);
+ assert.equal(existsSync(join(f.root,'.advance-lock')),false);
+ assert.equal(readRunJournal(f.root).previous,before);
+});
+test('explicit case reselection retains source/Full contents, original gate and fresh approval boundary',t=>{
+ const f=reselectionFixture(t),replacement=structuredClone(f.p);replacement.policy.catalog=[{id:'review',public_input_digest:canonicalDigest('review')}];
+ replacement.practical.cases=[{id:'review',files:[],grader:{argv:['new']}}];replacement.selection={limit:1,changedTags:['review']};
+ const path=join(f.base,'replacement.json');writeFileSync(path,JSON.stringify(replacement));
+ const before=readRunJournal(f.root).previous,prepared=prepareRetainedFullAuthoringConfiguration({...f,replacementProfilePath:path,preEvaluation:true,reselectCases:true});
+ const p=JSON.parse(readFileSync(prepared.profile_path)),retained=readRetainedFullAuthoring(p.generator.provider.retainedAuthoring);
+ assert.equal(prepared.models_started,false);assert.equal(prepared.approval_carried_forward,false);assert.equal(prepared.case_reselection,true);
+ assert.equal(retained.origin.kind,'retained_full_authoring_origin_v3');assert.equal(readRunJournal(f.root).previous,before);
+ assert.deepEqual(p.policy.catalog,replacement.policy.catalog);assert.deepEqual(p.selection,replacement.selection);
+ verifyReselectedCandidate(p.generator.provider,{source_root:f.p.generator.candidateRoot,full_root:f.p.generator.fullRoot});
+ const copy=join(f.base,'different-source');cpSync(f.p.generator.candidateRoot,copy,{recursive:true});writeFileSync(join(copy,'skills/demo/SKILL.md'),'Another candidate.');
+ assert.throws(()=>verifyReselectedCandidate(p.generator.provider,{source_root:copy,full_root:f.p.generator.fullRoot}),/source content changed/);
+ const full=join(f.base,'different-full');cpSync(f.p.generator.fullRoot,full,{recursive:true});writeFileSync(join(full,'skills/demo/SKILL.md'),'Another Full.');
+ assert.throws(()=>verifyReselectedCandidate(p.generator.provider,{source_root:f.p.generator.candidateRoot,full_root:full}),/Full content changed/);
+ assert.equal(existsSync(prepared.run_root),false);
+});
+for(const [label,mutate]of [
+ ['goal',p=>p.generator.goal='changed'],['baseline',p=>p.baselineEnvironmentObjectDigest=canonicalDigest('other')],
+ ['owner',p=>p.normal.target='/tmp/other-owner'],['budget',p=>p.policy.max_trials=100],['repetitions',p=>p.policy.repetitions=2]
+])test(`case reselection refuses changed ${label}`,t=>{
+ const f=reselectionFixture(t),p=structuredClone(f.p);mutate(p);const path=join(f.base,'replacement.json');writeFileSync(path,JSON.stringify(p));
+ assert.throws(()=>prepareRetainedFullAuthoringConfiguration({...f,replacementProfilePath:path,preEvaluation:true,reselectCases:true}),/replacement may change only/);
+ assert.equal(existsSync(f.outputRoot),false);
+});
+test('case reselection rejects dirty original candidate and cannot start outside first gate',t=>{
+ const f=reselectionFixture(t);writeFileSync(join(f.p.generator.candidateRoot,'skills/demo/SKILL.md'),'dirty');
+ assert.throws(()=>prepareRetainedFullAuthoringConfiguration({...f,preEvaluation:true,reselectCases:true}),/not clean/);
+ assert.equal(existsSync(f.outputRoot),false);
+ const g=fixture(t);assert.throws(()=>prepareRetainedFullAuthoringConfiguration({...g,reselectCases:true}),/unapproved evaluation gate/);
+});
+test('reselection requires a new packet approval and original-gate drift blocks the practical runtime',async t=>{
+ const f=reselectionFixture(t),prepared=prepareRetainedFullAuthoringConfiguration({...f,preEvaluation:true,reselectCases:true});
+ const p=JSON.parse(readFileSync(prepared.profile_path)),config=JSON.parse(readFileSync(prepared.config_path));
+ const {advanceSupervisedInstructionLoop}=await import('./supervised-instruction-loop.mjs');
+ const {createFullPracticalInstructionLoopRuntime}=await import('./instruction-loop-practical-runtime.mjs');
+ const calls=[],results=new Map(),runtime={digest:config.policy.runtime_digest,inspect:async j=>results.get(canonicalDigest(j))??{status:'unknown'}};
+ for(const kind of ['generate','register','select','trial','report','plan','apply','version','cleanup','restore','evaluate','resumeEvaluation'])runtime[kind]=async j=>{
+  calls.push(kind);const output=kind==='generate'?readRunJournal(f.root).state.outputs.register:kind==='select'?{case_ids:['public']}:kind==='register'?{registry:{snapshot_digest:canonicalDigest('registry'),trusted_authority_contexts:[]}}:{synthetic:true};
+  const r={request_digest:canonicalDigest(j),status:'completed',output};results.set(canonicalDigest(j),r);return r;
+ };
+ const state=await advanceSupervisedInstructionLoop({root:prepared.run_root,policy:config.policy,runtime});
+ assert.equal(state.status,'awaiting_evaluation_approval');assert.equal(calls.includes('evaluate'),false);assert.equal(calls.includes('apply'),false);
+ assert.notEqual(canonicalDigest(state.pending_gate),canonicalDigest(readRunJournal(f.root).state.gate.packet));
+ const h=readRunJournal(f.root);h.state.evaluation_decision={disposition:'approved'};appendRunJournal(f.root,'later-approval',h.state);
+ assert.throws(()=>createFullPracticalInstructionLoopRuntime({definition:config.runtime}),/case or lifecycle effects/);
 });
 
 async function interruptedInitializationFixture(t,{siblingSession=false}={}){

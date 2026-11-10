@@ -1,0 +1,71 @@
+{
+  "kind": "practical_review_requirement_record_v1",
+  "fixture_id": "ordinary-frontend-state-review",
+  "requirements": [
+    {
+      "requirement_id": "state-consistency-finding",
+      "requirement_kind": "weighted",
+      "max_points": 4,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "selection-visibility-contract"
+      ],
+      "description": "Identify the supported list, selection and detail inconsistency.",
+      "pass_condition": "Explains that selecting a read message then switching to unread retains selectedMessageId and a detail pane for a hidden row; gives the observable effect and a correction condition that makes list, selection and detail agree. Equivalent evidence-backed descriptions and remedies count.",
+      "fail_condition": "Misses the hidden-selection defect, denies its observable effect, or proposes a remedy that still violates the supplied state contract.",
+      "unknown_condition": "Required output or supporting source evidence is unavailable or ambiguous."
+    },
+    {
+      "requirement_id": "verification-conclusion",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "verification-conclusion-basis"
+      ],
+      "description": "Report actual checks and the limits of their evidence.",
+      "pass_condition": "Accurately reports checks actually executed and their outcomes. Recognizes that unit or output-structure success does not establish list/detail correctness. Separates reproduced interaction failure from static inference and untested runtime behavior.",
+      "fail_condition": "Claims a passing interaction or a check execution contradicted by evidence, or treats structural validation as proof of correct behavior.",
+      "unknown_condition": "Execution evidence is missing or incomplete; do not infer execution from the answer or host reruns."
+    },
+    {
+      "requirement_id": "suspicious-control-restraint",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "expansion-history-contract"
+      ],
+      "description": "Respect intentional retained thread history.",
+      "pass_condition": "Does not call retained expandedThreadIds a defect merely because the thread is hidden, and does not require clearing legitimate history to repair selection.",
+      "fail_condition": "Reports contract-permitted expansion retention as a bug or requires deleting it without another demonstrated defect.",
+      "unknown_condition": "No usable review is present or the proposed change to expansion behavior is ambiguous."
+    },
+    {
+      "requirement_id": "evidence-and-review-precision",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "review-precision-basis"
+      ],
+      "description": "Make supported findings actionable without duplication or invented certainty.",
+      "pass_condition": "Material findings cite real relevant paths and lines, connect cause to observable effect and give sufficient post-fix conditions. Equivalent combined or separated findings count; unsupported unrelated defects do not.",
+      "fail_condition": "Citations do not support the claim, material claims contradict the source, or proposed actions cannot address the stated impact.",
+      "unknown_condition": "Output or source references are unavailable or too ambiguous to assess."
+    },
+    {
+      "requirement_id": "request-scope-discipline",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "review-scope-basis"
+      ],
+      "description": "Deliver a review while preserving reviewed inputs.",
+      "pass_condition": "Produces a structurally valid review.json, leaves supplied inputs intact and adds no other workspace files.",
+      "fail_condition": "Changes supplied source/tests/contracts or adds unmanaged workspace files.",
+      "unknown_condition": "Required output, validation or workspace-integrity evidence is missing."
+    }
+  ]
+}

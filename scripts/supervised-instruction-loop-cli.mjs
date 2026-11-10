@@ -133,10 +133,10 @@ try{
     console.log(JSON.stringify(prepareReferenceEvidenceInstructionLoop({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),
       outputRoot:resolve(options['--output-root']),id:options['--id'],referenceEvidence:readInstructionLoopJson(resolve(options['--reference-evidence']))}),null,2));
   }
-  else if(['recover-authoring','reconfigure-evaluation'].includes(command)){
+  else if(['recover-authoring','reconfigure-evaluation','reselect-evaluation'].includes(command)){
     assert.ok(Object.keys(options).every(k=>['--root','--profile','--config','--replacement-profile','--output-root','--id'].includes(k)));
     assert.ok(options['--profile']&&options['--config']&&options['--output-root']&&options['--id']);
-    console.log(JSON.stringify(prepareRetainedFullAuthoringConfiguration({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),replacementProfilePath:options['--replacement-profile']?resolve(options['--replacement-profile']):resolve(options['--profile']),outputRoot:resolve(options['--output-root']),id:options['--id'],preEvaluation:command==='reconfigure-evaluation'}),null,2));
+    console.log(JSON.stringify(prepareRetainedFullAuthoringConfiguration({root,profilePath:resolve(options['--profile']),configPath:resolve(options['--config']),replacementProfilePath:options['--replacement-profile']?resolve(options['--replacement-profile']):resolve(options['--profile']),outputRoot:resolve(options['--output-root']),id:options['--id'],preEvaluation:command!=='recover-authoring',reselectCases:command==='reselect-evaluation'}),null,2));
   }
   else if(['recover-authoring-initialization','recover-authoring-interrupted'].includes(command)){
     assert.ok(Object.keys(options).every(k=>['--root','--output-root','--id','--reason','--session-root'].includes(k)));

@@ -5,7 +5,8 @@ import {join} from 'node:path';
 import {tmpdir,devNull} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {prepareGitBaseline} from './ask-user-comparison-prepare.mjs';
-import {generateFullInstructionCandidate,fullGenerationInput} from './instruction-loop-full-candidate.mjs';
+import {canonicalDigest} from './content-addressed-store.mjs';
+import {generateFullInstructionCandidate,fullGenerationInput,fullInstructionInventory} from './instruction-loop-full-candidate.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {cleanOwnedInstructionLoopStaging} from './instruction-loop-normal-owner-worker.mjs';
 function fixture(t,{writerSuffix='',validatorSuffix='',emptySupport=false,pluginWriterSuffix=null}={}){
@@ -105,4 +106,19 @@ test('failed plugin synchronization retains the failure without commit or instal
 });
 test('plugin writer cannot change executable sources under derived-output authority',async t=>{
  const {p}=fixture(t,{pluginWriterSuffix:`writeFileSync(new URL('./install-kernel.mjs',import.meta.url),'throw Error("must not execute")');`});await assert.rejects(generateFullInstructionCandidate(p,provider('## Goal\nChanged.\n')),/source writer changed unexpected path: scripts\/install-kernel/);assert.equal(existsSync(join(p.fullRoot,'AGENTS.md')),false);
+});
+
+test('retained case reselection materializes the original Git commit and exact Full content without another model',async t=>{
+ const {p,root}=fixture(t),text='## Goal\nPreserved candidate.\n',first=await generateFullInstructionCandidate(p,provider(text));
+ const fresh={...p,candidateRoot:join(root,'reselected-source'),fullRoot:join(root,'reselected-full'),stagingRoot:join(root,'reselected-staging'),provider:{kind:'fixture',retainedAuthoring:{synthetic:true},caseReselection:true}};
+ // Force a different wall-clock commit timestamp if the implementation were to
+ // make a new commit, then exercise the actual source/installer generation path.
+ await new Promise(resolve=>setTimeout(resolve,1100));
+ const retained=async input=>{const r=await provider(text)(input);return {...r,execution:{...r.execution,model_calls:0,preserved_candidate_source:{source_root:first.source_root,source_revision:first.source_revision}}};};
+ const second=await generateFullInstructionCandidate(fresh,retained);
+ assert.equal(second.source_revision,first.source_revision);
+ assert.equal(canonicalDigest(fullInstructionInventory(second.source_root)),canonicalDigest(fullInstructionInventory(first.source_root)));
+ assert.equal(canonicalDigest(fullInstructionInventory(second.full_root)),canonicalDigest(fullInstructionInventory(first.full_root)));
+ const bad={...fresh,candidateRoot:join(root,'bad-source'),fullRoot:join(root,'bad-full'),stagingRoot:join(root,'bad-staging')};
+ await assert.rejects(generateFullInstructionCandidate(bad,async input=>{const r=await retained(input);r.response.changes[0].text='## Goal\nDifferent candidate.\n';return r;}),/source tree changed/);
 });

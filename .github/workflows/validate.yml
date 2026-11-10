@@ -281,6 +281,10 @@ jobs:
         id: ci_9061812f2b69
         run: node scripts/test-review-route.mjs
 
+      - name: Verify ordinary practical review case
+        id: ci_ordinary_review_case
+        run: node --test scripts/test-practical-ordinary-review-case.mjs
+
       - name: Run Execution Envelope record contract tests
         id: ci_0bc0db5fe5fc
         run: node scripts/test-execution-envelope-record.mjs

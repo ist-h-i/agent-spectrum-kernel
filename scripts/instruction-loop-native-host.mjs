@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {fullInstructionInventory,generateFullInstructionCandidate,codexFullInstructionProvider,registerFullInstructionCandidate,compareFullInstructionContext} from './instruction-loop-full-candidate.mjs';
-import {retainedFullAuthoringProvider} from './instruction-loop-retained-authoring.mjs';
+import {retainedFullAuthoringProvider,verifyReselectedCandidate} from './instruction-loop-retained-authoring.mjs';
 import {selectInstructionLoopCases} from './instruction-loop-case-selection.mjs';
 import {prepareRetainedInstructionComparison,readRetainedInstructionResults} from './retained-instruction-comparison.mjs';
 import {buildInstructionLoopReferenceReport} from './instruction-loop-reference-report.mjs';
@@ -76,6 +76,7 @@ export async function executeNativeInstructionLoopStage(p,job,{modelCallsAuthori
     else {assert.equal(p.generator.provider.kind,'codex');assert.equal(modelCallsAuthorized,true,'Full generation model call not authorized');
       provider=input=>codexFullInstructionProvider({...p.generator.provider,modelCallsAuthorized},input);}
     const generated=await generateFullInstructionCandidate({...p.generator,observation:job.input.observation},provider);
+    verifyReselectedCandidate(p.generator.provider,generated);
     // Archive the private, independently owned version before it can be
     // retired/deleted. Original repositories and immutable trial logs are not
     // cleanup targets. This archive is local and is never sent externally.
