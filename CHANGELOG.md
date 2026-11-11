@@ -1,5 +1,14 @@
 # Changelog
 
+## personal-v1.0.0 — Codex personal milestone
+
+This milestone keeps the package manifest version at `3.0.0`; it is not a downgrade to package v1 or a claim that the broader Issue #202 fixed release gate passed.
+
+- Documented the human-supervised Skill improvement cycle, measured candidate adoption, version activation, owned cleanup, and explicit recovery after interrupted lifecycle work.
+- Reconciled the public README, saved demo and personal release scope with the accepted 31-task practical evaluation (24 normal + seven challenges).
+- Preserved observed token/cost and runtime coverage limits, separate evaluation/adoption decisions, and the unverified Claude application boundary.
+- Distribution uses the tagged repository source. No npm release, model rerun, or global configuration change is part of this milestone.
+
 ## Unreleased
 
 Changes:
