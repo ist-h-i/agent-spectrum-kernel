@@ -1,5 +1,8 @@
 # ASK v1 release package — 2026年10月
 
+> このページは2026年10月の固定sourceに対する広いIssue #202の履歴です。現在のCodex個人milestoneは[個人v1の提供範囲](personal-v1-release-preparation-ja.md)を参照してください。以下の未完了・not_ready・Release未作成の記載は当時の状態であり、現在mainの再判定ではありません。
+
+
 2026年10月10日の評価方針変更は [探索的評価](pragmatic-evaluation.md) に分離しました。
 global の不明や環境差を記録して改善 cycle を回しますが、下記の source と判定は
 その時点の証拠として保持します。新しい観測だけで必須 #192/#198 や16 gate を

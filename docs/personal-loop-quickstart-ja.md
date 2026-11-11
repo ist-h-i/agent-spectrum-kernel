@@ -1,6 +1,6 @@
 # 個人の比較・改善ループを使う手順
 
-**最終受入との整合待ちの準備版です。** [提供範囲と制約](personal-v1-release-preparation-ja.md)を先に確認してください。ここでは準備→一度の開始→保存結果の確認→次サイクルと、失敗時の扱いをつなぎます。
+**このページは従来のPrompt専用CLIの手順です。** 個人Codex v1のSkill改善には [標準の人間判断付きループ](supervised-instruction-loop.md)を使います。 [提供範囲と制約](personal-v1-release-preparation-ja.md)を先に確認してください。ここでは準備→一度の開始→保存結果の確認→次サイクルと、失敗時の扱いをつなぎます。
 
 プロジェクトへKernel/Skillを入れる[Mac / Codexの導入](quickstart-mac-codex-ja.md)と、改善候補を比較するこの手順は別です。現在の個人CLIはPrompt向けで、比較が終わってもPortfolioやMacへ自動適用しません。
 
@@ -49,7 +49,7 @@ node scripts/ask-personal-evolution-cli.mjs result --cycle /absolute/saved-run/c
 | 費用・時間 | 取得できた比較usageと時間、取得できない生成/review usage・総費用を分ける |
 | 実際の変更 | no-op、候補棄却、別承認待ちの適用を区別する。現状維持receiptをMacへの適用と呼ばない |
 
-[保存デモ](demos/personal-loop-saved-demo-ja.md)では、一巡完了でも元の品質6行はすべてfail、判断は証拠不足だった例を説明します。現在の9条件Eval結果ではありません。
+旧Prompt CLIの保存例は一巡完了でも品質6行がfail、判断は証拠不足でした。現在の[保存デモ](demos/personal-loop-saved-demo-ja.md)は、後続の標準Skill改善ループの採用例です。両者を同じ実行と扱いません。
 
 ## 4. 次サイクルへ引き継ぐ
 
@@ -76,4 +76,4 @@ node scripts/ask-personal-evolution-cli.mjs next --cycle /absolute/saved-run/cyc
 
 正常な応答消失からの継続と、消費済みで終端不明の処理の再試行は違います。`run --output`は読取り専用ではなく、残る許可済み処理を進め得ます。先に保存状態を確認し、[既存run手順](personal-evolution-unattended.md#configuration-and-one-shot-procedure)の条件を満たす場合だけ扱います。拒否されたnative検証・モデル実行を、隔離外や設定変更でやり直す手順は提供しません。
 
-原本の再読込・次request準備と、限定された模擬停止・復旧回帰は確認済みです。準備専用の復旧入口は生成完了と既存source承認を前提とし、比較の全枠が未開始の準備だけを扱います。消費済みの比較や終端不明の処理は保守的に拒否します。最終source/profileのOperational判断や、上記の実次サイクル終端・軽量bypass・採用時の実target適用は、[範囲案の残作業](personal-v1-release-preparation-ja.md#既存v1目標に照らした残作業)に分けて残します。強制host障害や子孫/provider停止を保証する手順ではありません。
+原本の再読込・次request準備と、限定された模擬停止・復旧回帰は確認済みです。準備専用の復旧入口は生成完了と既存source承認を前提とし、比較の全枠が未開始の準備だけを扱います。消費済みの比較や終端不明の処理は保守的に拒否します。この旧Prompt入口の制限と、後続の標準Skill改善ループの受入範囲は[現在の提供範囲](personal-v1-release-preparation-ja.md)で区別します。強制host障害や子孫/provider停止を保証する手順ではありません。
