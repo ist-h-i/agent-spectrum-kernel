@@ -5,10 +5,18 @@ import { canonicalDigest } from './content-addressed-store.mjs';
 import { verifyAssetRegistry, buildAssetLifecycleAuthorityContext,
   applyAssetLifecycleTransitions } from './asset-registry.mjs';
 const same=(a,b)=>canonicalDigest(a)===canonicalDigest(b);
+export function validateInstructionLoopAssetAuthority(authority){
+  assert.ok(authority&&typeof authority==='object','Asset lifecycle authority is required before reserving a version operation');
+  assert.deepEqual(Object.keys(authority).sort(),['authority_evidence_digest','authority_id','authority_revision','kind'],'Asset lifecycle authority has unsupported fields');
+  assert.equal(authority.kind,'external_asset_lifecycle_authority');
+  assert.match(authority.authority_id??'',/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/,'Asset lifecycle authority_id is required');
+  assert.ok(typeof authority.authority_revision==='string'&&authority.authority_revision.length<=254&&/\S/.test(authority.authority_revision),'Asset lifecycle authority_revision is required');
+  assert.match(authority.authority_evidence_digest??'',/^sha256:[a-f0-9]{64}$/,'Asset lifecycle authority evidence digest is required');
+}
 export function transitionInstructionLoopAssets({storeRoot,snapshotDigest,trustedAuthorityContexts=[],
   candidateAssets,baselineAssets=[],action,authority,baselineSnapshotDigest=null}){
   assert.ok(['activate','retire','restore'].includes(action));
-  assert.equal(authority.kind,'external_asset_lifecycle_authority');
+  validateInstructionLoopAssetAuthority(authority);
   assert.ok(candidateAssets.length>0);
   let snapshot=verifyAssetRegistry({storeRoot,snapshotDigest,trustedAuthorityContexts});
   const history=[],trusted=[...trustedAuthorityContexts];

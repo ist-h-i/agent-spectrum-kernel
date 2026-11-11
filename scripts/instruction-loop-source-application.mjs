@@ -1,3 +1,4 @@
+import {verifyMeasuredSourceAdoptionPublication,MEASURED_REVIEW_TEST_PATH} from './instruction-loop-measured-adoption.mjs';
 import {assertReferenceEvidenceDecision} from './instruction-loop-reference-evidence.mjs';
 // ASK source publication is a separate owner capability, not a Full installer.
 import assert from 'node:assert/strict';
@@ -32,9 +33,10 @@ const canonical=path=>/^skills\/[a-z0-9-]+\/(?:SKILL\.md|references\/[A-Za-z0-9_
 function blob(root,revision,path){const listed=git(root,['ls-tree','-r','--name-only',revision,'--',path]);return listed===path?hash(gitBytes(root,['show',revision+':'+path])):null;}
 const plans=p=>join(p.stateRoot,'source-publication-plans');
 const planPath=(p,job)=>join(plans(p),canonicalDigest(job).slice(7)+'.json');
-function checkedPlan(p,plan){const n=owner(p);assert.equal(plan.kind,'ask_source_application_plan_v1');assert.equal(canonicalDigest(plan.destination),canonicalDigest(n),'source target transplant');
+function checkedPlan(p,plan){const n=owner(p);if(plan.measured_adoption)verifyMeasuredSourceAdoptionPublication(plan.measured_adoption,{...plan.candidate_binding,baseline_revision:n.base_revision,changed_paths:plan.changes.map(f=>f.path)});assert.equal(plan.kind,'ask_source_application_plan_v1');assert.equal(canonicalDigest(plan.destination),canonicalDigest(n),'source target transplant');
  verifyNormalOwnerSourceBinding({sourceRoot:p.generator.candidateRoot,binding:plan.candidate_binding});assert.equal(git(p.generator.candidateRoot,['rev-parse','HEAD^{tree}']),plan.result_tree,'prepared source tree drift');return n;}
 export function planSourceApplication(p,job){assert.equal(job.kind,'plan');assert.equal(job.input.target,p.normal.target);const n=owner(p),c=job.input.candidate;
+ if(c.measured_adoption)verifyMeasuredSourceAdoptionPublication(c.measured_adoption,c);
  const binding=bindMeasuredNormalOwnerSource({sourceRoot:p.generator.candidateRoot,candidate:c});sha(c.baseline_revision);
  const baseTree=git(n.target,['rev-parse',n.base_revision+'^{tree}']);assert.equal(git(c.source_root,['rev-parse',c.baseline_revision+'^{tree}']),baseTree,'source base differs from measured environment; re-plan against the current base');
  const paths=git(c.source_root,['diff','--name-only',c.baseline_revision,c.source_revision]).split('\n').filter(Boolean);assert.ok(paths.length>0&&paths.length<=256);
@@ -44,9 +46,9 @@ export function planSourceApplication(p,job){assert.equal(job.kind,'plan');asser
   assert.ok(blob(c.source_root,c.baseline_revision,scope.path)&&blob(c.source_root,c.source_revision,scope.path),'review contract must remain an existing canonical file');
   assert.ok(paths.some(path=>canonical(path)&&path.startsWith(`skills/${scope.skill}/`)&&blob(c.source_root,c.baseline_revision,path)!==blob(c.source_root,c.source_revision,path)),'review contract change requires an actual owner Skill Markdown change');
  }
- for(const path of paths)assert.ok(canonical(path)||scope&&path===scope.path||FULL_SOURCE_DERIVED_PATHS.includes(path),'non-instruction source change refused');
- const plan={kind:'ask_source_application_plan_v1',destination:structuredClone(n),candidate_binding:binding,base_tree:baseTree,result_tree:git(c.source_root,['rev-parse','HEAD^{tree}']),
-  changes:paths.map(path=>({path,kind:canonical(path)||scope&&path===scope.path?'canonical':'generated',before:blob(c.source_root,c.baseline_revision,path),after:blob(c.source_root,c.source_revision,path)})),
+ for(const path of paths)assert.ok(canonical(path)||scope&&path===scope.path||FULL_SOURCE_DERIVED_PATHS.includes(path)||c.measured_adoption&&path===MEASURED_REVIEW_TEST_PATH,'non-instruction source change refused');
+ const plan={kind:'ask_source_application_plan_v1',destination:structuredClone(n),candidate_binding:binding,...(c.measured_adoption?{measured_adoption:c.measured_adoption}:{}),base_tree:baseTree,result_tree:git(c.source_root,['rev-parse','HEAD^{tree}']),
+  changes:paths.map(path=>({path,kind:canonical(path)||scope&&path===scope.path?'canonical':path===MEASURED_REVIEW_TEST_PATH?'verification':'generated',before:blob(c.source_root,c.baseline_revision,path),after:blob(c.source_root,c.source_revision,path)})),
   allowed_operations:['push_new_branch','open_pull_request','inspect_ci_and_review','normal_merge'],formal_admission_implied:false};
  mkdirSync(plans(p),{recursive:true,mode:0o700});save(planPath(p,job),plan);return plan;
 }
@@ -70,7 +72,7 @@ export function prepareSourceApplication(p,job,context={}){assert.equal(job.kind
 }
 function checkedClaim(h,c){keys(c,['handoff_digest','execution_id','actor']);assert.equal(c.handoff_digest,canonicalDigest(h));for(const k of ['execution_id','actor'])assert.match(c[k],/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/u);return c;}
 function pinClaim(context,c){const old=progress(context)?.claim_digest;if(old){assert.ok(c,'recorded source claim missing; do not claim again');assert.equal(canonicalDigest(c),old,'source claim drift');}}
-function checkedCompletion(p,h,c,s){keys(s,['handoff_digest','claim_digest','publication','evidence']);assert.equal(s.handoff_digest,canonicalDigest(h));assert.equal(s.claim_digest,canonicalDigest(c));
+function checkedCompletion(p,h,c,s){if(h.plan.measured_adoption)verifyMeasuredSourceAdoptionPublication(h.plan.measured_adoption,{...h.plan.candidate_binding,baseline_revision:h.plan.destination.base_revision,changed_paths:h.plan.changes.map(f=>f.path)});keys(s,['handoff_digest','claim_digest','publication','evidence']);assert.equal(s.handoff_digest,canonicalDigest(h));assert.equal(s.claim_digest,canonicalDigest(c));
  const v=s.publication;keys(v,['state','repository','base_branch','branch','head_commit','merge_commit','merge_tree','pull_request','ci_status','review_status']);
  assert.equal(v.state,'merged','a branch or PR is pending, not applied');assert.equal(v.repository,h.plan.destination.repository);assert.equal(v.base_branch,h.plan.destination.base_branch);assert.equal(v.branch,h.plan.destination.publication_branch);
  assert.equal(v.head_commit,h.plan.candidate_binding.source_revision);sha(v.merge_commit);assert.equal(v.merge_tree,h.plan.result_tree);assert.ok(Number.isSafeInteger(v.pull_request)&&v.pull_request>0);assert.equal(v.ci_status,'passed');assert.equal(v.review_status,'approved');

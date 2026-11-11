@@ -5,17 +5,19 @@ import { readJsonFileStrict,canonicalDigest } from './content-addressed-store.mj
 import { createPracticalEvaluationCommandRuntime } from './instruction-loop-command-runtime.mjs';
 import { advancePracticalEvaluation,inspectPracticalEvaluation } from './practical-evaluation-runner.mjs';
 import {listPracticalChallenges,preparePracticalChallenge,inspectPracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff} from './practical-challenge-evaluation.mjs';
+import {importChallengeSemanticAssessment} from './practical-challenge-worker.mjs';
 const args=process.argv.slice(2),command=args.shift(),o={};
 try{
   while(args.length){const key=args.shift();assert.match(key,/^--[a-z-]+$/u);assert.equal(o[key],undefined);o[key]=key==='--allow-model-calls'?true:args.shift();}
   if(command==='challenge-list'){assert.equal(Object.keys(o).length,0);console.log(JSON.stringify(listPracticalChallenges(),null,2));}
   else if(command.startsWith('challenge-')){
-    const allowed={ 'challenge-prepare':['--config'], 'challenge-status':['--root'], 'challenge-start':['--root','--confirm','--allow-model-calls'], 'challenge-resume':['--root','--confirm','--allow-model-calls'], 'challenge-score-handoff':['--root','--evaluator-root'] };
+    const allowed={ 'challenge-prepare':['--config'], 'challenge-status':['--root'], 'challenge-start':['--root','--confirm','--allow-model-calls'], 'challenge-resume':['--root','--confirm','--allow-model-calls'], 'challenge-score-handoff':['--root','--evaluator-root'], 'challenge-import-score':['--root','--assessment'] };
     assert.ok(allowed[command]&&Object.keys(o).every(k=>allowed[command].includes(k)),'unsupported challenge options');
     let report;
     if(command==='challenge-prepare'){assert.ok(o['--config']);report=preparePracticalChallenge(readJsonFileStrict(resolve(o['--config'])));}
     else{assert.ok(o['--root']);const root=resolve(o['--root']);
       if(command==='challenge-status')report=inspectPracticalChallenge(root);
+      else if(command==='challenge-import-score'){assert.ok(o['--assessment']);report=await importChallengeSemanticAssessment(root,readJsonFileStrict(resolve(o['--assessment'])));}
       else if(command==='challenge-score-handoff')report=preparePracticalChallengeScoreHandoff(root,{evaluatorRoot:o['--evaluator-root']??null});
       else{
         if(o['--allow-model-calls']===true)process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';

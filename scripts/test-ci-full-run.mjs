@@ -11,7 +11,9 @@ const baseline = JSON.parse(readFileSync(new URL('../docs/fixtures/ci-full-run-i
 const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs';
 const publicSandboxFile = 'scripts/test-ask-user-comparison-public-sandbox.mjs';
 const manualComparisonCommand = 'node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs';
+const challengeLifecycleCommand = 'node --experimental-test-module-mocks --test scripts/test-practical-challenge-worker.mjs scripts/test-challenge-evaluation.mjs scripts/test-instruction-loop-measured-adoption.mjs scripts/test-instruction-loop-version-recovery.mjs';
 const environmentCommands = [
+  challengeLifecycleCommand,
   'node --experimental-test-module-mocks --test scripts/test-instruction-loop-reference-evidence.mjs scripts/test-instruction-loop-reference-preparation.mjs',
   'node --experimental-test-module-mocks --test scripts/test-practical-isolated-grade-continuation.mjs scripts/test-practical-isolated-grade-lifecycle.mjs',
   'node --test scripts/test-instruction-loop-component-runtime.mjs scripts/test-instruction-loop-component-recovery.mjs scripts/test-instruction-loop-receiving.mjs scripts/test-instruction-loop-operation.mjs scripts/test-instruction-loop-operation-resume.mjs scripts/test-instruction-loop-normal-chain.mjs scripts/test-instruction-loop-operator-cli.mjs scripts/test-instruction-loop-provider-preflight.mjs scripts/test-instruction-loop-host-authoring.mjs',
@@ -158,4 +160,17 @@ test('cross-workflow duplicates have one pinned, unconditional owner and unique 
 test('public sandbox artificial requests reuse the existing OS matrix step exactly once', () => {
   assert.equal(commands(local).filter(command => command.split(' ').includes(publicSandboxFile)).length, 1);
   for (const workflow of [validate, rollover, completion]) assert.ok(!workflow.includes(publicSandboxFile));
+});
+
+
+test('challenge lifecycle suites remain separately registered exactly once with mock support', () => {
+  const files = challengeLifecycleCommand.match(/scripts\/[^ ]+\.mjs/g);
+  const check = main => {
+    assert.equal(commands(main).filter(command => command === challengeLifecycleCommand).length, 1);
+    for (const file of files) assert.equal(commands(main).filter(command => command.split(' ').includes(file)).length, 1, file);
+  };
+  check(validate);
+  for (const file of files) assert.throws(() => check(validate.replace(challengeLifecycleCommand, challengeLifecycleCommand.replace(' ' + file, ''))));
+  assert.throws(() => check(validate.replace(challengeLifecycleCommand, challengeLifecycleCommand.replace('--experimental-test-module-mocks ', ''))));
+  assert.throws(() => check(validate + '\n' + challengeLifecycleCommand));
 });
