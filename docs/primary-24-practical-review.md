@@ -5,8 +5,8 @@ Public inputs and catalog registration: `2e3c42d2f6ae5b4408d127ba5bee64f9d7b7e8c
 Build immutable anchor: `483d861b376835e52f65138d39d9eb3a113d9bdd`.
 Pending authority metadata: `b0e3e99829255106a74d8516d58179886df7ee8e`.
 These anchors and the initial checks below describe the preparation stage.
-The completed practical measurement and later integration are recorded in the
-2026-11-06 update below; they do not establish a causal model effect.
+The accepted practical measurement is recorded below (2026-11-11).
+It does not establish a causal model effect.
 
 | Task | Preserved work and mandatory result | Public revision |
 |---|---|---|
@@ -73,7 +73,7 @@ and the proposed execution route was still awaiting confirmation. That historica
 status was superseded by the completed series below. The formal three-condition
 primary route remains separate and unqualified.
 
-## Completed measurement and integration (2026-11-06)
+## Accepted practical measurement (2026-11-11)
 
 The clean `normal24-v2-terra-low` series completed 48 root CLI runs on
 2026-11-05: 24 tasks × ASK off/full × one observation with requested
@@ -106,25 +106,18 @@ operator gaps. ASK-full CLI duration was 10.10% longer in this observation,
 with seven task pairs faster and 17 slower. One sample per condition, fixed
 order and no counterbalancing do not establish an ASK causal effect.
 
-Sixteen unique child records were observed: 15 normal terminals and one
-interruption, with observed Terra/low settings and no forced parent-child
-match. Root and observed partial child counters are retained separately.
-Complete coverage and disjointness remain unverified, so full hierarchical
-token totals and costs remain null. Cached tokens are part of input.
+The user accepted the task-aligned grading correction and the limited-usage
+readout on 2026-11-11. The current content scores are **off 238/240 and full
+238/240**. Both conditions use the same approved criteria. Earlier provisional,
+strict-old-rubric and exclusion alternatives are superseded, not additional
+current results; the prior public account is recoverable at commit
+`eaa1988f6d90acd7ecc31d531a0243f78cb9ae9d` in this file.
 
-| ASK | Confirmed reference points / 240 | Unconfirmed points | Evidenced unmet |
-|---|---:|---:|---:|
-| off | 231 | 7 | 2 |
-| full | 227 | 11 | 2 |
-
-These are saved AI/static reference judgments. Formal scores remain null.
-Common resolved criteria score 227/229 in both arms, with zero paired
-differences across all 24 comparisons; two whole-task pair differences remain
-unknown. Overall, 42 answers have content 10/10, two 8/10 and four partial
-assessments, covering five unknown criteria. Mandatory-command evidence is
-separate: 46 direct successful captures, one indirect successful frozen-task
-wrapper, and one required guard without a successful final capture. Content
-points and CLI exit zero do not establish all mandatory outcomes.
+Forty-six answers score 10/10 and two score 8/10. Mandatory execution evidence
+remains separate: 46 direct successes, one indirect frozen-task wrapper success
+and one original guard failure, followed by successful posthoc verification of
+the unchanged artifact. The recovery below must not be represented as original
+model work. All 48 source answers and original captures remain unchanged.
 
 The local operator evidence, under `primary24-practical-20261104/execution-preparation/`,
 contains:
@@ -139,17 +132,16 @@ contains:
   their citations, including unresolved criteria and mandatory-check flags.
 - `normal48-v2-reaggregatable-report-20261105/`: stdlib-only `build_report.py`,
   a 247-file input hash manifest and outputs with 48 trial rows, 24 pairs,
-  172 criterion reasons/citations, five unknown criteria and 16 child records.
+  172 original criterion reasons/citations and 16 child records.
   Two generated 17-file reports were byte-identical; a corrupted manifest
   failed before output. This reaggregates saved judgments; it does not re-score
-  or execute models or candidates. The source judgments record user result
-  review as pending; the later instruction to proceed with review and merge
-  does not independently validate those judgments.
+  or execute models or candidates. The historical source judgments retain their original statuses; the accepted
+  recovery assessment below supersedes unresolved content judgments.
 
 Raw answers, logs, private grading bodies and credentials remain local; this
 public inventory gives aggregate observations, not the private evidence itself.
-Formal primary admission and semantic grading authority are not established.
-Sol remains on hold.
+The separate strict three-condition native route is not certified by this
+accepted two-condition practical evaluation.
 
 Integration at `303d242dcde51e494ea81ec7b806bdf731146474` completed all four CI
 workflows successfully: [repository validation](https://github.com/ist-h-i/agent-spectrum-kernel/actions/runs/42062914702),
@@ -163,9 +155,9 @@ user-authorized merge of [PR #451](https://github.com/ist-h-i/agent-spectrum-ker
 
 ## Posthoc evidence recovery (2026-11-11)
 
-Scope: the same 24 tasks and 48 off/full answers above. This is not an
-acceptance claim for the separate challenge series, a new model comparison, or
-the three-condition native primary route. No answer-generation trial was added.
+Scope: the same 24 tasks and 48 off/full answers above. The separate seven-task
+challenge acceptance is summarized at the end. This is not a new model comparison
+or certification of the three-condition native primary route. No answer-generation trial was added.
 The original 247-file report input manifest was revalidated before recovery;
 original answers, captures and frozen judgments remain unchanged.
 
@@ -220,23 +212,70 @@ Missing response/token counts, complete hierarchical totals and billed costs
 remain unknown. Additional model trials would not reconstruct historical
 missing usage. An uninterrupted observed tree is not proof of complete capture.
 
-### Remaining grading decision
+### Approved grading correction
 
-The performance-investigation task has a mismatch between public instructions
-and the private rubric's narrower citation categories and next-check details.
-A strict reading of that frozen rubric would yield off 236/240 and full 232/240,
-but that diagnostic result must not be used as an ASK effect claim or as the
-accepted resolution of the disputed criteria. A task-aligned, versioned rubric
-correction and independent review are required before using those criteria for
-acceptance. The proposed correction would yield 238/240 in both conditions;
-this is a provisional policy-repair assessment, not an approved score.
-A symmetric exclusion of that one disputed task leaves 23 tasks with 228/230
-content points in each condition. This is a limited practical readout, not a
-retroactive change to the frozen 24-task plan; retain the excluded task and its
-reason in the report. Original mandatory-check failures remain separate. The original
-rubric/results are not silently rewritten. Pending that decision, native formal
-scores and admission remain unchanged.
+For `mp-performance-investigation`, the user approved the versioned,
+task-aligned v2 correction on 2026-11-11. All five criteria were independently
+reviewed for both conditions, yielding 10/10 each. Schema, criterion IDs,
+maximum points, exact citation matching and edit boundaries stay unchanged.
 
-Historical approval of CI/accessibility evaluator identities also does not
-approve their newer revised identities. This identity boundary is separate
-from practical posthoc acceptance of the saved two-condition comparison.
+- Causal hypothesis (4 points): allow evidence relevant to the explanation or
+  its explicit limitations, including CPU/build and release context, rather than
+  a narrower private citation-category list. Unsupported causal certainty or
+  timing coincidence presented as proof still fails.
+- Next check (2 points): require comparable inputs, a falsifiable prediction,
+  tenant/window isolation, nonproduction boundaries and a normal-path finite
+  sequence, fixed repetition count or deadline. No prescribed phrase or latency
+  decrease forecast is required when the public task asks for a mechanism check.
+  A safety-failure event alone does not bound an otherwise infinite run.
+
+Twelve control families, represented by 15 mutated answers, were checked.
+Independent semantic review agreed on the expected outcomes, including rejection
+of unbounded normal execution and preservation of valid equivalent wording.
+The 15/15 mechanical checks validate schema, citation and evidence binding, not
+automatic semantic detection sensitivity. One citation control combines invalid
+references and an invented measurement, so it does not isolate a single irrelevant
+extra citation. No new model answer was generated.
+
+### Accepted 31-task coverage
+
+The completed evaluation/acceptance scope is normal24 plus CH01 v4,
+CH02–06 business-five-v3 and RC01 review-public-v1. Retained results were matched
+to current public inputs and checked through saved answer/evidence hashes.
+No cross-version substitution or pooled average of heterogeneous trials is used.
+
+| Task | Saved measurement | Accepted score |
+|---|---|---|
+| CH01 v4 | Sol low, ASK none, n=1 | 99.375/100 |
+| CH02 | Terra low, old/new ASK, n=2 each | 68.375 / 60.5 |
+| CH03 | Same | 72.125 / 76.25 |
+| CH04 | Same | 60.5 / 35.375 |
+| CH05 | Same | 73.625 / 81.5 |
+| CH06 | Same | 68.375 / 68.375 |
+| RC01 | Sol low/max, n=1 each | 83.5 / 89 |
+| RC01 | Terra low, old/new ASK, n=1 each | 70.5 / 76.5 |
+
+CH01's retained qualification covers two correct solutions, 24 cases and
+16 defective controls; nine proof/scoring tests passed again. For business-five,
+two designs per task yielded 106 positive observations and 34 defective-control
+detections. Supplemental saved-answer execution covered all four answers for
+CH02/03/06 and selected single answers for CH04/05, not exhaustive HTTP/UI
+coverage of every answer. These checks confirmed existing scoring, including
+known missing capabilities; no duplicate deductions or score increases were made.
+
+RC01's additional checks reproduce known defects, including an actual HTTP/UI
+case displaying zero critical findings despite an existing critical finding.
+The 30 expected outcomes include defect reproductions, not 30 correct application
+features. Existing answers had already identified the issue, so scores did not
+change. Original inputs/answers were unchanged and owned test servers/browser
+processes were stopped.
+
+The seven-task results and normal24 are accepted as practical evidence with
+explicit limitations. Business-five average 68.60 to 64.40 does not show maintained
+hard-task performance. RC01's improved Terra score accompanies 4.20x time and
+3.09x input and is not evidence of improved time efficiency. CH01 is near its
+score ceiling. Complete hierarchy usage and billed costs remain unknown, not zero.
+No statistical ASK causal effect, exhaustive failure-order coverage, production
+provider/database behavior or strict three-condition native admission is claimed.
+Historical evaluator approvals do not automatically approve later evaluator
+identities. These boundaries do not reopen the completed practical acceptance.
