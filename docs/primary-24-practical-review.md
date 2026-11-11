@@ -233,8 +233,8 @@ Twelve control families, represented by 15 mutated answers, were checked.
 Independent semantic review agreed on the expected outcomes, including rejection
 of unbounded normal execution and preservation of valid equivalent wording.
 The 15/15 mechanical checks validate schema, citation and evidence binding, not
-automatic semantic detection sensitivity. One citation control combines invalid
-references and an invented measurement, so it does not isolate a single irrelevant
+automatic semantic detection sensitivity. One citation control combines irrelevant
+evidence and an invented measurement, so it does not isolate a single irrelevant
 extra citation. No new model answer was generated.
 
 ### Accepted 31-task coverage
