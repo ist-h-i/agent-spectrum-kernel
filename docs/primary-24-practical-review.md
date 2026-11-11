@@ -159,3 +159,84 @@ and [verification completion](https://github.com/ist-h-i/agent-spectrum-kernel/a
 These checks cover that integration head. The documentation update and any later
 head require their own final-head checks and independent review before the
 user-authorized merge of [PR #451](https://github.com/ist-h-i/agent-spectrum-kernel/pull/451).
+
+
+## Posthoc evidence recovery (2026-11-11)
+
+Scope: the same 24 tasks and 48 off/full answers above. This is not an
+acceptance claim for the separate challenge series, a new model comparison, or
+the three-condition native primary route. No answer-generation trial was added.
+The original 247-file report input manifest was revalidated before recovery;
+original answers, captures and frozen judgments remain unchanged.
+
+### Required validation and regression evidence
+
+The retained trial 29 infrastructure-plan answer and trial 31 investigation
+answer both pass their original task's fixed-input hash guard and public
+validator when checked in separate posthoc workspaces. The files were unchanged
+before and after these checks. This repairs the artifact-verification evidence
+gap; it does not turn trial 29's original failed guard into a successful
+model-executed command. Trial 31's original successful task-extracting wrapper
+remains distinct from this later direct verification.
+
+The two focused-regression answers were checked with the original authenticated
+control/mutant runner. Each passes two control executions and fails two
+missing-lowercase mutant executions, with mixed-case API observations and
+existing-behavior calibrations. This supports their previously unknown five
+content points each. It is posthoc quality evidence, not additional agent work.
+
+For client compatibility, both retained answers and an equivalent solution pass
+the existing behavioral checks in modern and legacy modes. Five defective
+controls fail: the original seed, a truthiness fallback, inherited-property
+acceptance, a shadowed-method call, and repeated getter evaluation. All eight
+expected outcomes match. Existing isolation was preserved. This directly
+supplements the older observation-state-only fixtures.
+
+The retained historical control inventory contains 836 case records, including
+four observation-state placeholders for the client and focused-regression tasks.
+These counts are an inventory, not a newly measured sensitivity rate. The
+previously documented 511 pure checks over 241 inputs cover five JSON-oriented
+fixtures, not all 24 tasks. Unknown implementations or unresolved prose still
+require review; AST signatures and public structural validation do not establish
+universal semantic correctness.
+
+### Observed usage, completeness and cost
+
+Response-level reconciliation covers 64 saved spools: 48 roots and 16 observed
+children, with 366 root and 70 child response records. The 436 response IDs are
+unique across the recorded scopes, all 48 root response sums match CLI usage,
+and all 16 observed spawns match recorded children. Thus overlap between these
+recorded root/child components is ruled out. Cached input is already in input.
+
+| Condition | Recorded disjoint input | Cached subset | Recorded output |
+|---|---:|---:|---:|
+| off | 7,012,057 | 6,148,736 | 46,763 |
+| full | 10,140,862 | 8,978,176 | 48,070 |
+
+These are **observed response sums**, not complete usage or billed cost. The
+pinned observer can omit completions with no usage; no closed request inventory
+exists, and auxiliary work can be unlinked. One observed child is interrupted.
+Missing response/token counts, complete hierarchical totals and billed costs
+remain unknown. Additional model trials would not reconstruct historical
+missing usage. An uninterrupted observed tree is not proof of complete capture.
+
+### Remaining grading decision
+
+The performance-investigation task has a mismatch between public instructions
+and the private rubric's narrower citation categories and next-check details.
+A strict reading of that frozen rubric would yield off 236/240 and full 232/240,
+but that diagnostic result must not be used as an ASK effect claim or as the
+accepted resolution of the disputed criteria. A task-aligned, versioned rubric
+correction and independent review are required before using those criteria for
+acceptance. The proposed correction would yield 238/240 in both conditions;
+this is a provisional policy-repair assessment, not an approved score.
+A symmetric exclusion of that one disputed task leaves 23 tasks with 228/230
+content points in each condition. This is a limited practical readout, not a
+retroactive change to the frozen 24-task plan; retain the excluded task and its
+reason in the report. Original mandatory-check failures remain separate. The original
+rubric/results are not silently rewritten. Pending that decision, native formal
+scores and admission remain unchanged.
+
+Historical approval of CI/accessibility evaluator identities also does not
+approve their newer revised identities. This identity boundary is separate
+from practical posthoc acceptance of the saved two-condition comparison.

@@ -127,3 +127,56 @@ test('hierarchy usage rejects a root outside the approved workspace and excludes
  const result=collectPracticalSessionUsage(options);assert.equal(result.aggregate_observed.input_tokens,null);assert.equal(result.unique_response_count,0);assert.deepEqual(result.sessions,[]);assert.deepEqual(result.missing_usage_sessions,['foreign-root']);assert.ok(result.issues.includes('root_workspace_binding_mismatch:foreign-root'));assert.equal(result.complete_total,null);
  const absent=collectPracticalSessionUsage({...options,rootSessionId:'absent-root'});assert.deepEqual(absent.sessions,[]);assert.deepEqual(absent.missing_usage_sessions,['absent-root']);
 });
+
+test('hierarchy usage excludes response IDs claimed by different threads or turns',t=>{
+ const f=setup(t),logs=join(f.base,'scope-conflicts');mkdirSync(logs);
+ const usage=(thread,turn,response,input)=>({type:'token_usage_record',payload:{thread_id:thread,turn_id:turn,response_id:response,usage:{input_tokens:input,cached_input_tokens:2,output_tokens:3,reasoning_output_tokens:1,total_tokens:input+3}}});
+ const write=(id,parent,events)=>writeFileSync(join(logs,id+'.jsonl'),[{type:'session_meta',payload:{id,parent_thread_id:parent,cwd:join(f.root,'workspace')}},...events].map(JSON.stringify).join('\n'));
+ // The alphabetically first child is processed before the root: its provisional
+ // sum must also lose the collision discovered while reading the root later.
+ write('root',null,[usage('root','r1','cross-thread',10),usage('root','r1','cross-turn',20),usage('root','r2','cross-turn',20),usage('root','r2','root-valid',40)]);
+ write('child','root',[usage('child','c1','cross-thread',10),usage('child','c1','child-valid',30)]);
+ const result=collectPracticalSessionUsage({sessionRoots:[logs],workspace:join(f.root,'workspace'),rootSessionId:'root'});
+ assert.equal(result.unique_response_count,2);assert.equal(result.aggregate_observed.input_tokens,70);
+ assert.deepEqual(result.sessions.map(s=>[s.id,s.unique_response_count,s.observed.input_tokens]),[['child',1,30],['root',1,40]]);
+ assert.ok(result.issues.includes('conflicting_response_scope:cross-thread'));assert.ok(result.issues.includes('conflicting_response_scope:cross-turn'));
+ assert.equal(result.complete_total,null);assert.equal(result.complete_billed_cost,null);
+});
+
+test('hierarchy usage retains missing response usage identities without inventing zero',t=>{
+ const f=setup(t),logs=join(f.base,'missing-responses');mkdirSync(logs);
+ const missing={type:'token_usage_record',payload:{thread_id:'root',turn_id:'turn',response_id:'missing',usage:null}};
+ const valid={type:'token_usage_record',payload:{thread_id:'root',turn_id:'turn',response_id:'valid',usage:{input_tokens:10,cached_input_tokens:2,output_tokens:3,reasoning_output_tokens:1,total_tokens:13}}};
+ const write=events=>writeFileSync(join(logs,'root.jsonl'),[{type:'session_meta',payload:{id:'root',cwd:join(f.root,'workspace')}},...events].map(JSON.stringify).join('\n'));
+ const options={sessionRoots:[logs],workspace:join(f.root,'workspace'),rootSessionId:'root'};
+ write([missing,missing,valid]);const result=collectPracticalSessionUsage(options);
+ assert.deepEqual(result.missing_usage_records,[{thread_id:'root',turn_id:'turn',response_id:'missing'}]);
+ assert.equal(result.unique_response_count,1);assert.equal(result.aggregate_observed.input_tokens,10);assert.ok(result.issues.includes('invalid_usage:root'));
+ assert.equal(result.complete_total,null);assert.equal(result.complete_billed_cost,null);
+ write([missing]);const empty=collectPracticalSessionUsage(options);
+ assert.equal(empty.aggregate_observed.input_tokens,null);assert.deepEqual(empty.missing_usage_sessions,['root']);
+ assert.deepEqual(empty.missing_usage_records,result.missing_usage_records);
+ const recovered={...valid,payload:{...valid.payload,response_id:'missing'}};
+ write([missing,recovered,recovered]);const recoveredResult=collectPracticalSessionUsage(options);
+ assert.equal(recoveredResult.unique_response_count,1);assert.equal(recoveredResult.aggregate_observed.input_tokens,10);
+ assert.deepEqual(recoveredResult.missing_usage_sessions,[]);
+ assert.deepEqual(recoveredResult.missing_usage_records,result.missing_usage_records);
+ assert.equal(recoveredResult.complete_total,null);assert.equal(recoveredResult.complete_billed_cost,null);
+});
+
+test('hierarchy usage treats missing-usage scope claims as conflicts too',t=>{
+ const f=setup(t),logs=join(f.base,'missing-scope-conflict');mkdirSync(logs);
+ for(const [id,parent,usage] of [['child','root',null],['root',null,{input_tokens:10,cached_input_tokens:2,output_tokens:3,reasoning_output_tokens:1,total_tokens:13}]]){
+  writeFileSync(join(logs,id+'.jsonl'),[
+   {type:'session_meta',payload:{id,parent_thread_id:parent,cwd:join(f.root,'workspace')}},
+   {type:'token_usage_record',payload:{thread_id:id,turn_id:id+'-turn',response_id:'shared',usage}},
+  ].map(JSON.stringify).join('\n'));
+ }
+ const result=collectPracticalSessionUsage({sessionRoots:[logs],workspace:join(f.root,'workspace'),rootSessionId:'root'});
+ assert.equal(result.unique_response_count,0);assert.equal(result.aggregate_observed.input_tokens,null);
+ assert.ok(result.sessions.every(s=>s.unique_response_count===0&&s.observed.input_tokens===null));
+ assert.deepEqual(result.missing_usage_sessions,['child','root']);
+ assert.deepEqual(result.missing_usage_records,[{thread_id:'child',turn_id:'child-turn',response_id:'shared'}]);
+ assert.ok(result.issues.includes('conflicting_response_scope:shared'));
+ assert.equal(result.complete_total,null);assert.equal(result.complete_billed_cost,null);
+});

@@ -6,7 +6,7 @@ import {readStableFile} from './ask-benchmark-stable-file.mjs';
 import {canonicalDigest} from './content-addressed-store.mjs';
 const fields=['input_tokens','cached_input_tokens','output_tokens','reasoning_output_tokens','total_tokens'];
 export function collectPracticalSessionUsage({sessionRoots,workspace,rootSessionId,rootTurnLowerBound=null}){
- const metas=new Map(),issues=[],records=new Map(),conflicts=new Set();let scanned=0;
+ const metas=new Map(),issues=[],records=new Map(),conflicts=new Set(),responseScopes=new Map(),missingUsageRecords=new Map(),sessionRecords=new Map();let scanned=0;
  const scan=dir=>{for(const item of readdirSync(dir,{withFileTypes:true})){
   if(++scanned>20000)throw new Error('session discovery limit reached');
   const path=join(dir,item.name);if(item.isSymbolicLink())continue;
@@ -40,18 +40,33 @@ export function collectPracticalSessionUsage({sessionRoots,workspace,rootSession
    if(event.type==='turn_context')models.push({model:p.model??null,reasoning:p.effort??null,turn_id:p.turn_id??null});
    if(event.type==='event_msg'&&['task_complete','task_aborted','turn_aborted'].includes(p.type))terminals.push({type:p.type,timestamp:event.timestamp??null});
    if(event.type!=='token_usage_record'||p.thread_id!==id)continue;
-   if(typeof p.turn_id!=='string'||!p.turn_id||typeof p.response_id!=='string'||!p.response_id||!p.usage||fields.some(k=>p.usage[k]!==undefined&&(!Number.isSafeInteger(p.usage[k])||p.usage[k]<0))||p.usage.cached_input_tokens>p.usage.input_tokens){issues.push('invalid_usage:'+id);continue;}
+   if(typeof p.turn_id!=='string'||!p.turn_id||typeof p.response_id!=='string'||!p.response_id){issues.push('invalid_usage:'+id);continue;}
    const key=JSON.stringify([id,p.turn_id,p.response_id]);
+   const scopes=responseScopes.get(p.response_id)??new Set();scopes.add(key);responseScopes.set(p.response_id,scopes);
+   if(scopes.size>1){
+    const issue='conflicting_response_scope:'+p.response_id;if(!issues.includes(issue))issues.push(issue);
+    for(const scope of scopes)conflicts.add(scope);
+   }
+   // Historical missing observations remain even if a later record supplies usage.
+   // This is not a ledger of currently unresolved provider requests.
+   if(p.usage==null)missingUsageRecords.set(key,{thread_id:id,turn_id:p.turn_id,response_id:p.response_id});
+   if(!p.usage||fields.some(k=>p.usage[k]!==undefined&&(!Number.isSafeInteger(p.usage[k])||p.usage[k]<0))||p.usage.cached_input_tokens>p.usage.input_tokens){issues.push('invalid_usage:'+id);continue;}
    if(records.has(key)&&canonicalDigest(records.get(key))!==canonicalDigest(p.usage)){conflicts.add(key);issues.push('conflicting_response_usage:'+id);}
    records.set(key,p.usage);own.set(key,p.usage);
   }
-  const valid=[...own].filter(([k])=>!conflicts.has(k));
-  if(!valid.length)missing.push(id);
-  sessions.push({id,parent:m.parent,cwd:m.meta.cwd,path:m.path,models,terminal_events:terminals,unique_response_count:valid.length,observed:total(valid.map(([,v])=>v))});
+  sessionRecords.set(id,own);
+  sessions.push({id,parent:m.parent,cwd:m.meta.cwd,path:m.path,models,terminal_events:terminals});
+ }
+ // A later thread can invalidate a previously observed response owner. Derive
+ // both session and aggregate totals only after all scope claims are known.
+ for(const session of sessions){
+  const valid=[...sessionRecords.get(session.id)].filter(([k])=>!conflicts.has(k));
+  if(!valid.length)missing.push(session.id);
+  session.unique_response_count=valid.length;session.observed=total(valid.map(([,v])=>v));
  }
  const valid=[...records].filter(([k])=>!conflicts.has(k)).map(([,v])=>v);
  return {kind:'practical_linked_session_usage_v1',root_session_id:rootSessionId,scope:'root_and_recursively_linked_descendants',
-  cumulative_snapshot:true,do_not_sum_stage_snapshots:true,sessions,unique_response_count:valid.length,aggregate_observed:total(valid),missing_usage_sessions:missing,issues,
+  cumulative_snapshot:true,do_not_sum_stage_snapshots:true,sessions,unique_response_count:valid.length,aggregate_observed:total(valid),missing_usage_sessions:missing,missing_usage_records:[...missingUsageRecords.values()],issues,
   complete_total:null,complete_billed_cost:null,root_turn_lower_bound:rootTurnLowerBound,
   completeness:'Unknown: observed linked records only; discovery and descendant terminal closure are not independently certified. Cached input is a subset of input.'};
 }
