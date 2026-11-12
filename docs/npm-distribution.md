@@ -171,3 +171,69 @@ successfully; examine the comparison report and the candidate diff first.
 This is an observed Codex configuration, not a synthetic fixture. Advancing with
 `operate --allow-model-calls` can start model work and consume your provider
 allowance or incur charges. Only do so within your approved execution scope.
+
+## Reusing verification evidence
+
+`ask verification` exposes the existing evidence planner and final coverage check
+from an installed package. It does not change CI selection or run gates/models on
+its own. The ASK package/workspace can remain Gitless; **this optional scoped
+verification route requires Git history in the project being verified**, plus its
+committed gate inventory, dependency manifests, completion policy and signed
+baseline evidence. See [the completion contract](verification-reuse-completion-contract.md).
+
+```sh
+ask verification prepare --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT
+ask verification coverage --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT
+```
+
+`prepare` identifies exact/scoped reuse, affected gates, unknown/missing evidence
+and any required delta review. Run only the indicated gates using your trusted
+runner and store their newly signed evidence; do not execute commands copied from
+an evidence record. An unknown dependency or missing proof requires revalidation.
+`coverage` recomputes the plan against the clean current target, refreshes current
+obligations twice, then checks inputs again. It exits nonzero when blocked.
+Neither command grants approval or performs a merge, release or deployment.
+
+Current-state observations are host capabilities, not portable evidence. If the
+policy requires current approval, independent judgment or external state, omission
+of a host provider deliberately blocks coverage. An operator can explicitly supply
+an audited module and pin its exact bytes:
+
+```sh
+ask verification coverage --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT \
+  --provider-module /absolute/trusted-host.mjs --provider-sha256 sha256:HEX_DIGEST
+```
+
+This flag **executes trusted host code with the operator's privileges and inherited
+environment**. It is not a sandbox. Never use a downloaded/evidence-supplied module
+without inspecting and authorizing it. ASK never discovers providers from a repo,
+transfer, or cached result. The module exports `providers`, a map from policy
+provider IDs to async functions. Each function receives the current bound query
+and returns exactly `{query, status, actor_id, evidence_digest}`. Status is
+`satisfied`, `unsatisfied` or `unavailable`. Read the authoritative system on
+**every invocation**, including `confirm`; never echo a cached success. The core
+checks authorized/independent actors, query identity and stable observation digest.
+
+Each observation runs the pinned module bytes in a fresh Node process, with a
+10-second upper bound (also constrained by the policy's overall deadline) and a
+1 MiB response bound. Pin mismatches, missing functions, extra stdout and malformed
+responses fail closed. Write diagnostics to stderr, not stdout; diagnostics are
+not retained. On POSIX, the owned process group is terminated on completion or
+failure; pipes are closed on cancellation. Host providers must clean up detached
+children themselves, and on Windows must own cleanup of all child processes.
+Module code is loaded from a data URL, so use Node built-ins or
+explicit absolute dependencies, not relative imports. The pin covers the module
+bytes, not its transitive dependencies; audit the entire trusted host integration.
+A fresh process does not make a lying provider trustworthy. Do not use this route
+to substitute a developer's assertion for an independent review or human decision.
+
+The installed-package acceptance test checks unchanged inputs, changed inputs,
+missing evidence, fresh provider calls and failure handling with real local gate
+executions. Its providers are synthetic and do **not** establish production GitHub
+approval, live model quality, or token/time savings for a particular application.
+Report gate counts and measured elapsed time separately from model tokens; missing
+model counters remain unavailable rather than zero. Existing native-model pilot
+results retain their documented scope in [reuse measurement](verification-reuse-measurement.md).
