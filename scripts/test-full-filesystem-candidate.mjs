@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync,chmodSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {snapshotInstructionSource} from './instruction-source-version.mjs';
+import {snapshotInstructionSource,readInstructionSourceSnapshot} from './instruction-source-version.mjs';
 import {generateFullInstructionCandidate,fullGenerationInput} from './instruction-loop-full-candidate.mjs';
 
 function fixture(t){
@@ -24,7 +24,10 @@ test('filesystem Full generation needs no Git and preserves standard projection 
  process.env.PATH=join(root,'no-git');t.after(()=>{process.env.PATH=path;});
  const c=await generateFullInstructionCandidate(p,provider);
  assert.equal(c.source_kind,'filesystem_snapshot');assert.match(c.source_revision,/^sha256:[a-f0-9]{64}$/u);
- assert.equal(c.source_revision,snapshotInstructionSource(p.candidateRoot));assert.deepEqual(c.changed_paths,['skills/demo/SKILL.md']);
+ const {bindMeasuredNormalOwnerSource,verifyNormalOwnerSourceBinding}=await import('./instruction-loop-source-binding.mjs');
+ const binding=bindMeasuredNormalOwnerSource({sourceRoot:p.candidateRoot,candidate:c});
+ assert.equal(verifyNormalOwnerSourceBinding({sourceRoot:p.candidateRoot,binding}).source_revision,c.source_revision);
+ assert.equal(c.source_revision,readInstructionSourceSnapshot(p.candidateRoot).revision);assert.deepEqual(c.changed_paths,['skills/demo/SKILL.md']);
  assert.equal(c.source_validation.kind,'instruction_assets_v1');assert.equal(c.source_validation.status,'passed');
  assert.equal(readFileSync(join(p.fullRoot,'.agents/skills/demo/SKILL.md'),'utf8'),'## Goal\nImproved instruction.\n');
  assert.equal(existsSync(join(p.candidateRoot,'.git')),false);assert.equal(readFileSync(join(base,'skills/demo/SKILL.md'),'utf8'),'## Goal\nOriginal instruction.\n');
@@ -45,6 +48,8 @@ test('filesystem mode refuses repository-validation semantics and unknown source
 });
 test('filesystem generation retains a snapshot revision on a no-change reselection',async t=>{
  const {p,root}=fixture(t),first=await generateFullInstructionCandidate(p,provider);
+ const replay=await generateFullInstructionCandidate({...p,candidateRoot:join(root,'candidate-replay'),fullRoot:join(root,'full-replay'),stagingRoot:join(root,'staging-replay')},provider);
+ assert.equal(replay.source_revision,first.source_revision,'same baseline, lineage and content remain deterministic across output roots');
  const next={...p,candidateRoot:join(root,'candidate-two'),fullRoot:join(root,'full-two'),stagingRoot:join(root,'staging-two'),provider:{retainedAuthoring:{synthetic:true},caseReselection:true}};
  const c=await generateFullInstructionCandidate(next,async()=>({...await provider(),execution:{kind:'fixture',preserved_candidate_source:{source_root:first.source_root,source_revision:first.source_revision}}}));
  assert.equal(c.source_revision,first.source_revision);
@@ -78,4 +83,26 @@ test('filesystem projection failure cannot leave a passed source-validation rece
  writeFileSync(join(base,'scripts/install-codex-adapter.mjs'),'process.exit(1);');p.baselineRevision=snapshotInstructionSource(base);
  await assert.rejects(generateFullInstructionCandidate(p,provider),/Full installer failed/);
  assert.equal(existsSync(join(p.stagingRoot,'source-validation.json')),false);
+});
+
+test('filesystem Full B-C-B cycles retain distinct versions and correct immediate parents',async t=>{
+ const {fullPartialFixture}=await import('./test-helpers-full-partial-assets.mjs');
+ const {registerFullInstructionCandidate}=await import('./instruction-loop-full-candidate.mjs');
+ const {verifyAssetRegistry}=await import('./asset-registry.mjs');
+ const f=fullPartialFixture(t),base=f.p.baselineSourceRoot;
+ rmSync(join(base,'.git'),{recursive:true});mkdirSync(join(base,'scripts'));
+ writeFileSync(join(base,'scripts/install-kernel.mjs'),`import{cpSync,copyFileSync}from'node:fs';import{join}from'node:path';const target=process.argv[process.argv.indexOf('--target')+1];copyFileSync(new URL('../AGENTS.md',import.meta.url),join(target,'AGENTS.md'));cpSync(new URL('../skills/',import.meta.url),join(target,'skills'),{recursive:true});`);
+ writeFileSync(join(base,'scripts/install-codex-adapter.mjs'),`import{cpSync,mkdirSync,writeFileSync}from'node:fs';import{join}from'node:path';const target=process.argv[process.argv.indexOf('--target')+1];mkdirSync(join(target,'.agents'));cpSync(new URL('../skills/',import.meta.url),join(target,'.agents/skills'),{recursive:true});mkdirSync(join(target,'.agent-spectrum-kernel'));writeFileSync(join(target,'.agent-spectrum-kernel/codex-install-state.json'),JSON.stringify({selected_profile:'full',selected_skills:['alpha','beta']}));`);
+ let p={...f.p,sourceKind:'filesystem_snapshot',baselineRevision:snapshotInstructionSource(base),goal:'Synthetic version roundtrip'};
+ const entries=[];
+ for(const [index,text] of ['B instructions.\n','C instructions.\n','B instructions.\n'].entries()){
+  p={...p,candidateRoot:join(f.root,`round-${index}`),fullRoot:join(f.root,`projection-${index}`),stagingRoot:join(f.root,`staging-${index}`)};
+  const generated=await generateFullInstructionCandidate(p,async()=>({response:{changes:[{operation:'write',path:'skills/alpha/SKILL.md',text}]},execution:{kind:'fixture'}}));
+  const registered=registerFullInstructionCandidate(p,generated);
+  const entry=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:registered.registry.snapshot_digest}).assets.find(a=>a.record_digest===registered.candidate_assets[0].record_digest);
+  assert.equal(entry.record.derivation.parent.record_digest,p.parentAssets[0].record_digest);entries.push(entry);
+  p={...p,baselineSourceRoot:generated.source_root,baselineRevision:generated.source_revision,parentAssets:registered.environment_assets,registrySnapshotDigest:registered.registry.snapshot_digest};
+ }
+ assert.notEqual(entries[0].record.version,entries[2].record.version);
+ assert.deepEqual(entries[0].content.files,entries[2].content.files);
 });

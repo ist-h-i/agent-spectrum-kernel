@@ -245,7 +245,7 @@ export function importInstructionEnvironmentAuthoring(options) {
       for (const f of item.change.files) { const path = join(source, f.path); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, f.text, { flag: 'wx', mode: 0o600 }); }
       for(const f of item.fixedFiles){instructionPath(f.path);const path=join(source,f.path);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,f.bytes,{flag:'wx',mode:0o600});}
       const d = item.descriptor, filesystem=spec.bundle_descriptor.source.kind==='filesystem_snapshot';
-      const revision=filesystem?writeInstructionSourceSnapshot(source):commitInstructionSource(source,{contextDigest:options.requestObjectDigest});
+      const revision=filesystem?writeInstructionSourceSnapshot(source,{contextDigest:options.requestObjectDigest}):commitInstructionSource(source,{contextDigest:options.requestObjectDigest});
       d.source.kind=filesystem?'filesystem_snapshot':'git_repository';
       d.source.revision=revision;d.version=filesystem?revision:'git:'+revision;d.version_scheme=filesystem?'content_digest':'git_revision';
       d.content = { package_format: 'canonical_json_base64_files', files: item.change.files.map(f => ({ path: f.path,

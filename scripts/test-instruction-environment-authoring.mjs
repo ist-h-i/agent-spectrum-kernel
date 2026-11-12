@@ -141,3 +141,32 @@ test('filesystem authoring revises a Git-origin component without invoking Git o
   assert.equal(record.source.kind,'filesystem_snapshot');assert.equal(record.version_scheme,'content_digest');assert.equal(record.version,record.source.revision);
   assert.deepEqual(record.derivation.parent,f.rootAsset);assert.equal(result.activation_implied,false);
 });
+
+test('filesystem authoring can return B to C to B while preserving lineage and retry identity',t=>{
+  const f=compiledMembershipFixture(t,'codex');
+  let current=f.challenger, previous=f.rootAsset;
+  const revisions=[];
+  const originalPath=process.env.PATH;process.env.PATH=join(f.root,'no-git');t.after(()=>{process.env.PATH=originalPath;});
+  for(const text of ['Content B.\n','Content C.\n','Content B.\n']) {
+    const local=verifyAssetRegistry({storeRoot:f.storeRoot,snapshotDigest:current.snapshot_digest});
+    const bundle=local.assets.find(a=>a.record_digest===current.asset.record_digest);
+    const env=captureInstructionEnvironment({...f.options,registrySnapshotDigest:current.snapshot_digest,selectionObjectDigest:null,
+      bindings:[{asset:current.asset,files:bundle.content.files.map(f=>({source:f.path,target:f.path}))}]});
+    const descriptor=structuredClone(bundle.record);delete descriptor.object_kind;
+    descriptor.version=`1.${revisions.length+2}.0`;
+    descriptor.source.kind='filesystem_snapshot';descriptor.source.revision='sha256:'+'a'.repeat(64);
+    descriptor.derivation.parent=current.asset;descriptor.maintenance.rollback.target=current.asset;
+    const options={...f.options,registrySnapshotDigest:current.snapshot_digest,environmentObjectDigest:env.object_digest,
+      editableStableIds:[f.rootAsset.stable_id],observation:{goal:'Clarify the applicable instruction.'},bundleDescriptor:descriptor};
+    const request=prepareInstructionEnvironmentAuthoring(options);
+    const input={...options,requestObjectDigest:request.request_object_digest,response:{request_digest:request.request_object_digest,
+      changes:[{operation:'revise',stable_id:f.rootAsset.stable_id,files:[{path:'skills/new-local/SKILL.md',text}]}]}};
+    const result=importInstructionEnvironmentAuthoring(input);
+    const record=verifyAssetRegistry({storeRoot:f.storeRoot,snapshotDigest:result.snapshot_digest}).assets.find(a=>a.record_digest===result.individual_assets[0].record_digest).record;
+    assert.deepEqual(record.derivation.parent,previous);
+    const retry=importInstructionEnvironmentAuthoring(input);
+    assert.equal(retry.created,false);assert.deepEqual({...retry,created:result.created},result);
+    revisions.push(record.version);previous=result.individual_assets[0];current=result;
+  }
+  assert.equal(new Set(revisions).size,3);
+});

@@ -14,7 +14,7 @@ import {executeCodexSession} from './codex-exec-runner.mjs';
 import {readStableFile} from './ask-benchmark-stable-file.mjs';
 import {FULL_REVIEW_FINDING_CONTRACT_PATH} from './instruction-projection-paths.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
-import {snapshotInstructionSource,verifyInstructionSourceSnapshot,writeInstructionSourceSnapshot} from './instruction-source-version.mjs';
+import {snapshotInstructionSource,verifyInstructionSourceSnapshot,writeInstructionSourceSnapshot,readInstructionSourceSnapshot} from './instruction-source-version.mjs';
 
 const gitEnv=()=>({...Object.fromEntries(['PATH','TMPDIR','LANG','TZ'].filter(k=>process.env[k]).map(k=>[k,process.env[k]])),
   GIT_CONFIG_GLOBAL:devNull,GIT_CONFIG_SYSTEM:devNull,GIT_CONFIG_NOSYSTEM:'1',GIT_TERMINAL_PROMPT:'0'});
@@ -58,8 +58,13 @@ function filesystemSource(p){
   assert.ok(['git_repository','filesystem_snapshot'].includes(kind),'unsupported source kind');
   return kind==='filesystem_snapshot';
 }
+function verifiedFilesystemContext(root,revision){
+  const marker=readInstructionSourceSnapshot(root);
+  if(marker){assert.equal(marker.revision,revision,'filesystem source revision drift');return marker.context_digest;}
+  verifyInstructionSourceSnapshot(root,revision);return null;
+}
 function assertSourceRevision(p){
-  if(filesystemSource(p))return verifyInstructionSourceSnapshot(p.baselineSourceRoot,p.baselineRevision);
+  if(filesystemSource(p))return verifiedFilesystemContext(p.baselineSourceRoot,p.baselineRevision);
   assert.equal(git(p.baselineSourceRoot,['rev-parse','HEAD']),p.baselineRevision,'baseline revision drift');
   assert.equal(git(p.baselineSourceRoot,['status','--porcelain','--untracked-files=no']),'','baseline source must be clean');
 }
@@ -194,7 +199,7 @@ export async function generateFullInstructionCandidate(p,provider){
   }
   const filesystem=filesystemSource(p);
   // Revalidate after the provider returns, before allocating materializations.
-  assertSourceRevision(p);
+  const baselineContext=assertSourceRevision(p);
   for(const dir of [p.candidateRoot,p.fullRoot,p.stagingRoot]){assertNoSymlinkPathSegments(dir,'fresh owned materialization',{allowMissingLeaf:true});assert.ok(!existsSync(dir),'fresh owned materialization required');mkdirSync(dir,{mode:0o700});}
   if(filesystem){
     for(const file of fullInstructionInventory(p.baselineSourceRoot)){
@@ -202,7 +207,7 @@ export async function generateFullInstructionCandidate(p,provider){
       assert.equal(hash(bytes),file.sha256,'filesystem source changed during materialization');
       const target=join(p.candidateRoot,file.path);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,bytes,{flag:'wx',mode:file.mode});chmodSync(target,file.mode);
     }
-    verifyInstructionSourceSnapshot(p.candidateRoot,p.baselineRevision);
+    verifyInstructionSourceSnapshot(p.candidateRoot,p.baselineRevision,{contextDigest:baselineContext});
   }else{
     git(p.candidateRoot,['init','--quiet','--template=']);
     git(p.candidateRoot,['fetch','--quiet',...(p.sourceValidation?[]:['--depth=1']),'--no-tags',p.baselineSourceRoot,p.baselineRevision]);
@@ -240,11 +245,14 @@ export async function generateFullInstructionCandidate(p,provider){
   }
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
   if(!filesystem)git(p.candidateRoot,['add','--','skills',...(scope?[scope.path]:[]),...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
+  // Version identity includes lineage, so returning to earlier bytes is a new
+  // derivation rather than colliding with its earlier stable ID/version.
+  let snapshotContext=filesystem?canonicalDigest({kind:'full_candidate_lineage_v1',baseline_revision:p.baselineRevision,parent_assets:p.parentAssets??[]}):null;
   const preserved=provided.execution?.preserved_candidate_source;
   if(preserved&&filesystem){
     assert.ok(p.provider?.retainedAuthoring&&p.provider.caseReselection===true,'preserved snapshot requires retained case reselection');
-    verifyInstructionSourceSnapshot(preserved.source_root,preserved.source_revision);
-    assert.equal(snapshotInstructionSource(p.candidateRoot),preserved.source_revision,'retained candidate source snapshot changed');
+    snapshotContext=verifiedFilesystemContext(preserved.source_root,preserved.source_revision);
+    assert.equal(snapshotInstructionSource(p.candidateRoot,{contextDigest:snapshotContext}),preserved.source_revision,'retained candidate source snapshot changed');
   }else if(preserved){
     assert.ok(p.provider?.retainedAuthoring&&p.provider.caseReselection===true,'preserved commit requires retained case reselection');
     assert.equal(resolve(preserved.source_root),preserved.source_root);assertNoSymlinkPathSegments(preserved.source_root,'retained candidate source');
@@ -255,7 +263,7 @@ export async function generateFullInstructionCandidate(p,provider){
     // file. This also keeps installer provenance and the Full bytes identical.
     git(p.candidateRoot,['reset','--soft',preserved.source_revision]);
   }else if(!filesystem)git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
-  const revision=filesystem?writeInstructionSourceSnapshot(p.candidateRoot):git(p.candidateRoot,['rev-parse','HEAD']);
+  const revision=filesystem?writeInstructionSourceSnapshot(p.candidateRoot,{contextDigest:snapshotContext}):git(p.candidateRoot,['rev-parse','HEAD']);
   const before=filesystem?inventoryMap(p.baselineSourceRoot):null,after=filesystem?inventoryMap(p.candidateRoot):null;
   const changed=filesystem?[...new Set([...before.keys(),...after.keys()])].sort().filter(path=>before.get(path)?.sha256!==after.get(path)?.sha256||before.get(path)?.mode!==after.get(path)?.mode):git(p.candidateRoot,['diff','--name-only',p.baselineRevision,'HEAD']).split('\n').filter(Boolean);
   assert.ok(changed.every(path=>allowed(path,p.skills)||scope&&path===scope.path||derivedPaths.includes(path)),'non-instruction/non-derived source changed');
@@ -289,7 +297,7 @@ export async function generateFullInstructionCandidate(p,provider){
 export function registerFullInstructionCandidate(p,candidate){
   assert.equal(candidate.source_root,p.candidateRoot);assert.equal(candidate.full_root,p.fullRoot);
   const filesystem=filesystemSource(p);
-  if(filesystem){assert.equal(candidate.source_kind,'filesystem_snapshot');verifyInstructionSourceSnapshot(p.candidateRoot,candidate.source_revision);}
+  if(filesystem){assert.equal(candidate.source_kind,'filesystem_snapshot');verifiedFilesystemContext(p.candidateRoot,candidate.source_revision);}
   else{assert.equal(git(p.candidateRoot,['rev-parse','HEAD']),candidate.source_revision);assert.equal(git(p.candidateRoot,['status','--porcelain']),'','generated source drift');}
   const trusted=p.trustedAuthorityContexts??[],parents=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:p.registrySnapshotDigest,trustedAuthorityContexts:trusted});
   const scope=reviewFindingContractScope(p),source=inventoryMap(p.candidateRoot),baseline=inventoryMap(p.baselineSourceRoot),installed=inventoryMap(p.fullRoot);
