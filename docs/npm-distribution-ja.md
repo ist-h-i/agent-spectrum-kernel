@@ -54,3 +54,35 @@ npm化によって、未検証のWindowsやClaude実環境への対応まで保�
 公開可能な`task.md`と、成果物を検証して成功時0・不合格時1で終了する`criterion.mjs`を用意し、workspace、Codexの絶対パス・実際の版・利用可能モデル、管理者の権限宣言ファイル、適用先を指定します。入力ファイルのハッシュを実際に計算してJSONを生成するため、ダミーのハッシュを手で置き換える必要はありません。
 
 生成したJSONを`ask --workspace PATH loop prepare --spec FILE --run-id ID`へ渡します。設定生成とprepareではモデルを実行しません。管理者の権限設定と、各サイクルの評価ケース承認・変更適用承認は別です。例は1課題・比較元と候補の計2試行であり、性能改善の十分な証明ではありません。実際の目的に合わせてスキル、課題、採点基準と試行数を調整してください。
+
+## 検証結果の再利用
+
+npmで導入したASKから `ask verification prepare|coverage` を使用できます。
+ASK本体はGitなしで導入できますが、この任意の変更影響判定機能は、検証対象
+プロジェクトのGit履歴、コミット済みの検証条件・依存関係・完了判定方針と、
+署名付きの基準証拠を必要とします。CIの選択実行を追加する機能ではありません。
+
+```sh
+ask verification prepare --repository /absolute/project --store /absolute/evidence --target FULL_CURRENT_COMMIT
+ask verification coverage --repository /absolute/project --store /absolute/evidence --target FULL_CURRENT_COMMIT
+```
+
+prepareは再利用できる検証、再実行が必要な検証、差分レビューの範囲を示します。
+証拠不足・依存関係不明を成功とは扱いません。必要な検証だけを信頼済みランナーで
+実行し、新しい署名付き証拠を保存した後、coverageで現在の対象に対する網羅性を
+確認します。両コマンドはモデル・テストの実行やマージを勝手に行いません。
+
+現在の承認・独立レビュー等が必要な場合は、ホスト側の接続処理がなければ
+coverageは非ゼロで終了します。接続する場合は、監査済みモジュールの絶対パスを
+`--provider-module`、全バイトのSHA256を `--provider-sha256 sha256:...` で明示します。
+これは利用者の権限・環境変数でコードを実行する指定であり、サンドボックスでは
+ありません。証拠ファイルから自動的に接続コードを読み込むことはありません。
+
+モジュールは `providers` をexportし、方針に登録したIDごとの関数を公開します。
+各関数は毎回その場で正本の状態を取得し、`{query, status, actor_id, evidence_digest}`
+を返します。初回と確認時に別プロセスで呼び出し、状態・対象・権限を照合します。
+詳細な契約・制約は[英語版](npm-distribution.md#reusing-verification-evidence)を参照してください。
+
+配布物の受け入れテストで確認するのは、変更なし・影響あり・証拠不足の場合の
+再利用と再検証、接続処理の失敗時の扱いです。疑似の承認情報を本番の承認とみなさず、
+モデルを呼んでいない測定からトークン節約や実業務の品質向上を主張しません。
