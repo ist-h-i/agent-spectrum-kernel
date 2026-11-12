@@ -3,8 +3,7 @@
 ## Implementation Contract
 
 - Artifact ID: issue315-read-policy-implementation; revision: 1.
-- Upstream refs: Issue #315; static comparison of #314 and #317; user approval
-  `Sentinel_91293770f4fc8191a0ef600051633f67` (2026-10-02 13:34:18 UTC).
+- Upstream refs: [Issue #315](https://github.com/ist-h-i/agent-spectrum-kernel/issues/315); static comparison of #314 and #317.
 - Boundary: adapter plan/command/grant, model-tool session and canary validation,
   owned simulation, documentation. No real CLI/probe/model, OS policy application,
   existing credentials or file modes. Draft #313 and formal #291 remain unchanged.

@@ -2,14 +2,16 @@
 
 npmパッケージは、ASKのCLI・標準スキル・自己改善の実行処理を配布します。
 `npm install`の途中で利用者のプロジェクトを書き換える処理はありません。
-現在の名前 `@hiroshi.inoue/agent-spectrum-kernel` と版 `0.1.0-dev.0` は仮のものです。
-誤公開を防ぐため `private: true` にしています。名前・ライセンス・公開の判断は別途必要です。
+公開準備の対象は `@hiroshi.inoue/agent-spectrum-kernel@1.0.0`、ライセンスは[MIT](../LICENSE)です。
+公開操作は別途行います。この文書や公開設定の変更だけではnpmに公開されません。
 パッケージ版と、manifestの資産版、過去のpersonal-v1公開タグは区別します。
 
 ## 導入と保存先
 
+公開後は `npm install @hiroshi.inoue/agent-spectrum-kernel@1.0.0` で導入できます。
+
 公開前は、チェックアウトで `npm pack` を実行し、生成したtgzを別のプロジェクトに
-`npm install /absolute/path/hiroshi.inoue-agent-spectrum-kernel-0.1.0-dev.0.tgz` で導入します。
+`npm install /absolute/path/hiroshi.inoue-agent-spectrum-kernel-1.0.0.tgz` で導入します。
 その後 `npx --no-install ask init --workspace /absolute/path/my-ask` を実行します。
 
 作成されるフォルダには、実行コードと標準資産の `source/`、候補・評価・版管理のための

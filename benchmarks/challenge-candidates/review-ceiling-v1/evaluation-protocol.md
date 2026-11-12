@@ -43,7 +43,7 @@ Human approval of cases/conditions precedes model runs. Fix model/effort, ASK ve
 
 Measure task elapsed time, setup/grading time and input/output/cache usage separately. Cache is an input subset, not another summand. Include child usage when available, disclose missing usage and interrupted runs. An execution fault is not a quality score of zero. Preserve failed attempts; retry only affected runs where justified, without selecting results for a desired score.
 
-CH01-level difficulty is a design goal, not a verified fact. Two pilot model trials are recorded in `calibration-summary.json`; they do not establish comparative difficulty or readiness of the new staged entry point. Scores near a ceiling should trigger inspection of task coverage and grader discrimination, not retrospective harsher grading.
+CH01-level difficulty is a design goal, not a verified fact. Two pilot model trials are recorded in [the archived calibration summary](https://github.com/ist-h-i/agent-spectrum-kernel/blob/445eec92545e694becf04278b96da867134c1758/benchmarks/challenge-candidates/review-ceiling-v1/calibration-summary.json); they do not establish comparative difficulty or readiness of the new staged entry point. Scores near a ceiling should trigger inspection of task coverage and grader discrimination, not retrospective harsher grading.
 
 ### One-phase score handling
 

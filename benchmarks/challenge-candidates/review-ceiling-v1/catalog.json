@@ -22,6 +22,6 @@
     }
   ],
   "runtime_registration": "../../practical-challenges.json",
-  "calibration_reference": "calibration-summary.json",
+  "calibration_reference": "https://github.com/ist-h-i/agent-spectrum-kernel/blob/445eec92545e694becf04278b96da867134c1758/benchmarks/challenge-candidates/review-ceiling-v1/calibration-summary.json",
   "runtime_verification": "synthetic_only; real staged CLI execution unverified"
 }

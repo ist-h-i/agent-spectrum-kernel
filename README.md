@@ -1,3 +1,16 @@
+# ASK npm distribution
+
+Gitless installation, portable instruction assets and a human-supervised improvement loop.
+Release preparation: **@hiroshi.inoue/agent-spectrum-kernel 1.0.0**, **MIT**.
+This preparation does not claim that the package has been published.
+
+[English installation guide](docs/npm-distribution.md) · [日本語の導入手順](docs/npm-distribution-ja.md) · [License](LICENSE)
+
+After publication: `npm install @hiroshi.inoue/agent-spectrum-kernel@1.0.0`.
+Requires Node.js 24 and POSIX tools for the Full workflow; model CLI authentication is separate.
+
+---
+
 # Agent Spectrum Kernel
 
 **ASKは、AIによる開発を必要な手順と検証の証拠で導き、その手順自体も評価・改善するための基盤です。**
