@@ -39,3 +39,9 @@ No public npm publication or real-model performance run is represented by these 
 - NPM-E08 → NPM-06: `node scripts/update-adapter-runtime-fixtures.mjs` refreshed checked projection fingerprints; `node scripts/validate-repo.mjs --write-report` passed. The validator's historical preregistration check required fetching its exact existing source commit into the shallow clone; no historical test semantics were changed.
 - NPM-E09 → NPM-01/NPM-02/NPM-03/NPM-04: final `npm run test:package` passed all 8 tests serially, including actual tarball and package-only Full lifecycle, after the configuration example and provider-session fixes. The CLI remains private/unpublished.
 - NPM-E10 → NPM-04: final fresh-build package lifecycle also prepared a Codex provider profile, checked its derived persistent session root and generation contract, and confirmed that preparation neither created the session nor dispatched a model. Full lifecycle test passed (52.4 seconds).
+
+### CI follow-up
+
+The first PR run passed the npm workflow but exposed two existing compatibility checks not covered by the initial focused run: stale Claude fixed-entry fingerprints and the Core Bundle's transitive `asset-registry.mjs` fingerprint. The plugin outputs and Core builder metadata were regenerated without changing instruction text, historical evaluation records or projected Core/Full assets. The isolated fixed-entry test also needed the three newly imported modules in its copied dependency list; assertions were retained.
+
+`node scripts/test-fixed-entry-profiles.mjs` passed. In the existing isolated historical context, `node scripts/generate-ask-core-bundle.mjs --check` and all 12 Core Bundle tests passed. `npm run test:package` passed all 8 tests again, and `node scripts/validate-repo.mjs` passed. Independent review found no remaining issue in the follow-up. The broad fixture suite and updated GitHub CI are tracked separately; these focused results do not claim they have finished.
