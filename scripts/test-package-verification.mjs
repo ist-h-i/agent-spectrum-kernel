@@ -59,6 +59,17 @@ test('installed npm verification: reuse, invalidation, missing evidence and expl
     const rerun=f.execute(f.gates[0],f.stores.reuse);
     assert.equal(parsed('prepare').deterministic_coverage,'covered');
     assert.equal(parsed('coverage',trusted).status,'covered');
+    // The installed command must dispatch the planner's actual scope rather
+    // than relying on a caller to choose changed paths manually.
+    const reviewer=join(temp,'trusted-reviewer.mjs');
+    writeFileSync(reviewer,`export const providers={review:request=>({result:{request_digest:request.request_digest,target_revision:request.target_revision,reviewed_paths:request.paths,reviewed_obligations:request.obligations.map(o=>o.ref),judgment_refs:request.judgment_refs,findings:[],decision:'pass'}})};`);
+    const reviewFlags=['--allow-review','true','--provider-module',reviewer,'--provider-sha256',sha(readFileSync(reviewer))];
+    const reviewed=parsed('review',reviewFlags);
+    assert.equal(reviewed.status,'reviewed');
+    assert.equal(reviewed.authorizes_action,false);
+    assert.deepEqual(reviewed.result.reviewed_paths,['src/limit.mjs']);
+    assert.deepEqual(reviewed.result.reviewed_obligations,['AC-limit-inclusive']);
+    assert.notEqual(invoke('review',reviewFlags.slice(2)).status,0,'model dispatch must be explicitly opted in');
     const empty=join(temp,'empty-store');mkdirSync(empty);
     blocked=invoke('coverage',trusted,empty);assert.equal(blocked.status,1);assert.equal(JSON.parse(blocked.stdout).status,'blocked');
     assert.notEqual(invoke('coverage',['--provider-module',provider]).status,0);

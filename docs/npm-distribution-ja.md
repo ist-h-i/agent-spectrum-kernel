@@ -86,3 +86,26 @@ coverageは非ゼロで終了します。接続する場合は、監査済みモ
 配布物の受け入れテストで確認するのは、変更なし・影響あり・証拠不足の場合の
 再利用と再検証、接続処理の失敗時の扱いです。疑似の承認情報を本番の承認とみなさず、
 モデルを呼んでいない測定からトークン節約や実業務の品質向上を主張しません。
+
+### plannerの判断からレビューを実行する
+
+`ask verification review` は、prepareで算出する対象範囲を、そのままホスト側の
+モデル接続処理へ渡します。手で対象ファイルを選び直す必要はありません。
+
+```sh
+ask verification review --repository /absolute/project --store /absolute/evidence --target FULL_CURRENT_COMMIT --allow-review true --provider-module /absolute/trusted-reviewer.mjs --provider-sha256 sha256:HEX_DIGEST
+```
+
+接続モジュールは `providers.review(request)` を公開し、`{result, usage}` を返します。
+モデル呼出しを行う場合があるため、明示的な実行指定が必要です。変更範囲が不明なら
+開始せず、レビュー不要なら呼び出しません。実行前後の対象とplanner結果を照合し、
+必要なファイル・観点の抜けや古い対象の結果を成功にしません。内容・返却形式は
+[英語版](npm-distribution.md#dispatch-the-planners-review-scope)を参照してください。
+
+問題を検出したレビューは有効な結果として保存し、非ゼロで終了します。通信失敗と
+取り違えて合格するまで繰り返してはいけません。実測トークンが取れない場合は未取得の
+ままにし、完了判定・人間の承認・マージとレビュー結果を混同しません。
+
+観点のIDだけでは判定条件の本文になりません。接続側は対応する承認済み仕様を
+読み込んでください。意味を解決できないIDを推測で合格にせず、不足として止めます。
+テスト問題の正解を本体のレビュー処理へ埋め込むことはしません。

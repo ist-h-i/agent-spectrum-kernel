@@ -16,7 +16,7 @@ Usage:
   ask [--workspace <directory>] environment <command> <input.json>
   ask [--workspace <directory>] assets <preview|export|receive|plan|apply> <input.json>
   ask [--workspace <directory>] evaluate <command> [options]
-  ask [--workspace <directory>] verification <prepare|coverage> [options]
+  ask [--workspace <directory>] verification <prepare|coverage|review> [options]
   ask --version
 
 init creates a persistent file-based source and state directory, without Git.

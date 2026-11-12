@@ -237,3 +237,41 @@ approval, live model quality, or token/time savings for a particular application
 Report gate counts and measured elapsed time separately from model tokens; missing
 model counters remain unavailable rather than zero. Existing native-model pilot
 results retain their documented scope in [reuse measurement](verification-reuse-measurement.md).
+
+### Dispatch the planner's review scope
+
+`prepare` is inspection only. To execute its selected review through a host's
+model adapter, use the separate opt-in command:
+
+```sh
+ask verification review --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT --allow-review true \
+  --provider-module /absolute/trusted-reviewer.mjs --provider-sha256 sha256:HEX_DIGEST
+```
+
+The host module exports `providers.review(request)`. ASK computes the paths from
+the current planner, expands gate-wide independent judgments to their declared
+semantic surfaces, and supplies bounded before/after Git content. The host must
+review this request rather than replace it with a manually chosen smaller scope.
+Unknown scope blocks dispatch; `not_required` makes no host/model call. HEAD,
+worktree, plan and request are checked again after the response. A changed target
+or an incomplete/mismatched response cannot become a successful review receipt.
+
+Return `{result, usage}`. `result` includes `request_digest`, `target_revision`,
+`reviewed_paths`, `reviewed_obligations`, `judgment_refs`, `findings` (each with
+`path`, `obligation_ref`, `severity`) and `decision` (`pass` or `block`). Use all
+required request identities. `usage` contains observed `input_tokens`,
+`cached_input_tokens`, `output_tokens`; omit unavailable telemetry rather than
+inventing zeroes. The recorded receipt excludes raw material/prompts/transcripts.
+A reviewer is trusted executable integration code; the same host-code caution as
+coverage applies. Review dispatch allows up to five minutes instead of the
+current-state observation's ten seconds, and may consume model usage. It still
+grants no approval and never merges or releases anything. A valid blocking review
+is retained as a reviewed result, but exits nonzero; it is not an infrastructure
+failure or a reason to repeat the model call until it passes.
+
+Obligation refs identify requirements; they are not the requirement text itself.
+The trusted host must resolve their actual approved specification (or include the
+corresponding task contract in its prompt). If a ref cannot be resolved, report
+that gap and block; do not infer a passing requirement from a name or fixture.
+ASK does not bake public benchmark answers into the production dispatcher.

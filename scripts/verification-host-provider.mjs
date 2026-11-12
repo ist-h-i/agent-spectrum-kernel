@@ -23,7 +23,8 @@ function sourceAt(modulePath, expectedDigest) {
   if (source.length > LIMIT || `sha256:${createHash('sha256').update(source).digest('hex')}` !== expectedDigest) throw new Error('trusted provider digest mismatch');
   return source.toString('utf8');
 }
-export function trustedHostProviders({ modulePath, expectedDigest, providerIds }) {
+export function trustedHostProviders({ modulePath, expectedDigest, providerIds, timeoutMs = 10000 }) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000) throw new Error("invalid trusted host timeout");
   sourceAt(modulePath, expectedDigest); // Validate before constructing a capability.
   return Object.fromEntries(providerIds.map(providerId => [providerId, async (query, { signal }) => {
     const source = sourceAt(modulePath, expectedDigest); // Recheck on both observations.
@@ -40,7 +41,7 @@ export function trustedHostProviders({ modulePath, expectedDigest, providerIds }
         child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
         reject(new Error('trusted provider unavailable'));
       };
-      const timer = setTimeout(fail, 10000);
+      const timer = setTimeout(fail, timeoutMs);
       child.on('error', fail);
       child.on('exit', stop); // A host observation must not leave owned descendants running.
       child.stdin.on('error', fail);

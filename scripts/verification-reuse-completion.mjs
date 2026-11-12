@@ -290,18 +290,29 @@ export async function buildFinalVerificationCoverage({ repositoryRoot, storeRoot
 
 async function main() {
   const [command, ...args] = process.argv.slice(2);
-  if (!["prepare", "coverage"].includes(command) || args.length % 2) throw new Error("expected prepare|coverage and named options");
+  if (!["prepare", "coverage", "review"].includes(command) || args.length % 2) throw new Error("expected prepare|coverage|review and named options");
   const flags = {};
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
-    if (!["--repository", "--store", "--target", "--claim", "--output", "--provider-module", "--provider-sha256"].includes(key) || Object.hasOwn(flags, key)) throw new Error("unknown or duplicate option");
+    if (!["--repository", "--store", "--target", "--claim", "--output", "--provider-module", "--provider-sha256", "--allow-review"].includes(key) || Object.hasOwn(flags, key)) throw new Error("unknown or duplicate option");
     flags[key] = args[i + 1];
   }
   for (const key of ["--repository", "--store", "--target"]) if (!flags[key]) throw new Error("missing required option");
-  if (command === "prepare" && flags["--claim"]) throw new Error("prepare does not make a claim");
+  if (command !== "coverage" && flags["--claim"]) throw new Error("only coverage makes a claim");
+  if (command !== "review" && flags["--allow-review"]) throw new Error("allow-review is only valid for review");
   const options = { repositoryRoot: resolve(flags["--repository"]), storeRoot: resolve(flags["--store"]), targetRevision: flags["--target"] };
   const hasProvider = flags["--provider-module"] !== undefined || flags["--provider-sha256"] !== undefined;
-  if (hasProvider && (command !== "coverage" || !flags["--provider-module"] || !flags["--provider-sha256"])) throw new Error("provider module and digest are paired coverage options");
+  if (hasProvider && (command === "prepare" || !flags["--provider-module"] || !flags["--provider-sha256"])) throw new Error("provider module and digest are paired coverage/review options");
+  if (command === "review") {
+    if (flags["--allow-review"] !== "true" || !hasProvider) throw new Error("review needs explicit --allow-review true and a pinned trusted reviewer");
+    const { dispatchVerificationReview } = await import("./verification-review-dispatch.mjs");
+    const reviewer = trustedHostProviders({ modulePath: flags["--provider-module"], expectedDigest: flags["--provider-sha256"], providerIds: ["review"], timeoutMs: 300000 }).review;
+    const result = await dispatchVerificationReview({ ...options, reviewer });
+    if (flags["--output"]) writeCanonicalJsonNoReplace({ outputPath: resolve(flags["--output"]), artifact: result, label: "verification review output" });
+    else process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    if (result.status === "blocked" || result.result?.decision === "block") process.exitCode = 1;
+    return;
+  }
   let providers = {};
   if (hasProvider) {
     // Resolve and validate the current policy before loading any host executable.
