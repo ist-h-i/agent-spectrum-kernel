@@ -16,7 +16,7 @@
     "asset_type": { "$ref": "#/$defs/assetType" },
     "stable_id": { "$ref": "#/$defs/stableId" },
     "version": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$" },
-    "version_scheme": { "type": "string", "enum": ["git_revision", "semantic"] },
+    "version_scheme": { "type": "string", "enum": ["git_revision", "semantic", "content_digest"] },
     "content": {
       "type": "object",
       "additionalProperties": false,
@@ -42,14 +42,28 @@
       }
     },
     "source": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "repository_id", "revision"],
-      "properties": {
-        "kind": { "type": "string", "const": "git_repository" },
-        "repository_id": { "$ref": "#/$defs/repositoryId" },
-        "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "repository_id", "revision"],
+          "properties": {
+            "kind": { "type": "string", "const": "git_repository" },
+            "repository_id": { "$ref": "#/$defs/repositoryId" },
+            "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "repository_id", "revision"],
+          "properties": {
+            "kind": { "type": "string", "const": "filesystem_snapshot" },
+            "repository_id": { "$ref": "#/$defs/repositoryId" },
+            "revision": { "$ref": "#/$defs/digest" }
+          }
+        }
+      ]
     },
     "provenance": {
       "type": "object",

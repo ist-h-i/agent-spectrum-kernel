@@ -10,7 +10,7 @@ import { instructionPath, instructionTargetPath } from './instruction-projection
 import { verifyAssetRegistry, registerAsset } from './asset-registry.mjs';
 import { registerInstructionEnvironmentBundle, resolveInstructionComponents, validateInstructionComponentMappings } from './instruction-environment-compiler.mjs';
 import { projectInstructionLoopObservation, assertPublicInstructionSummary } from './instruction-loop-feedback.mjs';
-import { commitInstructionSource } from './instruction-source-version.mjs';
+import { commitInstructionSource, writeInstructionSourceSnapshot } from './instruction-source-version.mjs';
 import { verifyInstructionComposition } from './instruction-composition.mjs';
 
 const same = (a, b) => canonicalDigest(a) === canonicalDigest(b);
@@ -244,8 +244,10 @@ export function importInstructionEnvironmentAuthoring(options) {
       const source = join(root, String(i)); mkdirSync(source);
       for (const f of item.change.files) { const path = join(source, f.path); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, f.text, { flag: 'wx', mode: 0o600 }); }
       for(const f of item.fixedFiles){instructionPath(f.path);const path=join(source,f.path);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,f.bytes,{flag:'wx',mode:0o600});}
-      const d = item.descriptor, revision = commitInstructionSource(source,{contextDigest:options.requestObjectDigest});
-      d.source.revision = revision; d.version = 'git:' + revision; d.version_scheme = 'git_revision';
+      const d = item.descriptor, filesystem=spec.bundle_descriptor.source.kind==='filesystem_snapshot';
+      const revision=filesystem?writeInstructionSourceSnapshot(source,{contextDigest:options.requestObjectDigest}):commitInstructionSource(source,{contextDigest:options.requestObjectDigest});
+      d.source.kind=filesystem?'filesystem_snapshot':'git_repository';
+      d.source.revision=revision;d.version=filesystem?revision:'git:'+revision;d.version_scheme=filesystem?'content_digest':'git_revision';
       d.content = { package_format: 'canonical_json_base64_files', files: item.change.files.map(f => ({ path: f.path,
         media_type: 'text/markdown; charset=utf-8', raw_digest: instructionBytesDigest(Buffer.from(f.text)) })).concat(item.fixedFiles.map(f=>({path:f.path,media_type:f.media_type,raw_digest:instructionBytesDigest(f.bytes)}))) };
       const saved = registerAsset({ storeRoot: options.storeRoot, sourceRoot: source, predecessorSnapshotDigest: snapshot,

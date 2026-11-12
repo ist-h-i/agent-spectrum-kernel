@@ -2,7 +2,7 @@
 name: review-pr
 description: Review a target through the fixed-entry Agent Spectrum Kernel profile.
 ---
-<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"eb924ffcb2a8b14cd8a4160725a5226e4ff17dab0ad6e73d06406309ebd947f5","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"dd2c1e11ab52de78487f0ca09e30da7ac977167c751444874be6ba87f53ed3e6","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Review PR
 

@@ -1563,8 +1563,8 @@
     },
     {
       "path": "scripts/asset-registry.mjs",
-      "bytes": 48268,
-      "digest": "sha256:c85bdae4b2fc1886fa99f38005ac89a45effa4e5107ee736ecea0b4220c675b7"
+      "bytes": 49650,
+      "digest": "sha256:886837a85dfbc26a8f723c54bc1fbf0f507423e284efa1b5730dbd3e5c0c30b4"
     },
     {
       "path": "scripts/claim-evidence-status.mjs",

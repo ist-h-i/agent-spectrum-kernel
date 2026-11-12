@@ -1232,7 +1232,7 @@ function buildState(args, manifest) {
   const targetPartialFileState = Object.fromEntries(Object.keys(args.managedPartialFiles).sort().map((path) => [path, existsSync(resolve(args.target, path)) ? readFileSync(resolve(args.target, path), "utf8") : null]));
   const appliedProvenance = lifecycle.buildAppliedProvenance({
     cliOptions: { profile: args.profile, custom_skills: args.skills, skip_hooks: args.skipHooks, skip_runtime: args.skipRuntime, prune: args.prune, force: args.force },
-    sourceRevision: lifecycle.readGitRevision(REPO_ROOT),
+    sourceRevision: lifecycle.readSourceRevision(REPO_ROOT),
     previousManagedState: args.previousState,
     managedPartialFiles: args.managedPartialFiles,
     targetPartialFileState,

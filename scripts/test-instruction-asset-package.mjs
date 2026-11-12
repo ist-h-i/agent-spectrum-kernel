@@ -182,3 +182,48 @@ test('v1.1 transfers exact text helpers inertly and rejects unsafe helper conten
   const projectedPath=join(x.f.root,'projected.json');writeFileSync(projectedPath,JSON.stringify(projected));
   assert.equal(receiveInstructionAssetPackage({packagePath:projectedPath,quarantineRoot:join(x.f.root,'projected-quarantine')}).status,'quarantined');
 });
+
+test('file-backed import works without Git and preserves untrusted candidate semantics', t => {
+  const x = fixture(t); x.quarantine();
+  const options = { ...x.receive, sourceKind: 'filesystem_snapshot', resolutions: { [x.f.rootAsset.stable_id]: { action: 'accept' } } };
+  const plan = planInstructionAssetImport(options);
+  const previousPath = process.env.PATH;
+  let result;
+  try {
+    process.env.PATH = '';
+    result = applyInstructionAssetImport({ ...options, confirmedPlanDigest: plan.plan_digest });
+  } finally { process.env.PATH = previousPath; }
+  const local = verifyAssetRegistry({ storeRoot: options.storeRoot, snapshotDigest: result.snapshot_digest });
+  const asset = local.assets[0];
+  assert.equal(asset.record.source.kind, 'filesystem_snapshot');
+  assert.match(asset.record.source.revision, /^sha256:[a-f0-9]{64}$/u);
+  assert.equal(asset.state, 'candidate');
+  assert.equal(asset.record.evaluation_history.status, 'not_evaluated');
+  assert.equal(result.activation_implied, false);
+  assert.equal(result.validation_required, true);
+  assert.deepEqual(applyInstructionAssetImport({ ...options, confirmedPlanDigest: plan.plan_digest }), result);
+});
+
+test('file source identity is bound to its kind and content-addressed version', t => {
+  const x = fixture(t);
+  const asset = verifyAssetRegistry({ storeRoot: x.f.storeRoot, snapshotDigest: x.source.registrySnapshotDigest }).assets.find(a => a.stable_id === x.f.rootAsset.stable_id);
+  const descriptor = structuredClone(asset.record); delete descriptor.object_kind;
+  descriptor.stable_id = 'ask.skill.filesystem-demo';
+  descriptor.source = { kind: 'filesystem_snapshot', repository_id: asset.record.source.repository_id, revision: 'sha256:' + 'a'.repeat(64) };
+  descriptor.version_scheme = 'content_digest'; descriptor.version = descriptor.source.revision;
+  descriptor.content = { package_format: 'canonical_json_base64_files', files: asset.content.files.map(({ path, raw_digest, media_type }) => ({ path, raw_digest, media_type })) };
+  const args = { storeRoot: x.f.storeRoot, sourceRoot: x.f.root, predecessorSnapshotDigest: x.source.registrySnapshotDigest, descriptor };
+  const result = registerAsset(args);
+  assert.equal(verifyAssetRegistry({ storeRoot: x.f.storeRoot, snapshotDigest: result.snapshot_digest }).assets.find(a => a.stable_id === descriptor.stable_id).version, descriptor.source.revision);
+  assert.throws(() => registerAsset({ ...args, descriptor: { ...descriptor, version: 'sha256:' + 'b'.repeat(64) } }), /exact filesystem/);
+  assert.throws(() => registerAsset({ ...args, descriptor: { ...descriptor, source: { ...descriptor.source, revision: 'a'.repeat(40) } } }), /exact filesystem/);
+  assert.throws(() => registerAsset({ ...args, descriptor: { ...descriptor, version_scheme: 'semantic', source: { ...descriptor.source, revision: 'a'.repeat(40) } } }), /schema/);
+  assert.throws(() => registerAsset({ ...args, descriptor: { ...descriptor, version_scheme: 'git_revision', version: 'git:' + 'a'.repeat(40) } }), /Git source/);
+});
+test('filesystem import approval cannot be reused to change the source backend', t => {
+  const x = fixture(t); x.quarantine();
+  const options = { ...x.receive, sourceKind: 'filesystem_snapshot', resolutions: { [x.f.rootAsset.stable_id]: { action: 'accept' } } };
+  const plan = planInstructionAssetImport(options);
+  assert.throws(() => applyInstructionAssetImport({ ...options, sourceKind: 'git_repository', confirmedPlanDigest: plan.plan_digest }), /plan changed/);
+  assert.throws(() => planInstructionAssetImport({ ...options, sourceKind: 'remote' }), /source kind/);
+});

@@ -159,7 +159,7 @@ try {
   for (const path of ["schemas", "docs/fixtures/asset-registry", "adapters/claude-code/plugin/templates"]) {
     cpSync(resolve(root, path), resolve(pluginFixtureRoot, path), { recursive: true });
   }
-  const moduleNames = ["claude-fixed-entry-profile", "fixed-entry-profile", "installer-lifecycle", "claim-evidence-status", "verification-proof-policy", "asset-registry", "content-addressed-store", "execution-envelope", "json-schema-validation"];
+  const moduleNames = ["claude-fixed-entry-profile", "fixed-entry-profile", "installer-lifecycle", "instruction-source-version", "ask-benchmark-stable-file", "ask-benchmark-atomic-publication", "claim-evidence-status", "verification-proof-policy", "asset-registry", "content-addressed-store", "execution-envelope", "json-schema-validation"];
   const paths = [...new Set([...moduleNames.map((name) => `scripts/${name}.mjs`), ...entryNames.flatMap((entryName) => fixedEntryCanonicalPaths(entryName))])];
   for (const path of paths) {
     mkdirSync(dirname(resolve(pluginFixtureRoot, path)), { recursive: true });

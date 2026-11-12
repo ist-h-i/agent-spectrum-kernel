@@ -1,3 +1,4 @@
+import { readInstructionSourceSnapshot } from "./instruction-source-version.mjs";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -164,6 +165,12 @@ export function buildGitDir(repoRoot) {
   return null;
 }
 
+// Git remains a supported development source. Sealed filesystem releases use
+// their verified content identity, never an invented Git commit.
+export function readSourceRevision(repoRoot) {
+  return readInstructionSourceSnapshot(repoRoot)?.revision ?? readGitRevision(repoRoot);
+}
+
 export function readGitRevision(repoRoot) {
   const gitDir = buildGitDir(repoRoot);
   if (!gitDir) {
@@ -245,6 +252,7 @@ export function buildLifecycleState({
       ? stripRollbackState(previousState)
       : previousState?.previous_successful_state ?? null;
 
+  const filesystemRevision = readInstructionSourceSnapshot(repoRoot)?.revision;
   const state = {
     ...extra,
     schema_version: LIFECYCLE_SCHEMA_VERSION,
@@ -257,6 +265,7 @@ export function buildLifecycleState({
       name: manifest?.name ?? "agent-spectrum-kernel",
       version: manifest?.version ?? null,
       git_revision: readGitRevision(repoRoot),
+      ...(filesystemRevision ? { filesystem_revision: filesystemRevision } : {}),
     },
     selected_profile: selectedProfile,
     installed_skills: installedSkills,

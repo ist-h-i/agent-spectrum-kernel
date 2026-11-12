@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { CORE_OWNED_IMMUTABLE_ASSETS, readGitRevision } from "./installer-lifecycle.mjs";
+import { CORE_OWNED_IMMUTABLE_ASSETS, readGitRevision, readSourceRevision } from "./installer-lifecycle.mjs";
 import { skillAssets } from "./skill-assets.mjs";
 import { readSetupRepositoryId, validateSetupGitMetadata } from "./ask-setup-git.mjs";
 import { readSetupJson, sanitizeSetupDoctorReport, summarizeSetupProcessFailure } from "./ask-setup-diagnostics.mjs";
@@ -141,7 +141,7 @@ export async function planningSource(adapter, profile) {
     coreAssets: CORE_OWNED_IMMUTABLE_ASSETS,
     rendererInputs: projection?.renderer_inputs ?? {},
     projection,
-    revision: readGitRevision(REPO_ROOT),
+    revision: readSourceRevision(REPO_ROOT),
   });
   return { source, selectedSkills, projection };
 }

@@ -263,7 +263,12 @@ function validateDescriptor(descriptor) {
   if (typeof descriptor.stable_id !== "string" || descriptor.stable_id.length === 0) throw new Error("Asset descriptor stable_id is required");
   if (typeof descriptor.version !== "string" || descriptor.version.length === 0) throw new Error("Asset descriptor version is required");
   if (!Array.isArray(descriptor.dependencies)) throw new Error("Asset descriptor dependencies must be an array");
-  if (descriptor.version_scheme === "git_revision") {
+  if (descriptor.version_scheme === "content_digest") {
+    if (descriptor.source?.kind !== "filesystem_snapshot" || descriptor.version !== descriptor.source.revision) {
+      throw new Error("content digest Asset version must bind the exact filesystem source revision");
+    }
+  } else if (descriptor.version_scheme === "git_revision") {
+    if (descriptor.source?.kind !== "git_repository") throw new Error("git revision Asset requires a Git source");
     if (descriptor.version !== `git:${descriptor.source?.revision ?? ""}`) throw new Error("git revision Asset version must bind the exact source revision");
   } else if (descriptor.version_scheme !== "semantic") {
     throw new Error("Asset descriptor version_scheme is unsupported");
@@ -297,6 +302,12 @@ function buildRecord(descriptor, contentDigest, content) {
     type_extension: cloneJson(descriptor.type_extension),
   };
   validateSchema(record, SCHEMAS.record, "Asset record");
+  if (record.version_scheme === "content_digest" && (record.source.kind !== "filesystem_snapshot" || record.version !== record.source.revision)) {
+    throw new Error("content digest Asset version must bind the exact filesystem source revision");
+  }
+  if (record.version_scheme === "git_revision" && (record.source.kind !== "git_repository" || record.version !== `git:${record.source.revision}`)) {
+    throw new Error("git revision Asset version must bind the exact source revision");
+  }
   normalizeRecordTextSets(record);
   validateRecordSemantics(record, content);
   return record;
@@ -304,6 +315,12 @@ function buildRecord(descriptor, contentDigest, content) {
 
 function validateRecordSemantics(record, content) {
   validateSchema(record, SCHEMAS.record, "Asset record");
+  if (record.version_scheme === "content_digest" && (record.source.kind !== "filesystem_snapshot" || record.version !== record.source.revision)) {
+    throw new Error("content digest Asset version must bind the exact filesystem source revision");
+  }
+  if (record.version_scheme === "git_revision" && (record.source.kind !== "git_repository" || record.version !== `git:${record.source.revision}`)) {
+    throw new Error("git revision Asset version must bind the exact source revision");
+  }
   validateContentSemantics(content);
   if (record.asset_type !== content.asset_type) throw new Error("Asset record/content type mismatch");
   if (record.content.content_digest !== canonicalDigest(content)) throw new Error("Asset record content digest mismatch");

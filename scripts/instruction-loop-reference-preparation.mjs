@@ -2,6 +2,7 @@
 // coordinator. The original journal/runtime, frozen Full metadata and approvals
 // remain historical evidence, never current execution or application authority.
 import assert from 'node:assert/strict';
+import {readInstructionSourceSnapshot,writeInstructionSourceSnapshot} from './instruction-source-version.mjs';
 import {mkdirSync,existsSync,writeFileSync,chmodSync,lstatSync,readdirSync,realpathSync} from 'node:fs';
 import {join,resolve,dirname,basename} from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -62,7 +63,8 @@ export function prepareReferenceEvidenceInstructionLoop({root,profilePath,config
   assert.equal(c.no_change,false,'reference adoption requires a changed retained candidate');
   const owned=verifyOwnedFullCandidate(old,c);checkEnvironment(old,c);
   inspectInstructionReferenceEvidence(referenceEvidence,c);
-  const sourceTree=git(c.source_root,['rev-parse','HEAD^{tree}']),fullInventory=fullInstructionInventory(c.full_root);
+  const filesystem=c.source_revision.startsWith('sha256:');
+  const sourceTree=filesystem?readInstructionSourceSnapshot(c.source_root)?.revision:git(c.source_root,['rev-parse','HEAD^{tree}']),fullInventory=fullInstructionInventory(c.full_root);
   assert.match(id,/^[A-Za-z0-9._-]{1,100}$/u);assert.notEqual(id,old.policy.id);assert.ok(outputRoot.startsWith(canonicalHostPath(old.protectedRoot)+'/'),'fresh reference run must remain in the protected root');
   const protectedPaths=[root,profilePath,configPath,old.storeRoot,old.stateRoot,old.generator.baselineSourceRoot,old.generator.candidateRoot,old.generator.fullRoot,old.generator.stagingRoot,old.generator.provider.sessionRoot,
    old.practical.root,old.practical.baselineRoot,old.normal.target,owned.archive,c.owned_version.manifest,...json(configPath).runtime.source_pins.map(p=>p.path),...referenceEvidence.artifacts.map(a=>a.path)].filter(Boolean);
@@ -77,7 +79,7 @@ export function prepareReferenceEvidenceInstructionLoop({root,profilePath,config
    for(const ref of [receipt.profile,receipt.config,receipt.origin])assert.deepEqual(pin(ref.path),ref,'prepared reference input drift');
    const next=json(receipt.profile.path);assert.equal(canonicalDigest(json(receipt.config.path)),canonicalDigest(createNativeInstructionLoopConfiguration(receipt.profile.path)),'prepared reference runtime drift');
    const h=readRunJournal(receipt.result.run_root);assert.equal(h.previous,receipt.journal_digest,'prepared reference coordinator already advanced');
-   verifyOwnedFullCandidate(next,h.state.outputs.register);independentObjects(next.generator.candidateRoot);readInstructionReferenceEvidence({root:receipt.result.run_root,state:h.state,verifySource:true});return receipt.result;
+   verifyOwnedFullCandidate(next,h.state.outputs.register);if(filesystem)assert.equal(readInstructionSourceSnapshot(next.generator.candidateRoot)?.revision,c.source_revision);else independentObjects(next.generator.candidateRoot);readInstructionReferenceEvidence({root:receipt.result.run_root,state:h.state,verifySource:true});return receipt.result;
   }
   const p=structuredClone(old);
   p.stateRoot=join(outputRoot,'state');p.generator.candidateRoot=join(outputRoot,'candidate');p.generator.fullRoot=join(outputRoot,'full');p.generator.stagingRoot=join(outputRoot,'staging');
@@ -85,13 +87,20 @@ export function prepareReferenceEvidenceInstructionLoop({root,profilePath,config
   const nextProfile=join(outputRoot,'profile.json'),nextConfig=join(outputRoot,'config.json'),nextRoot=join(outputRoot,'run'),originPath=join(outputRoot,'reference-origin.json');
   for(const path of [p.stateRoot,p.generator.candidateRoot,p.generator.fullRoot,p.generator.stagingRoot,p.generator.provider.sessionRoot,p.practical.root,nextRoot]){
    assertNoSymlinkPathSegments(path,'fresh reference destination',{allowMissingLeaf:true});assert.ok(!existsSync(path),'fresh reference destination required');}
-  mkdirSync(outputRoot,{mode:0o700});mkdirSync(p.stateRoot,{mode:0o700});mkdirSync(p.generator.candidateRoot,{mode:0o700});
+  mkdirSync(outputRoot,{mode:0o700});mkdirSync(p.stateRoot,{mode:0o700});
+  if(filesystem){
+   copyFull(c.source_root,p.generator.candidateRoot,owned.tracked_files);
+   writeInstructionSourceSnapshot(p.generator.candidateRoot,{contextDigest:readInstructionSourceSnapshot(c.source_root).context_digest});
+   assert.equal(readInstructionSourceSnapshot(p.generator.candidateRoot)?.revision,sourceTree,'retained filesystem source differs');
+  } else {
+  mkdirSync(p.generator.candidateRoot,{mode:0o700});
   git(p.generator.candidateRoot,['init','--quiet','--template=']);
   // Local fetch copies objects through Git transport. No --shared, alternates,
   // hardlinks, worktrees, copied hooks/config, or historical runtime execution.
   git(p.generator.candidateRoot,['fetch','--quiet','--no-tags','--no-recurse-submodules',c.source_root,c.source_revision,c.baseline_revision]);
   git(p.generator.candidateRoot,['checkout','--quiet','--detach',c.source_revision]);independentObjects(p.generator.candidateRoot);
   assert.equal(git(p.generator.candidateRoot,['rev-parse','HEAD^{tree}']),sourceTree,'retained source tree differs');
+  }
   // Git stores executable bits, not all frozen permissions. Restore the exact
   // inventory modes without changing any source bytes or commit identity.
   for(const file of owned.tracked_files)chmodSync(join(p.generator.candidateRoot,file.path),file.mode);
