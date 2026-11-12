@@ -62,6 +62,11 @@ test('packaged Full filesystem loop completes human gates, actual owner apply an
  assert.equal(existsSync(join(profile.generator.stagingRoot,'changes.json')),false);
  const ruleStatus=reviewRuleChangeStatus({request:rule,root:prepared.root});
  assert.equal(ruleStatus.state,'active');assert.equal(ruleStatus.application_verified,true);assert.equal(ruleStatus.effectiveness_status,'Unknown');
+ const live=join(target,'.agents',skillPath),liveBytes=readFileSync(live);
+ assert.deepEqual(ruleStatus.installed_projections_checked,[`.agents/${skillPath}`]);
+ rmSync(live);assert.equal(reviewRuleChangeStatus({request:rule,root:prepared.root}).state,'under_review');
+ writeFileSync(live,baseline);assert.equal(reviewRuleChangeStatus({request:rule,root:prepared.root}).state,'under_review');
+ writeFileSync(live,liveBytes);assert.equal(reviewRuleChangeStatus({request:rule,root:prepared.root}).state,'active');
  const next=prepareNextNativeInstructionLoopConfiguration({root:prepared.root,profilePath:prepared.profile_path,configPath:prepared.config_path,outputRoot:join(workspace,'next'),id:'package-next'});
  const nextProfile=JSON.parse(readFileSync(next.profile_path));
  assert.equal(nextProfile.generator.sourceKind,'filesystem_snapshot');assert.equal(nextProfile.generator.baselineSourceRoot,profile.generator.candidateRoot);

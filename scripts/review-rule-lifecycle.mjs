@@ -55,9 +55,11 @@ function checkTarget(request){
   assert.match(request.target_path,/^skills\/[a-zA-Z0-9_-]+\/(?:SKILL\.md|references\/[a-zA-Z0-9_-]+\.md)$/u,'use a selected skill SKILL.md or references/*.md file');
 }
 function targetBytes(request){
-  checkTarget(request);
-  const path=join(request.target_root,request.target_path);
-  assertNoSymlinkPathSegments(request.target_root,'rule project');
+  checkTarget(request);return readTargetPath(request.target_root,request.target_path);
+}
+function readTargetPath(root,relativePath){
+  const path=join(root,relativePath);
+  assertNoSymlinkPathSegments(root,'rule project');
   assertNoSymlinkPathSegments(path,'rule target',{allowMissingLeaf:true});
   return existsSync(path)?readStableBytes(path,'rule target',1024*1024):null;
 }
@@ -116,11 +118,26 @@ export function reviewRuleChangeStatus({request,root}){
   if(!completed.application_active)return {...result,state:completed.outcome==='restored'?'restored':/rejected/u.test(completed.outcome)?'rejected':'not_active'};
   assert.equal(state.evaluation_decision?.disposition,'approved','missing evaluation approval');
   assert.equal(state.change_decision?.disposition,'approved','missing change approval');
+  const projectionPaths=[];
+  for(const [adapter,prefix,stateFile] of [['codex','.agents','codex-install-state.json'],['claude-code','.claude','claude-install-state.json']]){
+    const statePath=join(request.target_root,'.agent-spectrum-kernel',stateFile);
+    const installed=existsSync(statePath);
+    if(installed||state.outputs.plan?.normal_plan?.selection?.adapter===adapter){
+      if(installed){
+        const install=readJsonFileStrict(statePath,'rule adapter state');
+        if(!Array.isArray(install.selected_skills)||request.action!=='retire'&&!install.selected_skills.includes(request.target_path.split('/')[1]))return {...result,state:'under_review',reason:`Rule Skill is not selected in ${adapter}.`};
+      }
+      projectionPaths.push(`${prefix}/${request.target_path}`);
+    }
+  }
   const actual=targetBytes(request);
-  const content=actual?.toString('utf8')??'',range=ruleRange(content,request.entry.id);
-  const matches=request.action==='retire'?range===null:range&&content.slice(range.start,range.end)===request.rule_block;
-  if(!matches)return {...result,state:'under_review',reason:'Applied rule differs from the exact proposal. Refresh or investigate before using the rule.'};
-  return {...result,state:request.action==='retire'?'deprecated':'active',application_verified:true,whole_file_matches_proposal:actual!==null&&hash(actual)===request.desired_file_digest};
+  for(const path of [request.target_path,...projectionPaths]){
+    const bytes=path===request.target_path?actual:readTargetPath(request.target_root,path);
+    const content=bytes?.toString('utf8')??'',range=ruleRange(content,request.entry.id);
+    const matches=request.action==='retire'?range===null:range&&content.slice(range.start,range.end)===request.rule_block;
+    if(!matches)return {...result,state:'under_review',reason:`Applied rule differs from the exact proposal at ${path}. Refresh or investigate before using the rule.`};
+  }
+  return {...result,state:request.action==='retire'?'deprecated':'active',application_verified:true,installed_projections_checked:projectionPaths,whole_file_matches_proposal:actual!==null&&hash(actual)===request.desired_file_digest};
 }
 // Host-reviewed observations, not telemetry scraping or proof of causation.
 export function reviewRuleEffectiveness({request,observations}){

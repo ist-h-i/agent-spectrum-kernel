@@ -16,7 +16,7 @@ function fixture(t){
  const spec={action:'add',entry,target_root:target,target_path:path,promotion_basis:'repeated',reason:'Prevent recurring access-control review omissions.',validation:{positive:[{evidence_digest:canonicalDigest('denial'),summary:'Guard change requires denial check.',outcome:'pass'}],negative:[{evidence_digest:canonicalDigest('docs'),summary:'Docs-only change suppresses rule.',outcome:'pass'}]}};
  return {dir,target,path,spec};
 }
-function loop(f,request,id='cycle',write=true){
+function loop(f,request,id='cycle',write=true,adapter=null){
  const root=join(f.dir,id),calls=[],receipts=new Map();
  const policy={kind:'reference_instruction_loop_v1',id,runtime_digest:canonicalDigest('synthetic-rule-runtime'),observation:request.observation,catalog:[{id:'positive',public_input_digest:canonicalDigest('positive'),tags:['review'],domain:'local'},{id:'negative',public_input_digest:canonicalDigest('negative'),tags:['review'],domain:'local'}],conditions:['baseline','candidate'],repetitions:1,max_trials:4,normal_target:f.target,formal_admission_implied:false};
  const runtime={digest:policy.runtime_digest,inspect:async j=>receipts.get(canonicalDigest(j))??{status:'unknown'}};
@@ -27,7 +27,7 @@ function loop(f,request,id='cycle',write=true){
    if(kind==='select')output=selectInstructionLoopCases({catalog:policy.catalog,changedTags:['review'],limit:2});
    if(kind==='trial')output={trial_id:job.input.row.id,ready_for_next_root:true};
    if(kind==='report')output={failures:[],unknowns:['synthetic fixture; no long-term efficacy']};
-   if(kind==='plan')output={target:f.target};
+   if(kind==='plan')output={target:f.target,...(adapter?{normal_plan:{selection:{adapter}}}:{})};
    if(kind==='apply'&&write)writeFileSync(join(f.target,f.path),proposedReviewRuleContent(readFileSync(join(f.target,f.path),'utf8'),request));
    const result={request_digest:canonicalDigest(job),status:'completed',output};receipts.set(canonicalDigest(job),result);return result;
  };
@@ -88,4 +88,18 @@ test('effectiveness review exposes noise, recurrence and replacement without aut
  r=reviewRuleEffectiveness({request,observations:{...observations,rule_firings:null,useful_catches:null,false_positives:null,recurrences:null}});assert.equal(r.recommendation,'no_refresh_signal');assert.equal(r.effectiveness_status,'Unknown');
  assert.throws(()=>reviewRuleEffectiveness({request,observations:{...observations,useful_catches:5}}));
  assert.throws(()=>reviewRuleEffectiveness({request,observations:{...observations,request_digest:canonicalDigest('other')}}));
+});
+
+test('applicable Codex and Claude projections remain required when state disappears and unknown selection is not active',async t=>{
+ for(const [adapter,prefix,stateFile] of [['codex','.agents','codex-install-state.json'],['claude-code','.claude','claude-install-state.json']]){
+  const f=fixture(t),request=prepareReviewRuleChange(f.spec),l=loop(f,request,'cycle',true,adapter);await complete(l);
+  const live=join(f.target,prefix,f.path),state=join(f.target,'.agent-spectrum-kernel',stateFile);
+  assert.equal(reviewRuleChangeStatus({request,root:l.root}).state,'under_review');
+  mkdirSync(dirname(live),{recursive:true});writeFileSync(live,request.rule_block);
+  assert.equal(reviewRuleChangeStatus({request,root:l.root}).state,'active');
+  mkdirSync(dirname(state),{recursive:true});writeFileSync(state,JSON.stringify({selected_skills:[]}));assert.equal(reviewRuleChangeStatus({request,root:l.root}).state,'under_review');
+  writeFileSync(state,'{}');assert.equal(reviewRuleChangeStatus({request,root:l.root}).state,'under_review');
+  writeFileSync(state,JSON.stringify({selected_skills:['review-code-health']}));assert.equal(reviewRuleChangeStatus({request,root:l.root}).state,'active');
+  rmSync(state);rmSync(live);assert.equal(reviewRuleChangeStatus({request,root:l.root}).state,'under_review');
+ }
 });

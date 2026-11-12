@@ -128,7 +128,9 @@ ask rules status --request rule-request.json --root /absolute/path/loop-root
 ```
 
 Status reconciles the exact observation, target, completed human-approved
-application, and the exact marked rule block in the target. Retirement checks
+application, and the exact marked rule block in the target and applicable installed
+Codex (`.agents/skills`) or Claude (`.claude/skills`) projections. Missing, changed,
+or unselected live guidance is reported as `under_review`, not active. Retirement checks
 that this rule block is absent. Unrelated independently approved rules may
 change in the same file without invalidating this rule;
 `whole_file_matches_proposal` reports whole-file equality separately. A prepared request alone is not an
