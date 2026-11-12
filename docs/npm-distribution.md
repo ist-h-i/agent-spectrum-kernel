@@ -2,19 +2,26 @@
 
 ASK's npm distribution contains the CLI, standard instruction assets and the
 shared improvement runtime. It does not run an installer during `npm install`.
-The package name `@hiroshi.inoue/agent-spectrum-kernel` and version
-`0.1.0-dev.0` are provisional. `private: true` prevents accidental publication;
-package naming, license and publication approval are separate release decisions.
+The release metadata is `@hiroshi.inoue/agent-spectrum-kernel@1.0.0`, licensed
+under [MIT](../LICENSE). Publication is a separate operator action; release
+preparation does not mean the package is already available on npm.
 The package version is not the `manifest.json` asset version or the historical
 `personal-v1.0.0` milestone.
 
 ## Install and create a persistent workspace
 
+After publication, install the pinned release with:
+
+```sh
+npm install @hiroshi.inoue/agent-spectrum-kernel@1.0.0
+npx --no-install ask init --workspace /absolute/path/my-ask
+```
+
 Before publication, build a local archive from a checkout:
 
 ```sh
 npm pack
-npm install /absolute/path/hiroshi.inoue-agent-spectrum-kernel-0.1.0-dev.0.tgz
+npm install /absolute/path/hiroshi.inoue-agent-spectrum-kernel-1.0.0.tgz
 npx --no-install ask init --workspace /absolute/path/my-ask
 ```
 

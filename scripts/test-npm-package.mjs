@@ -19,12 +19,18 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     for(const e of built.entries) assert.ok(!/^scripts\/(?:test-|test-fixtures\/)|^\.github\/|^dist\/|^benchmarks\/results\//u.test(e.path),e.path);
     const pack=JSON.parse(okay(run('npm',['pack','--ignore-scripts','--json','--pack-destination',root],{cwd:ROOT,env:{...process.env,npm_config_cache:join(root,'npm-cache')}})))[0];
     const published=pack.files.map(f=>f.path);
+    assert.ok(published.includes('LICENSE'));assert.ok(published.includes('dist/LICENSE'));
+    assert.ok(published.includes('dist/docs/npm-distribution.md'));assert.ok(published.includes('dist/docs/npm-distribution-ja.md'));
     assert.ok(published.includes('bin/ask.mjs'));assert.ok(published.includes('dist/npm-runtime-inventory.json'));
+    assert.ok(!published.some(p=>/review-ceiling-v1\/calibration-(report\.md|summary\.json)$/.test(p)));
     assert.ok(!published.some(p=>p.includes('/.git/')||p.startsWith('scripts/')||p.startsWith('.github/')));
     const app=join(root,'application');mkdirSync(app);writeFileSync(join(app,'package.json'),' {"name":"ask-local-install-test","private":true} ');
     okay(run('npm',['install','--ignore-scripts','--no-audit','--no-fund',join(root,pack.filename)],{cwd:app,env:{...process.env,npm_config_cache:join(root,'npm-cache')}}));
     const linked=join(app,'node_modules','.bin','ask');
-    const version=okay(run(process.execPath,[linked,'--version'],{cwd:app})).trim();assert.equal(version,'0.1.0-dev.0');
+    const metadata=JSON.parse(readFileSync(join(app,'node_modules','@hiroshi.inoue','agent-spectrum-kernel','package.json'),'utf8'));
+    assert.equal(metadata.license,'MIT');assert.equal(metadata.private,undefined);assert.equal(metadata.publishConfig.access,'public');
+    assert.match(readFileSync(join(app,'node_modules','@hiroshi.inoue','agent-spectrum-kernel','LICENSE'),'utf8'),/MIT License/);
+    const version=okay(run(process.execPath,[linked,'--version'],{cwd:app})).trim();assert.equal(version,'1.0.0');
     assert.match(okay(run(process.execPath,[linked,'--help'])),/ask init/);
     assert.notEqual(run(process.execPath,[linked,'does-not-exist']).status,0);
     // No git executable is reachable by the application command. Node uses its

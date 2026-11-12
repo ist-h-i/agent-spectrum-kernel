@@ -1,10 +1,9 @@
 {
   "name": "@hiroshi.inoue/agent-spectrum-kernel",
-  "version": "0.1.0-dev.0",
-  "private": true,
+  "version": "1.0.0",
   "description": "A supervised improvement loop and portable instruction assets for coding agents.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "node": ">=24 <25"
   },
@@ -13,7 +12,8 @@
   },
   "files": [
     "bin/ask.mjs",
-    "dist/"
+    "dist/",
+    "LICENSE"
   ],
   "scripts": {
     "build": "node scripts/build-npm-package.mjs",
@@ -30,5 +30,9 @@
     "evaluation",
     "codex",
     "self-improvement"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }
