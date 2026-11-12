@@ -225,7 +225,8 @@ not retained. On POSIX, the owned process group is terminated on completion or
 failure; pipes are closed on cancellation. Host providers must clean up detached
 children themselves, and on Windows must own cleanup of all child processes.
 Module code is loaded from a data URL, so use Node built-ins or
-explicit absolute dependencies, not relative imports. The pin covers the module
+explicit absolute `file:///...` dependency URLs, not relative imports or bare
+absolute filesystem-path specifiers. The pin covers the module
 bytes, not its transitive dependencies; audit the entire trusted host integration.
 A fresh process does not make a lying provider trustworthy. Do not use this route
 to substitute a developer's assertion for an independent review or human decision.
