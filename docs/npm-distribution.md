@@ -178,3 +178,108 @@ successfully; examine the comparison report and the candidate diff first.
 This is an observed Codex configuration, not a synthetic fixture. Advancing with
 `operate --allow-model-calls` can start model work and consume your provider
 allowance or incur charges. Only do so within your approved execution scope.
+
+## Reusing verification evidence
+
+`ask verification` exposes the existing evidence planner and final coverage check
+from an installed package. It does not change CI selection or run gates/models on
+its own. The ASK package/workspace can remain Gitless; **this optional scoped
+verification route requires Git history in the project being verified**, plus its
+committed gate inventory, dependency manifests, completion policy and signed
+baseline evidence. See [the completion contract](verification-reuse-completion-contract.md).
+
+```sh
+ask verification prepare --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT
+ask verification coverage --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT
+```
+
+`prepare` identifies exact/scoped reuse, affected gates, unknown/missing evidence
+and any required delta review. Run only the indicated gates using your trusted
+runner and store their newly signed evidence; do not execute commands copied from
+an evidence record. An unknown dependency or missing proof requires revalidation.
+`coverage` recomputes the plan against the clean current target, refreshes current
+obligations twice, then checks inputs again. It exits nonzero when blocked.
+Neither command grants approval or performs a merge, release or deployment.
+
+Current-state observations are host capabilities, not portable evidence. If the
+policy requires current approval, independent judgment or external state, omission
+of a host provider deliberately blocks coverage. An operator can explicitly supply
+an audited module and pin its exact bytes:
+
+```sh
+ask verification coverage --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT \
+  --provider-module /absolute/trusted-host.mjs --provider-sha256 sha256:HEX_DIGEST
+```
+
+This flag **executes trusted host code with the operator's privileges and inherited
+environment**. It is not a sandbox. Never use a downloaded/evidence-supplied module
+without inspecting and authorizing it. ASK never discovers providers from a repo,
+transfer, or cached result. The module exports `providers`, a map from policy
+provider IDs to async functions. Each function receives the current bound query
+and returns exactly `{query, status, actor_id, evidence_digest}`. Status is
+`satisfied`, `unsatisfied` or `unavailable`. Read the authoritative system on
+**every invocation**, including `confirm`; never echo a cached success. The core
+checks authorized/independent actors, query identity and stable observation digest.
+
+Each observation runs the pinned module bytes in a fresh Node process, with a
+10-second upper bound (also constrained by the policy's overall deadline) and a
+1 MiB response bound. Pin mismatches, missing functions, extra stdout and malformed
+responses fail closed. Write diagnostics to stderr, not stdout; diagnostics are
+not retained. On POSIX, the owned process group is terminated on completion or
+failure; pipes are closed on cancellation. Host providers must clean up detached
+children themselves, and on Windows must own cleanup of all child processes.
+Module code is loaded from a data URL, so use Node built-ins or
+explicit absolute `file:///...` dependency URLs, not relative imports or bare
+absolute filesystem-path specifiers. The pin covers the module
+bytes, not its transitive dependencies; audit the entire trusted host integration.
+A fresh process does not make a lying provider trustworthy. Do not use this route
+to substitute a developer's assertion for an independent review or human decision.
+
+The installed-package acceptance test checks unchanged inputs, changed inputs,
+missing evidence, fresh provider calls and failure handling with real local gate
+executions. Its providers are synthetic and do **not** establish production GitHub
+approval, live model quality, or token/time savings for a particular application.
+Report gate counts and measured elapsed time separately from model tokens; missing
+model counters remain unavailable rather than zero. Existing native-model pilot
+results retain their documented scope in [reuse measurement](verification-reuse-measurement.md).
+
+### Dispatch the planner's review scope
+
+`prepare` is inspection only. To execute its selected review through a host's
+model adapter, use the separate opt-in command:
+
+```sh
+ask verification review --repository /absolute/project --store /absolute/evidence \
+  --target FULL_CURRENT_COMMIT --allow-review true \
+  --provider-module /absolute/trusted-reviewer.mjs --provider-sha256 sha256:HEX_DIGEST
+```
+
+The host module exports `providers.review(request)`. ASK computes the paths from
+the current planner, expands gate-wide independent judgments to their declared
+semantic surfaces, and supplies bounded before/after Git content. The host must
+review this request rather than replace it with a manually chosen smaller scope.
+Unknown scope blocks dispatch; `not_required` makes no host/model call. HEAD,
+worktree, plan and request are checked again after the response. A changed target
+or an incomplete/mismatched response cannot become a successful review receipt.
+
+Return `{result, usage}`. `result` includes `request_digest`, `target_revision`,
+`reviewed_paths`, `reviewed_obligations`, `judgment_refs`, `findings` (each with
+`path`, `obligation_ref`, `severity`) and `decision` (`pass` or `block`). Use all
+required request identities. `usage` contains observed `input_tokens`,
+`cached_input_tokens`, `output_tokens`; omit unavailable telemetry rather than
+inventing zeroes. The recorded receipt excludes raw material/prompts/transcripts.
+A reviewer is trusted executable integration code; the same host-code caution as
+coverage applies. Review dispatch allows up to five minutes instead of the
+current-state observation's ten seconds, and may consume model usage. It still
+grants no approval and never merges or releases anything. A valid blocking review
+is retained as a reviewed result, but exits nonzero; it is not an infrastructure
+failure or a reason to repeat the model call until it passes.
+
+Obligation refs identify requirements; they are not the requirement text itself.
+The trusted host must resolve their actual approved specification (or include the
+corresponding task contract in its prompt). If a ref cannot be resolved, report
+that gap and block; do not infer a passing requirement from a name or fixture.
+ASK does not bake public benchmark answers into the production dispatcher.
