@@ -1,6 +1,7 @@
 import test from 'node:test';
+import {writeInstructionSourceSnapshot} from './instruction-source-version.mjs';
 import assert from 'node:assert/strict';
-import {mkdirSync,writeFileSync,readFileSync,existsSync,lstatSync,chmodSync,readdirSync,rmSync} from 'node:fs';
+import {mkdirSync,writeFileSync,readFileSync,existsSync,lstatSync,chmodSync,readdirSync,rmSync,symlinkSync} from 'node:fs';
 import {join,dirname,basename} from 'node:path';
 import {devNull} from 'node:os';
 import {spawnSync} from 'node:child_process';
@@ -20,10 +21,11 @@ import {createConfiguredInstructionLoopRuntime} from './instruction-loop-runtime
 const json=p=>JSON.parse(readFileSync(p));
 const put=(path,value)=>{mkdirSync(join(path,'..'),{recursive:true});writeFileSync(path,typeof value==='string'?value:JSON.stringify(value));};
 function git(root,args){const r=spawnSync('git',['-c','core.hooksPath='+devNull,'-c','user.name=Fixture','-c','user.email=fixture@invalid','-c','commit.gpgsign=false',...args],{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();}
-function fixture(t,{owner=false}={}){
+function fixture(t,{owner=false,filesystem=false}={}){
  const f=environmentFixture(t,'codex','challenger'),base=f.root,source=join(base,'source'),candidateRoot=join(base,'old-candidate'),fullRoot=join(base,'old-full'),stateRoot=join(base,'old-state'),root=join(base,'old-run'),session=join(base,'old-session');
- put(join(source,'skills/demo/SKILL.md'),'Original instruction.\n');git(source,['init','--quiet']);git(source,['add','.']);git(source,['commit','--quiet','-m','baseline']);const baseline=git(source,['rev-parse','HEAD']);
- git(source,['clone','--quiet','--no-local','--no-hardlinks',source,candidateRoot]);put(join(candidateRoot,'skills/demo/SKILL.md'),'Changed instruction.\n');git(candidateRoot,['add','.']);git(candidateRoot,['commit','--quiet','-m','candidate']);const revision=git(candidateRoot,['rev-parse','HEAD']);
+ put(join(source,'skills/demo/SKILL.md'),'Original instruction.\n');git(source,['init','--quiet']);git(source,['add','.']);git(source,['commit','--quiet','-m','baseline']);let baseline=git(source,['rev-parse','HEAD']);
+ git(source,['clone','--quiet','--no-local','--no-hardlinks',source,candidateRoot]);put(join(candidateRoot,'skills/demo/SKILL.md'),'Changed instruction.\n');git(candidateRoot,['add','.']);git(candidateRoot,['commit','--quiet','-m','candidate']);let revision=git(candidateRoot,['rev-parse','HEAD']);
+ if(filesystem){rmSync(join(source,'.git'),{recursive:true});rmSync(join(candidateRoot,'.git'),{recursive:true});baseline=writeInstructionSourceSnapshot(source);revision=writeInstructionSourceSnapshot(candidateRoot);}
  for(const path of ['skills/demo/SKILL.md','.agents/skills/demo/SKILL.md'])put(join(fullRoot,path),'Changed instruction.\n');
  put(join(fullRoot,'AGENTS.md'),'Synthetic retained full context.\n');put(join(fullRoot,'.agent-spectrum-kernel/codex-install-state.json'),{selected_profile:'full',selected_skills:['demo'],target:fullRoot,source_root:candidateRoot});
  chmodSync(join(fullRoot,'AGENTS.md'),0o640);
@@ -40,7 +42,7 @@ function fixture(t,{owner=false}={}){
  const normal=owner?{kind:'ask_source_repository_v1',target:source,repository:'github.com/example/synthetic',remote_url:'https://github.com/example/synthetic.git',base_branch:'main',base_revision:baseline,publication_branch:'reference/synthetic'}:{target:null};
  const p={kind:'full_practical_instruction_loop_profile_v1',protectedRoot:base,stateRoot,storeRoot:f.storeRoot,normal,baselineEnvironmentObjectDigest:environment.object_digest,
   assetAuthority:{kind:'external_asset_lifecycle_authority',authority_id:'synthetic-owner',authority_revision:'fixture',authority_evidence_digest:canonicalDigest('synthetic lifecycle owner')},
-  generator:{storeRoot:f.storeRoot,baselineSourceRoot:source,baselineRevision:baseline,skills:['demo'],goal:'Improve public instructions.',candidateRoot,fullRoot,stagingRoot:c.staging_root,provider:{kind:'codex',sessionRoot:session},registrySnapshotDigest:f.options.registrySnapshotDigest,parentAssets:[],environmentId:'historical-environment'},selection:{limit:1},
+  generator:{...(filesystem?{sourceKind:'filesystem_snapshot'}:{}),storeRoot:f.storeRoot,baselineSourceRoot:source,baselineRevision:baseline,skills:['demo'],goal:'Improve public instructions.',candidateRoot,fullRoot,stagingRoot:c.staging_root,provider:{kind:'codex',sessionRoot:session},registrySnapshotDigest:f.options.registrySnapshotDigest,parentAssets:[],environmentId:'historical-environment'},selection:{limit:1},
   policy:{kind:'reference_instruction_loop_v1',id:'old-loop',observation:{goal:'Improve public instructions.'},catalog:[{id:'old-unapproved',public_input_digest:canonicalDigest('synthetic')}],conditions:['baseline','candidate'],repetitions:1,max_trials:2,normal_target:normal.target,evaluation_mode:'practical_v1',formal_admission_implied:false},
   practical:{root:join(base,'old-evaluation'),baselineRoot:join(base,'baseline-full'),conditions:{baseline:{context,command,command_role:'check'},candidate:{context,command,command_role:'check'}}}};
  const profilePath=join(base,'profile.json'),configPath=join(base,'config.json');put(profilePath,p);const config=createNativeInstructionLoopConfiguration(profilePath);
@@ -128,4 +130,13 @@ test('case aliases of missing reserved old roots are refused before allocation',
   assert.throws(()=>prepareReferenceEvidenceInstructionLoop({...f,outputRoot}),/overlaps/);assert.equal(existsSync(outputRoot),false);assert.equal(existsSync(reserved),false);
  }
  assert.equal(readRunJournal(f.root).previous,before);assert.equal(git(f.c.source_root,['status','--porcelain','--untracked-files=normal']),'');
+});
+
+test('filesystem reference preparation retains candidate without Git or carried approvals',t=>{
+ const f=fixture(t,{filesystem:true}),path=process.env.PATH;const bin=join(f.base,'no-git');mkdirSync(bin);symlinkSync('/usr/bin/gzip',join(bin,'gzip'));process.env.PATH=bin;t.after(()=>{process.env.PATH=path;});
+ const r=prepareReferenceEvidenceInstructionLoop(f),h=readRunJournal(r.run_root),candidate=h.state.outputs.register;
+ assert.equal(h.state.status,'awaiting_reference_review');assert.equal(h.state.evaluation_decision,undefined);
+ assert.equal(candidate.source_revision,f.c.source_revision);assert.equal(existsSync(join(candidate.source_root,'.git')),false);
+ assert.ok(readInstructionReferenceEvidence({root:r.run_root,state:h.state,verifySource:true}));
+ assert.deepEqual(prepareReferenceEvidenceInstructionLoop(f),r);
 });

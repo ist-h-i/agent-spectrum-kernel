@@ -1432,7 +1432,7 @@ function buildPlan(args) {
   const targetPartialFileState = Object.fromEntries(Object.keys(managedBlocks).sort().map((path) => [path, existsSync(resolve(args.target, path)) ? readFileSync(resolve(args.target, path), "utf8") : null]));
   const appliedProvenance = lifecycle.buildAppliedProvenance({
     cliOptions: { profile: args.profile, custom_skills: args.skills, skip_prompts: args.skipPrompts, skip_command: args.skipCommand, no_overwrite_skills: args.noOverwriteSkills, prune: args.prune, force: args.force },
-    sourceRevision: lifecycle.readGitRevision(REPO_ROOT),
+    sourceRevision: lifecycle.readSourceRevision(REPO_ROOT),
     previousManagedState: previousState,
     managedPartialFiles: managedBlocks,
     targetPartialFileState,

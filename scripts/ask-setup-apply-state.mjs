@@ -321,7 +321,8 @@ export function managedSetupIdentities(target) {
       state_path: definition.state,
       install_status: ["installed", "detached"].includes(state.install_status) ? state.install_status : "unknown",
       profile: typeof state.selected_profile === "string" ? state.selected_profile : null,
-      source_revision: /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/iu.test(state.source?.git_revision ?? "") ? state.source.git_revision : null,
+      source_revision: /^sha256:[a-f0-9]{64}$/u.test(state.source?.filesystem_revision ?? "") ? state.source.filesystem_revision
+        : /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/iu.test(state.source?.git_revision ?? "") ? state.source.git_revision : null,
       files,
       // These hashes bind generated projection/source identities and owned
       // subsets, without leaking rendered prompts, hooks or rollback contents.

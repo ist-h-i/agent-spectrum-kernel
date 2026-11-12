@@ -1,3 +1,4 @@
+import {writeInstructionSourceSnapshot} from './instruction-source-version.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,existsSync,rmSync} from 'node:fs';
@@ -38,4 +39,14 @@ test('owned manifest detects measured-file drift even if Git index hides it',t=>
 });
 test('candidate binding cannot be moved to another source root',t=>{
   const f=fixture(t),binding=bindMeasuredNormalOwnerSource({sourceRoot:f.source,candidate:f.candidate});assert.throws(()=>verifyNormalOwnerSourceBinding({sourceRoot:f.target,binding}),/root mismatch/);
+});
+
+test('filesystem binding pins bytes without Git and rejects later drift',t=>{
+  const f=fixture(t);rmSync(join(f.source,'.git'),{recursive:true});
+  const revision=writeInstructionSourceSnapshot(f.source),candidate={source_root:f.source,source_revision:revision};
+  const binding=bindMeasuredNormalOwnerSource({sourceRoot:f.source,candidate});
+  assert.equal(verifyNormalOwnerSourceBinding({sourceRoot:f.source,binding}).source_revision,revision);
+  writeFileSync(join(f.source,'skills/demo/SKILL.md'),'Unmeasured bytes');
+  assert.throws(()=>verifyNormalOwnerSourceBinding({sourceRoot:f.source,binding}),/drift|differ|snapshot/i);
+  assert.equal(existsSync(f.marker),false);
 });

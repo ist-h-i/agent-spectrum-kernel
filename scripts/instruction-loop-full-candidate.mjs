@@ -3,7 +3,7 @@
 // by the existing installers, never authored by the model.
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdirSync,readdirSync,lstatSync,writeFileSync,existsSync,rmSync} from 'node:fs';
+import {mkdirSync,readdirSync,lstatSync,writeFileSync,existsSync,rmSync,chmodSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {devNull} from 'node:os';
 import {canonicalDigest,readStableBytes,readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -14,6 +14,7 @@ import {executeCodexSession} from './codex-exec-runner.mjs';
 import {readStableFile} from './ask-benchmark-stable-file.mjs';
 import {FULL_REVIEW_FINDING_CONTRACT_PATH} from './instruction-projection-paths.mjs';
 import {projectInstructionLoopObservation} from './instruction-loop-feedback.mjs';
+import {snapshotInstructionSource,verifyInstructionSourceSnapshot,writeInstructionSourceSnapshot} from './instruction-source-version.mjs';
 
 const gitEnv=()=>({...Object.fromEntries(['PATH','TMPDIR','LANG','TZ'].filter(k=>process.env[k]).map(k=>[k,process.env[k]])),
   GIT_CONFIG_GLOBAL:devNull,GIT_CONFIG_SYSTEM:devNull,GIT_CONFIG_NOSYSTEM:'1',GIT_TERMINAL_PROMPT:'0'});
@@ -21,7 +22,7 @@ function git(root,args){const r=spawnSync('git',['--no-optional-locks','-c',`cor
 export function fullInstructionInventory(root,relative=''){
   assertNoSymlinkPathSegments(root,'owned Full source');
   return readdirSync(join(root,relative)).sort().flatMap(name=>{
-    if(name==='.git')return [];
+    if(name==='.git'||relative===''&&name==='.ask-source-version.json')return [];
     const path=relative?relative+'/'+name:name,s=lstatSync(join(root,path));assert.ok(!s.isSymbolicLink(),'Full source symlink');
     if(s.isDirectory())return fullInstructionInventory(root,path);
     assert.ok(s.isFile());const b=readStableFile(join(root,path),'Full source file',16*1024*1024).bytes;
@@ -52,7 +53,24 @@ function assertReviewContractDelta(before,after,scope){
 }
 export const FULL_SOURCE_DERIVED_PATHS=['docs/fixtures/adapter-runtime-bundle.json','docs/fixtures/adapter-runtime-evidence.json','docs/fixtures/adapter-runtime-profiles.json','docs/fixtures/verification-proof-policy-cases.json','docs/verification-proof-policy-contract.md','docs/validation-report.md',
   ...['implement','investigate','review-pr','verify','handoff'].map(name=>`adapters/claude-code/plugin/skills/${name}/SKILL.md`)];
+function filesystemSource(p){
+  const kind=p.sourceKind??'git_repository';
+  assert.ok(['git_repository','filesystem_snapshot'].includes(kind),'unsupported source kind');
+  return kind==='filesystem_snapshot';
+}
+function assertSourceRevision(p){
+  if(filesystemSource(p))return verifyInstructionSourceSnapshot(p.baselineSourceRoot,p.baselineRevision);
+  assert.equal(git(p.baselineSourceRoot,['rev-parse','HEAD']),p.baselineRevision,'baseline revision drift');
+  assert.equal(git(p.baselineSourceRoot,['status','--porcelain','--untracked-files=no']),'','baseline source must be clean');
+}
 function sourceValidation(p){
+  if(filesystemSource(p)){
+    if(p.sourceValidation!==undefined){
+      assert.deepEqual(Object.keys(p.sourceValidation),['kind'],'closed source validation setting required');
+      assert.equal(p.sourceValidation.kind,'instruction_assets_v1','filesystem sources require instruction asset validation, not repository history validation');
+    }
+    return {kind:'instruction_assets_v1',entrypoint_contracts:'Preserve selected Skill entrypoints, supporting references and existing installer projection contracts.'};
+  }
   if(p.sourceValidation===undefined)return null;
   assert.deepEqual(Object.keys(p.sourceValidation).sort(),['kind'],'closed source validation setting required');
   assert.equal(p.sourceValidation.kind,'ask_repository_v1','unsupported source validation contract');
@@ -115,8 +133,7 @@ export function compareFullInstructionContext({baselineRoot,candidateRoot,skills
 }
 export function fullGenerationInput(p){
   assert.equal(resolve(p.baselineSourceRoot),p.baselineSourceRoot);assertNoSymlinkPathSegments(p.baselineSourceRoot,'baseline source');
-  assert.equal(git(p.baselineSourceRoot,['rev-parse','HEAD']),p.baselineRevision,'baseline revision drift');
-  assert.equal(git(p.baselineSourceRoot,['status','--porcelain','--untracked-files=no']),'','baseline source must be clean');
+  assertSourceRevision(p);
   const validation=sourceValidation(p),scope=reviewFindingContractScope(p);
   assert.ok(p.skills.length>0&&p.skills.length<=64&&new Set(p.skills).size===p.skills.length);
   for(const s of p.skills)assert.match(s,/^[a-z0-9-]+$/u);
@@ -124,7 +141,7 @@ export function fullGenerationInput(p){
   const files=p.skills.flatMap(s=>fullInstructionInventory(join(p.baselineSourceRoot,'skills',s)).map(f=>({...f,path:`skills/${s}/`+f.path})))
     .filter(f=>allowed(f.path,p.skills)).map(f=>({path:f.path,raw_digest:f.sha256,text:readStableBytes(join(p.baselineSourceRoot,f.path),'public Skill').toString('utf8')}));
   if(scope){
-    assert.equal(git(p.baselineSourceRoot,['ls-files','--error-unmatch','--',scope.path]),scope.path,'review contract must be tracked');
+    if(!filesystemSource(p))assert.equal(git(p.baselineSourceRoot,['ls-files','--error-unmatch','--',scope.path]),scope.path,'review contract must be tracked');
     const bytes=readStableBytes(join(p.baselineSourceRoot,scope.path),'public review contract');
     files.push({path:scope.path,raw_digest:hash(bytes),text:new TextDecoder('utf-8',{fatal:true}).decode(bytes)});
   }
@@ -175,22 +192,36 @@ export async function generateFullInstructionCandidate(p,provider){
     for(const c of changes)if(c.operation==='delete')after.delete(c.path);else after.set(c.path,{sha256:hash(Buffer.from(c.text))});
     assertReviewContractDelta(before,after,scope);
   }
+  const filesystem=filesystemSource(p);
+  // Revalidate after the provider returns, before allocating materializations.
+  assertSourceRevision(p);
   for(const dir of [p.candidateRoot,p.fullRoot,p.stagingRoot]){assertNoSymlinkPathSegments(dir,'fresh owned materialization',{allowMissingLeaf:true});assert.ok(!existsSync(dir),'fresh owned materialization required');mkdirSync(dir,{mode:0o700});}
-  git(p.candidateRoot,['init','--quiet','--template=']);
-  git(p.candidateRoot,['fetch','--quiet',...(p.sourceValidation?[]:['--depth=1']),'--no-tags',p.baselineSourceRoot,p.baselineRevision]);
-  git(p.candidateRoot,['checkout','--quiet','--detach','FETCH_HEAD']);
+  if(filesystem){
+    for(const file of fullInstructionInventory(p.baselineSourceRoot)){
+      const bytes=readStableFile(join(p.baselineSourceRoot,file.path),'pinned filesystem source',16*1024*1024).bytes;
+      assert.equal(hash(bytes),file.sha256,'filesystem source changed during materialization');
+      const target=join(p.candidateRoot,file.path);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,bytes,{flag:'wx',mode:file.mode});chmodSync(target,file.mode);
+    }
+    verifyInstructionSourceSnapshot(p.candidateRoot,p.baselineRevision);
+  }else{
+    git(p.candidateRoot,['init','--quiet','--template=']);
+    git(p.candidateRoot,['fetch','--quiet',...(p.sourceValidation?[]:['--depth=1']),'--no-tags',p.baselineSourceRoot,p.baselineRevision]);
+    git(p.candidateRoot,['checkout','--quiet','--detach','FETCH_HEAD']);
+  }
   // The provider never receives candidateRoot or this executable checkout.
   for(const c of changes){const path=join(p.candidateRoot,c.path);assertNoSymlinkPathSegments(path,'canonical generated file',{allowMissingLeaf:true});
     if(c.operation==='delete')rmSync(path);else{mkdirSync(dirname(path),{recursive:true});writeFileSync(path,c.text,{mode:0o644});}}
   const pluginWriter=join(p.candidateRoot,'scripts/claude-plugin-fixed-entries.mjs');
-  const derivedPaths=FULL_SOURCE_DERIVED_PATHS.filter(path=>path!=='docs/validation-report.md'&&(!path.startsWith('adapters/')||existsSync(pluginWriter)));
-  if(p.sourceValidation)derivedPaths.push('docs/validation-report.md');
+  const derivedPaths=filesystem?[]:FULL_SOURCE_DERIVED_PATHS.filter(path=>path!=='docs/validation-report.md'&&(!path.startsWith('adapters/')||existsSync(pluginWriter)));
+  if(p.sourceValidation&&!filesystem)derivedPaths.push('docs/validation-report.md');
   const authored=p.sourceValidation||scope?fullInstructionInventory(p.candidateRoot):null;
+  if(!filesystem){
   const refresh=spawnSync(process.execPath,[join(p.candidateRoot,'scripts/update-adapter-runtime-fixtures.mjs')],{encoding:'utf8',maxBuffer:4*1024*1024});
   assert.equal(refresh.status,0,'existing adapter fixture writer failed');
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
+  }
   const derivation=[];
-  if(existsSync(pluginWriter))for(const mode of ['write','check']){
+  if(!filesystem&&existsSync(pluginWriter))for(const mode of ['write','check']){
     const result=spawnSync(process.execPath,[pluginWriter,'--'+mode],{cwd:p.candidateRoot,encoding:'utf8',maxBuffer:4*1024*1024,timeout:120000});
     const record={kind:'full_source_derivation_receipt_v1',writer:'claude-plugin-fixed-entries',mode,exit_code:result.status,signal:result.signal??null,
       stdout:String(result.stdout??'').slice(0,131072),stderr:String(result.stderr??'').slice(0,131072),runtime_or_effectiveness_implied:false};
@@ -199,11 +230,22 @@ export async function generateFullInstructionCandidate(p,provider){
     assert.equal(result.status,0,'existing Claude plugin fixed-entry '+mode+' failed; inspect source derivation receipt');
     if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
   }
-  const validation=p.sourceValidation?validateGeneratedSource(p,input.source_validation.validator_digest):null;
+  let validation=!filesystem&&p.sourceValidation?validateGeneratedSource(p,input.source_validation.validator_digest):null;
+  if(filesystem){
+    for(const skill of p.skills){
+      const bytes=readStableBytes(join(p.candidateRoot,'skills',skill,'SKILL.md'),'required Skill entrypoint',2*1024*1024);
+      const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);assert.ok(text.trim().length&&!text.includes('\0'),'empty or invalid Skill entrypoint');
+    }
+
+  }
   if(authored)assertDerivedSourceChanges(authored,p.candidateRoot,derivedPaths);
-  git(p.candidateRoot,['add','--','skills',...(scope?[scope.path]:[]),...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
+  if(!filesystem)git(p.candidateRoot,['add','--','skills',...(scope?[scope.path]:[]),...derivedPaths.filter(path=>existsSync(join(p.candidateRoot,path)))]);
   const preserved=provided.execution?.preserved_candidate_source;
-  if(preserved){
+  if(preserved&&filesystem){
+    assert.ok(p.provider?.retainedAuthoring&&p.provider.caseReselection===true,'preserved snapshot requires retained case reselection');
+    verifyInstructionSourceSnapshot(preserved.source_root,preserved.source_revision);
+    assert.equal(snapshotInstructionSource(p.candidateRoot),preserved.source_revision,'retained candidate source snapshot changed');
+  }else if(preserved){
     assert.ok(p.provider?.retainedAuthoring&&p.provider.caseReselection===true,'preserved commit requires retained case reselection');
     assert.equal(resolve(preserved.source_root),preserved.source_root);assertNoSymlinkPathSegments(preserved.source_root,'retained candidate source');
     assert.match(preserved.source_revision,/^[a-f0-9]{40}$/u);
@@ -212,13 +254,20 @@ export async function generateFullInstructionCandidate(p,provider){
     // Preserve the proven original commit without overwriting any materialized
     // file. This also keeps installer provenance and the Full bytes identical.
     git(p.candidateRoot,['reset','--soft',preserved.source_revision]);
-  }else git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
-  const revision=git(p.candidateRoot,['rev-parse','HEAD']);
-  const changed=git(p.candidateRoot,['diff','--name-only',p.baselineRevision,'HEAD']).split('\n').filter(Boolean);
+  }else if(!filesystem)git(p.candidateRoot,['-c','user.name=ASK local versioning','-c','user.email=ask-local@invalid','commit','--quiet','--allow-empty','-m','Generated scoped Full instruction candidate']);
+  const revision=filesystem?writeInstructionSourceSnapshot(p.candidateRoot):git(p.candidateRoot,['rev-parse','HEAD']);
+  const before=filesystem?inventoryMap(p.baselineSourceRoot):null,after=filesystem?inventoryMap(p.candidateRoot):null;
+  const changed=filesystem?[...new Set([...before.keys(),...after.keys()])].sort().filter(path=>before.get(path)?.sha256!==after.get(path)?.sha256||before.get(path)?.mode!==after.get(path)?.mode):git(p.candidateRoot,['diff','--name-only',p.baselineRevision,'HEAD']).split('\n').filter(Boolean);
   assert.ok(changed.every(path=>allowed(path,p.skills)||scope&&path===scope.path||derivedPaths.includes(path)),'non-instruction/non-derived source changed');
   for(const script of ['install-kernel.mjs','install-codex-adapter.mjs']){
     const r=spawnSync(process.execPath,[join(p.candidateRoot,'scripts',script),'--target',p.fullRoot,...(script.includes('codex')?['--profile','full']:[])],{encoding:'utf8',maxBuffer:16*1024*1024});
     assert.equal(r.status,0,'existing Full installer failed');
+  }
+  if(filesystem){
+    const record={kind:'full_source_validation_receipt_v1',contract:'instruction_assets_v1',baseline_revision:p.baselineRevision,
+      selected_skills:p.skills,entrypoints_present:true,projection_validation:'passed',installers:['install-kernel.mjs','install-codex-adapter.mjs'],runtime_or_effectiveness_implied:false};
+    const path=join(p.stagingRoot,'source-validation.json');writeCanonicalJsonNoReplace({outputPath:path,artifact:record,label:'instruction asset validation'});
+    validation={status:'passed',kind:'instruction_assets_v1',record,receipt:{path,digest:hash(readStableBytes(path,'instruction asset validation receipt'))},runtime_or_effectiveness_implied:false};
   }
   for(const s of p.supplements??[]){
     retainedInstructionPath(s.path);
@@ -233,14 +282,15 @@ export async function generateFullInstructionCandidate(p,provider){
   writeCanonicalJsonNoReplace({outputPath:join(p.stagingRoot,'changes.json'),artifact:{input_digest:canonicalDigest(input),changes},label:'owned generation changes',maximumBytes:4*1024*1024});
   writeCanonicalJsonNoReplace({outputPath:join(p.stagingRoot,'owned-files.json'),artifact:{files:[{path:'changes.json',digest:hash(readStableBytes(join(p.stagingRoot,'changes.json'),'owned changes',4*1024*1024))},
     ...derivation.map(({path,digest})=>({path,digest})),...(validation?[{path:'source-validation.json',digest:validation.receipt.digest}]:[])]},label:'owned generation staging'});
-  return {kind:'generated_full_instruction_candidate_v1',source_root:p.candidateRoot,source_revision:revision,baseline_revision:p.baselineRevision,
+  return {kind:'generated_full_instruction_candidate_v1',source_root:p.candidateRoot,...(filesystem?{source_kind:'filesystem_snapshot'}:{}),source_revision:revision,baseline_revision:p.baselineRevision,
     full_root:p.fullRoot,staging_root:p.stagingRoot,changed_paths:changed,derived_binding_paths:changed.filter(path=>derivedPaths.includes(path)),layout_object_digest:layout.object_digest,
     generated_by_this_loop:true,execution:provided.execution,...(derivation.length?{source_derivation:derivation}:{}),...(validation?{source_validation:validation}:{}),formal_admission_implied:false};
 }
 export function registerFullInstructionCandidate(p,candidate){
   assert.equal(candidate.source_root,p.candidateRoot);assert.equal(candidate.full_root,p.fullRoot);
-  assert.equal(git(p.candidateRoot,['rev-parse','HEAD']),candidate.source_revision);
-  assert.equal(git(p.candidateRoot,['status','--porcelain']),'','generated source drift');
+  const filesystem=filesystemSource(p);
+  if(filesystem){assert.equal(candidate.source_kind,'filesystem_snapshot');verifyInstructionSourceSnapshot(p.candidateRoot,candidate.source_revision);}
+  else{assert.equal(git(p.candidateRoot,['rev-parse','HEAD']),candidate.source_revision);assert.equal(git(p.candidateRoot,['status','--porcelain']),'','generated source drift');}
   const trusted=p.trustedAuthorityContexts??[],parents=verifyAssetRegistry({storeRoot:p.storeRoot,snapshotDigest:p.registrySnapshotDigest,trustedAuthorityContexts:trusted});
   const scope=reviewFindingContractScope(p),source=inventoryMap(p.candidateRoot),baseline=inventoryMap(p.baselineSourceRoot),installed=inventoryMap(p.fullRoot);
   assertReviewContractDelta(baseline,source,scope);
@@ -268,7 +318,8 @@ export function registerFullInstructionCandidate(p,candidate){
   for(const parent of p.parentAssets){
     const found=parents.assets.find(a=>a.record_digest===parent.record_digest&&a.content_digest===parent.content_digest);assert.ok(found,'parent Asset missing');
     const d=structuredClone(found.record);delete d.object_kind;const prefix=d.type_extension.entrypoint.replace(/SKILL\.md$/u,'');
-    d.version='git:'+candidate.source_revision;d.source.revision=candidate.source_revision;
+    d.version=filesystem?candidate.source_revision:'git:'+candidate.source_revision;d.source.revision=candidate.source_revision;
+    if(filesystem){d.source.kind='filesystem_snapshot';d.version_scheme='content_digest';}
     const oldTypes=new Map(found.content.files.map(f=>[f.path,f.media_type]));
     const bindContract=scope&&prefix===`skills/${scope.skill}/`&&(found.content.files.some(f=>f.path===scope.path)||actualSkillChange(baseline,source,scope.skill));
     const files=[...installed.values()].filter(f=>f.path.startsWith(prefix)||bindContract&&f.path===scope.path).map(f=>({path:f.path,raw_digest:f.sha256,media_type:oldTypes.get(f.path)??(f.path.endsWith('.md')?'text/markdown; charset=utf-8':'application/octet-stream')}));

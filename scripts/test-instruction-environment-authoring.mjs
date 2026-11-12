@@ -120,3 +120,24 @@ for(const oversized of [false,true])test('authoring preserves fixed executable h
   const bad=structuredClone(response);bad.changes[0].files.push({path:helper,text:'changed executable'});
   assert.throws(()=>importInstructionEnvironmentAuthoring({...o,requestObjectDigest:request.request_object_digest,response:bad}),/Markdown inventory/);
 });
+
+test('filesystem authoring revises a Git-origin component without invoking Git or losing parent lineage',t=>{
+  const f=compiledMembershipFixture(t,'codex'),local=verifyAssetRegistry({storeRoot:f.storeRoot,snapshotDigest:f.challenger.snapshot_digest});
+  const bundle=local.assets.find(a=>a.record_digest===f.challenger.asset.record_digest);
+  const env=captureInstructionEnvironment({...f.options,registrySnapshotDigest:f.challenger.snapshot_digest,selectionObjectDigest:null,
+    bindings:[{asset:f.challenger.asset,files:bundle.content.files.map(f=>({source:f.path,target:f.path}))}]});
+  const descriptor=structuredClone(bundle.record);delete descriptor.object_kind;
+  descriptor.version='1.2.0';descriptor.source.kind='filesystem_snapshot';descriptor.source.revision='sha256:'+'a'.repeat(64);
+  descriptor.derivation.parent=f.challenger.asset;descriptor.maintenance.rollback.target=f.challenger.asset;
+  const options={...f.options,registrySnapshotDigest:f.challenger.snapshot_digest,environmentObjectDigest:env.object_digest,
+    editableStableIds:[f.rootAsset.stable_id],observation:{goal:'Clarify the applicable instruction.'},bundleDescriptor:descriptor};
+  const request=prepareInstructionEnvironmentAuthoring(options);
+  const response={request_digest:request.request_object_digest,changes:[{operation:'revise',stable_id:f.rootAsset.stable_id,
+    files:[{path:'skills/new-local/SKILL.md',text:'Verify the applicable change before reporting success.\n'}]}]};
+  const originalPath=process.env.PATH;process.env.PATH=join(f.root,'no-git');t.after(()=>{process.env.PATH=originalPath;});
+  const result=importInstructionEnvironmentAuthoring({...options,requestObjectDigest:request.request_object_digest,response});
+  const registry=verifyAssetRegistry({storeRoot:f.storeRoot,snapshotDigest:result.snapshot_digest});
+  const record=registry.assets.find(a=>a.record_digest===result.individual_assets[0].record_digest).record;
+  assert.equal(record.source.kind,'filesystem_snapshot');assert.equal(record.version_scheme,'content_digest');assert.equal(record.version,record.source.revision);
+  assert.deepEqual(record.derivation.parent,f.rootAsset);assert.equal(result.activation_implied,false);
+});

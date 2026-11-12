@@ -1,6 +1,7 @@
 // Verify the measured source before importing any executable from its checkout.
 // This is identity binding, not grading/admission or application authority.
 import assert from 'node:assert/strict';
+import {readInstructionSourceSnapshot} from './instruction-source-version.mjs';
 import {spawnSync} from 'node:child_process';
 import {devNull} from 'node:os';
 import {canonicalDigest,readJsonFileStrict,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -10,10 +11,14 @@ const git=(root,args)=>{const r=spawnSync('git',['--no-optional-locks','-c',`cor
   assert.equal(r.status,0,'candidate source Git identity unavailable');return r.stdout.trim();};
 export function bindMeasuredNormalOwnerSource({sourceRoot,candidate}){
   assert.ok(candidate&&candidate.source_root===sourceRoot,'candidate source root mismatch');
-  assert.match(candidate.source_revision??'',/^[a-f0-9]{40}$/u,'candidate source revision required');
+  assert.match(candidate.source_revision??'',/^(?:[a-f0-9]{40}|sha256:[a-f0-9]{64})$/u,'candidate source revision required');
   assertNoSymlinkPathSegments(sourceRoot,'measured candidate source');
-  assert.equal(git(sourceRoot,['rev-parse','HEAD']),candidate.source_revision,'candidate source revision drift');
-  assert.equal(git(sourceRoot,['status','--porcelain','--untracked-files=normal']),'','candidate source is not clean');
+  if(candidate.source_revision.startsWith('sha256:')) {
+    assert.equal(readInstructionSourceSnapshot(sourceRoot)?.revision,candidate.source_revision,'candidate source revision drift');
+  } else {
+    assert.equal(git(sourceRoot,['rev-parse','HEAD']),candidate.source_revision,'candidate source revision drift');
+    assert.equal(git(sourceRoot,['status','--porcelain','--untracked-files=normal']),'','candidate source is not clean');
+  }
   const owned=candidate.owned_version??null;
   if(owned){
     const manifest=readJsonFileStrict(owned.manifest,'owned measured source manifest',16*1024*1024);

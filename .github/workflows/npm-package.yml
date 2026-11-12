@@ -1,0 +1,20 @@
+name: Validate npm distribution
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.19.0"
+      - name: Verify packed CLI and Gitless supervised lifecycle
+        run: npm run test:package

@@ -16,7 +16,7 @@ function validate(m,c,originalCandidateDigest){
  keys(m,['kind','candidate_digest','source_revision','baseline_revision','environment_object_digest','artifacts','attempts','limitations']);
  assert.equal(m.kind,'instruction_loop_reference_evidence_v1');assert.equal(m.candidate_digest,originalCandidateDigest??canonicalDigest(c),'reference candidate differs');
  for(const key of ['source_revision','baseline_revision','environment_object_digest'])assert.equal(m[key],c[key],'reference source/environment differs');
- digest(m.environment_object_digest);assert.match(m.source_revision,/^[a-f0-9]{40}$/u);assert.match(m.baseline_revision,/^[a-f0-9]{40}$/u);
+ digest(m.environment_object_digest);assert.match(m.source_revision,/^(?:[a-f0-9]{40}|sha256:[a-f0-9]{64})$/u);assert.match(m.baseline_revision,/^(?:[a-f0-9]{40}|sha256:[a-f0-9]{64})$/u);
  assert.ok(Array.isArray(m.artifacts)&&m.artifacts.length>=3&&m.artifacts.length<=256);
  const refs=new Map(),receiptPaths=new Set(),receiptDigests=new Set();for(const a of m.artifacts){keys(a,['id','role','path','digest']);id(a.id);assert.ok(!refs.has(a.id),'duplicate evidence artifact');refs.set(a.id,a);digest(a.digest);assert.equal(resolve(a.path),a.path);
   assert.ok(['case_approval','input','receipt','report','context'].includes(a.role));

@@ -9,7 +9,7 @@ import { verifyAssetRegistry, registerAsset } from './asset-registry.mjs';
 import { exactInstructionAsset, instructionBytesDigest } from './instruction-environment.mjs';
 import { instructionPath } from './instruction-projection-paths.mjs';
 import { validateJsonSchema } from './execution-envelope.mjs';
-import { commitInstructionSource } from './instruction-source-version.mjs';
+import { commitInstructionSource, snapshotInstructionSource } from './instruction-source-version.mjs';
 
 const digest = /^sha256:[a-f0-9]{64}$/u;
 const id = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -151,6 +151,8 @@ export function receiveInstructionAssetPackage(options) {
   return { status: 'quarantined', package_digest: p.package_digest, activation_implied: false };
 }
 export function planInstructionAssetImport(options) {
+  const sourceKind = options.sourceKind ?? 'git_repository';
+  assert.ok(['git_repository', 'filesystem_snapshot'].includes(sourceKind), 'unsupported import source kind');
   const p = readPackage(join(resolve(options.quarantineRoot), 'package.json')), local = registry(options);
   assert.equal(options.intendedScope, local.scope_id, 'receiver scope must be its local Registry scope');
   assert.equal(p.payload.intended_scope, options.intendedScope, 'package intended for a different scope');
@@ -187,7 +189,7 @@ export function planInstructionAssetImport(options) {
     const a = p.payload.assets.find(a => a.source_ref_digest === row.source_ref_digest);
     if (a.dependencies.some(d => !accepted.some(r => r.source_ref_digest === d))) row.blockers.push('dependency_not_accepted');
   }
-  const plan = { kind: 'instruction_asset_import_plan_v1', package_digest: p.package_digest,
+  const plan = { kind: 'instruction_asset_import_plan_v1', ...(sourceKind === 'filesystem_snapshot' ? { source_kind: sourceKind } : {}), package_digest: p.package_digest,
     registry_snapshot_digest: options.registrySnapshotDigest, scope_id: local.scope_id, adapter: options.adapter,
     available_capabilities: [...options.availableCapabilities].sort(), rows,
     available_runtime_profiles: [...(options.availableRuntimeProfiles ?? [])].sort(),
@@ -197,10 +199,10 @@ export function planInstructionAssetImport(options) {
     activation_implied: false, rollback_snapshot_digest: options.registrySnapshotDigest };
   return { plan, plan_digest: canonicalDigest(plan), ready: accepted.length > 0 && accepted.every(r => !r.blockers.length) };
 }
-function localDescriptor(a, row, version, local, dependencies, packageDigest, revision) {
+function localDescriptor(a, row, version, local, dependencies, packageDigest, revision, sourceKind) {
   const unknown = () => ({ status: 'unknown', included: [], excluded: [] });
   return { schema_version: '1.0.0', asset_type: a.asset_type, stable_id: row.target_id, version, version_scheme: 'semantic',
-    source: { kind: 'git_repository', repository_id: local.repository_id, revision },
+    source: { kind: sourceKind, repository_id: local.repository_id, revision },
     provenance: { origin: 'repository_file', license: { status: 'unknown', spdx_id: null, evidence_ref: null },
       owner: { status: 'unknown', owner_id: null, evidence_ref: null } },
     derivation: { kind: 'root', parent: null, delta: null }, dependencies,
@@ -220,6 +222,8 @@ function localDescriptor(a, row, version, local, dependencies, packageDigest, re
       rollback: { status: 'requires_explicit_authority', target: null, authority_ref: null } } };
 }
 export function applyInstructionAssetImport(options) {
+  const sourceKind = options.sourceKind ?? 'git_repository';
+  assert.ok(['git_repository', 'filesystem_snapshot'].includes(sourceKind), 'unsupported import source kind');
   const checked = planInstructionAssetImport(options);
   assert.equal(options.confirmedPlanDigest, checked.plan_digest, 'import plan changed');
   assert.equal(checked.ready, true, 'import plan has unresolved conflicts or no accepted candidates');
@@ -235,8 +239,8 @@ export function applyInstructionAssetImport(options) {
       const a = p.payload.assets.find(a => a.source_ref_digest === row.source_ref_digest);
       const source = join(root, String(done.size)); mkdirSync(source);
       for (const f of a.files) { const path = join(source, f.path); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, f.text, { flag: 'wx', mode: 0o600 }); }
-      const revision = commitInstructionSource(source);
-      const descriptor = localDescriptor(a, row, 'import:' + p.package_digest.slice(7, 31), local, a.dependencies.map(d => done.get(d)), p.package_digest, revision);
+      const revision = sourceKind === 'filesystem_snapshot' ? snapshotInstructionSource(source) : commitInstructionSource(source);
+      const descriptor = localDescriptor(a, row, 'import:' + p.package_digest.slice(7, 31), local, a.dependencies.map(d => done.get(d)), p.package_digest, revision, sourceKind);
       const result = registerAsset({ storeRoot: options.storeRoot, sourceRoot: source, predecessorSnapshotDigest: snapshot,
         descriptor, trustedAuthorityContexts: options.trustedAssetAuthorityContexts ?? [] });
       snapshot = result.snapshot_digest; done.set(a.source_ref_digest, exactInstructionAsset({ ...descriptor, ...result }));

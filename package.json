@@ -1,0 +1,34 @@
+{
+  "name": "@hiroshi.inoue/agent-spectrum-kernel",
+  "version": "0.1.0-dev.0",
+  "private": true,
+  "description": "A supervised improvement loop and portable instruction assets for coding agents.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "bin": {
+    "ask": "bin/ask.mjs"
+  },
+  "files": [
+    "bin/ask.mjs",
+    "dist/"
+  ],
+  "scripts": {
+    "build": "node scripts/build-npm-package.mjs",
+    "prepack": "npm run build",
+    "test:package": "node --test --test-concurrency=1 scripts/test-npm-package.mjs scripts/test-package-full-loop.mjs scripts/test-ask-package-loop-prepare.mjs scripts/test-instruction-source-snapshot.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ist-h-i/agent-spectrum-kernel.git"
+  },
+  "keywords": [
+    "coding-agent",
+    "skills",
+    "evaluation",
+    "codex",
+    "self-improvement"
+  ]
+}

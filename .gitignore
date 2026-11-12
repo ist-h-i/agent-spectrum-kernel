@@ -1,0 +1,4 @@
+# Generated npm distribution; rebuilt and verified from source.
+/dist/
+/*.tgz
+/node_modules/
