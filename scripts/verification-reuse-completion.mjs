@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { trustedHostProviders } from "./verification-host-provider.mjs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
@@ -293,14 +294,30 @@ async function main() {
   const flags = {};
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
-    if (!["--repository", "--store", "--target", "--claim", "--output"].includes(key) || Object.hasOwn(flags, key)) throw new Error("unknown or duplicate option");
+    if (!["--repository", "--store", "--target", "--claim", "--output", "--provider-module", "--provider-sha256"].includes(key) || Object.hasOwn(flags, key)) throw new Error("unknown or duplicate option");
     flags[key] = args[i + 1];
   }
   for (const key of ["--repository", "--store", "--target"]) if (!flags[key]) throw new Error("missing required option");
   if (command === "prepare" && flags["--claim"]) throw new Error("prepare does not make a claim");
   const options = { repositoryRoot: resolve(flags["--repository"]), storeRoot: resolve(flags["--store"]), targetRevision: flags["--target"] };
+  const hasProvider = flags["--provider-module"] !== undefined || flags["--provider-sha256"] !== undefined;
+  if (hasProvider && (command !== "coverage" || !flags["--provider-module"] || !flags["--provider-sha256"])) throw new Error("provider module and digest are paired coverage options");
+  let providers = {};
+  if (hasProvider) {
+    // Resolve and validate the current policy before loading any host executable.
+    let policy;
+    try {
+      currentTarget(options.repositoryRoot, options.targetRevision);
+      const prepared = prepareVerificationCompletion(options);
+      policy = completionPolicy(options.repositoryRoot, prepared).policy;
+    } catch {
+      // Let the common coverage path emit its bounded structured blockers. Do
+      // not load host code when the target/evidence/policy cannot be resolved.
+    }
+    if (policy) providers = trustedHostProviders({ modulePath: flags["--provider-module"], expectedDigest: flags["--provider-sha256"], providerIds: [...new Set(policy.providers.map(entry => entry.provider_id))] });
+  }
   const result = command === "prepare" ? prepareVerificationCompletion(options)
-    : await buildFinalVerificationCoverage({ ...options, claim: flags["--claim"] ?? "completion" });
+    : await buildFinalVerificationCoverage({ ...options, claim: flags["--claim"] ?? "completion", providers });
   if (flags["--output"]) writeCanonicalJsonNoReplace({ outputPath: resolve(flags["--output"]), artifact: result, label: "verification completion output" });
   else process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (command === "coverage" && result.status !== "covered") process.exitCode = 1;
