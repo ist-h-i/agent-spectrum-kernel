@@ -111,3 +111,17 @@ ask verification review --repository /absolute/project --store /absolute/evidenc
 観点のIDだけでは判定条件の本文になりません。接続側は対応する承認済み仕様を
 読み込んでください。意味を解決できないIDを推測で合格にせず、不足として止めます。
 テスト問題の正解を本体のレビュー処理へ埋め込むことはしません。
+
+## レビュー指摘を再利用可能なルールにする
+
+`ask rules prepare --spec rule-spec.json --output rule-request.json` で、
+既存の自己改善ループに渡すレビュー指針の候補を準備します。
+`ask rules status --request rule-request.json --root /absolute/path/loop-root`
+で、承認された変更と実際の適用内容を照合します。準備だけでは適用先を変更せず、
+承認も記録しません。更新・廃止にも新しい人間の判断が必要です。
+採用条件、指定する項目、検証の限界は[ルールのライフサイクル](review-rule-lifecycle.md)を参照してください。
+長期的な再発防止効果は、適用できたこととは分けて扱います。
+
+`ask rules review --request rule-request.json --observations rule-observations.json`
+は、確認済みの観測情報から見直し・廃止の検討を提案します。ルールは変更せず、
+観測件数だけで再発防止効果が実証されたとは扱いません。

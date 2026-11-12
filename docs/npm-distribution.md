@@ -283,3 +283,14 @@ The trusted host must resolve their actual approved specification (or include th
 corresponding task contract in its prompt). If a ref cannot be resolved, report
 that gap and block; do not infer a passing requirement from a name or fixture.
 ASK does not bake public benchmark answers into the production dispatcher.
+
+## Review findings to reusable rules
+
+Use `ask rules prepare --spec rule-spec.json --output rule-request.json` to
+prepare bounded review guidance for the existing supervised loop, and
+`ask rules status --request rule-request.json --root /absolute/path/loop-root`
+to reconcile its application. `ask rules review --request rule-request.json
+--observations rule-observations.json` recommends refresh or retirement from
+host-reviewed observations without changing the rule. Preparation does not edit the target or grant
+approval. See [project-local review rule lifecycle](review-rule-lifecycle.md)
+for promotion criteria, update/retirement, and evidence limits.
