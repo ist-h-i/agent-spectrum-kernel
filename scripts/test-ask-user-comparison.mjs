@@ -95,7 +95,7 @@ test("K-principles aggregation separates source revisions and pools the same gen
       assert.equal(value.plan.verification.digest, current.plan.verification.digest);
     }
     assert.equal(historical.plan.kernel_definition.generation.renderer_revision, 1);
-    assert.equal(current.plan.kernel_definition.generation.renderer_revision, 2);
+    assert.equal(current.plan.kernel_definition.generation.renderer_revision, 3);
     const collection = aggregateUserComparisons(prepared.map(value => value.root));
     assert.equal(collection.groups.length, 2);
     assert.equal(collection.mixed_kernel_generations_pooled, false);

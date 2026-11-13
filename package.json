@@ -18,7 +18,7 @@
   "scripts": {
     "build": "node scripts/build-npm-package.mjs",
     "prepack": "npm run build",
-    "test:package": "node --test --test-concurrency=1 scripts/test-npm-package.mjs scripts/test-package-full-loop.mjs scripts/test-review-rule-lifecycle.mjs scripts/test-ask-package-loop-prepare.mjs scripts/test-instruction-source-snapshot.mjs scripts/test-package-verification.mjs scripts/test-verification-host-provider.mjs scripts/test-verification-review-dispatch.mjs"
+    "test:package": "node --test --test-concurrency=1 scripts/test-npm-package.mjs scripts/test-package-full-loop.mjs scripts/test-review-rule-lifecycle.mjs scripts/test-finding-intake.mjs scripts/test-ask-package-loop-prepare.mjs scripts/test-instruction-source-snapshot.mjs scripts/test-package-verification.mjs scripts/test-verification-host-provider.mjs scripts/test-verification-review-dispatch.mjs"
   },
   "repository": {
     "type": "git",

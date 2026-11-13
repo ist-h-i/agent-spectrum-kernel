@@ -92,3 +92,18 @@ for(const invalidation of ['result-binding','target-change'])test(`observed usag
   assert.equal(r.reviewer_calls,1);assert.deepEqual(r.usage,usage);
   assert.equal(r.authorizes_action,false);
 });
+
+test('enabled intake captures dispatched results and separates review executions',async t=>{
+ const {initializeFindingIntake,listFindings}=await import('./finding-intake.mjs');
+ const f=fixture(t);f.revise(REVISIONS[2]);initializeFindingIntake(f.root,'review-project');
+ const reviewer=request=>{const response=pass(request);response.result.findings=[{path:'src/limit.mjs',obligation_ref:'AC-limit-inclusive',severity:'major'}];response.result.decision='block';return response;};
+ for(let i=0;i<2;i++){const r=await dispatchVerificationReview({...options(f),reviewer});assert.equal(r.status,'reviewed');assert.equal(r.finding_capture.status,'recorded');assert.equal(r.finding_capture.events.length,1);}
+ const records=listFindings(f.root);assert.equal(records.length,2);assert.ok(records.every(r=>r.source.kind==='ai_review'&&r.evidence_status==='Hypothesis'));
+});
+test('capture failure preserves completed review and does not rerun it',async t=>{
+ const {initializeFindingIntake}=await import('./finding-intake.mjs');const {rmSync}=await import('node:fs');
+ const f=fixture(t);f.revise(REVISIONS[2]);initializeFindingIntake(f.root,'review-project');
+ rmSync(join(f.root,'.agent-spectrum-kernel/findings/events'),{recursive:true});let calls=0;
+ const r=await dispatchVerificationReview({...options(f),reviewer:request=>{calls++;const response=pass(request);response.result.findings=[{path:'src/limit.mjs',obligation_ref:'AC-limit-inclusive',severity:'major'}];response.result.decision='block';return response;}});
+ assert.equal(calls,1);assert.equal(r.status,'reviewed');assert.equal(r.finding_capture.status,'failed');assert.equal(r.result.decision,'block');
+});

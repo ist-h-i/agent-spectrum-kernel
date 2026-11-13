@@ -17,6 +17,7 @@ Usage:
   ask [--workspace <directory>] assets <preview|export|receive|plan|apply> <input.json>
   ask [--workspace <directory>] evaluate <command> [options]
   ask [--workspace <directory>] rules <prepare|status|review> [options]
+  ask [--workspace <directory>] findings <init|capture|list|feedback> [options]
   ask [--workspace <directory>] verification <prepare|coverage|review> [options]
   ask --version
 
@@ -41,7 +42,7 @@ export function packageCommand(args){
   }
   const runtime=workspace?packageWorkspaceRuntime(workspace):ROOT;
   const entries={setup:'ask-setup.mjs',doctor:'ask-setup.mjs',loop:'supervised-instruction-loop-cli.mjs',
-    environment:'ask-package-environment.mjs',assets:'ask-package-environment.mjs',evaluate:'practical-evaluation-cli.mjs',verification:'verification-reuse-completion.mjs',rules:'review-rule-lifecycle.mjs'};
+    environment:'ask-package-environment.mjs',assets:'ask-package-environment.mjs',evaluate:'practical-evaluation-cli.mjs',verification:'verification-reuse-completion.mjs',rules:'review-rule-lifecycle.mjs',findings:'finding-intake.mjs'};
   if(!Object.hasOwn(entries,command))throw new Error(`Unknown command: ${command}. Run ask --help.`);
   if(command==='loop'&&args[0]==='prepare'){
     if(!workspace)throw new Error('loop prepare requires --workspace');

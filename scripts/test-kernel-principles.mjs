@@ -50,3 +50,24 @@ test("condition choice is closed and omission retains historical K", () => {
   assert.deepEqual(comparisonConditions(KERNEL_PRINCIPLES_ID), ["plain", KERNEL_PRINCIPLES_ID, "full_ask"]);
   for (const value of [null, "", "kernel_principles_v2", "core", "../kernel_only"]) assert.throws(() => comparisonConditions(value), /unknown kernel condition/u);
 });
+
+
+test("reviewed optional capture procedure is excluded without changing historical principles", () => {
+  const text = source.toString("utf8");
+  const capture = /## 7\.6 Opt-in finding capture\n[\s\S]*?(?=## 8\. Skill routing\n)/u;
+  assert.match(text, capture);
+  // Reconstruct the previously sealed source, not an unsealed alternate input.
+  const previous = renderKernelPrinciples(Buffer.from(text.replace(capture, "")));
+  const current = renderKernelPrinciples(source);
+  assert.equal(previous.generation.source_digest, "sha256:9246ccde37219850da235544c158100efd0b473112ad59c7b692fc930e4538ee");
+  assert.equal(previous.generation.renderer_revision, 2);
+  assert.equal(current.generation.renderer_revision, 3);
+  assert.equal(current.body, previous.body);
+  assert.equal(current.generation.generated_digest, previous.generation.generated_digest);
+  assert.deepEqual(current.generation.included, previous.generation.included);
+  assert.ok(current.generation.excluded.includes("7.6:opt-in finding capture procedure"));
+  assert.ok(!previous.generation.excluded.includes("7.6:opt-in finding capture procedure"));
+  assert.doesNotMatch(current.body, /finding capture|findings\/|capture receipts/u);
+  // Even this excluded procedure remains protected by the full source seal.
+  assert.throws(() => renderKernelPrinciples(Buffer.from(text.replace("Without enabled intake", "Even without enabled intake"))), /canonical source changed/u);
+});
