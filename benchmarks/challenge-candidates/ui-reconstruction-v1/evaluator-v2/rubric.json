@@ -1,0 +1,744 @@
+{
+  "kind": "ch08_semantic_rubric_v2",
+  "version": "2.0.0",
+  "maximum": 100,
+  "categories": {
+    "functional": 40,
+    "ux": 60
+  },
+  "source": "https://uiux-design-guide.maroneko-tensuke.chatgpt.site/",
+  "task_na": [],
+  "requirements": [
+    {
+      "id": "F01",
+      "category": "functional",
+      "weight": 4.571428571428571,
+      "title": "目標・条件・取組",
+      "scenarios": [
+        "T01",
+        "T04"
+      ],
+      "checks": [
+        {
+          "id": "F01.1",
+          "acceptance": "複数目標の作成と切替、期限と週時間の編集"
+        },
+        {
+          "id": "F01.2",
+          "acceptance": "条件と取組の独立表示、取組の所要時間と成果物"
+        },
+        {
+          "id": "F01.3",
+          "acceptance": "次アクション、保留と置換の履歴を確認"
+        },
+        {
+          "id": "F01.4",
+          "acceptance": "全取組doneでも条件を自動達成にしない"
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "category": "functional",
+      "weight": 4.571428571428571,
+      "title": "先行記録と履歴",
+      "scenarios": [
+        "T01",
+        "T02"
+      ],
+      "checks": [
+        {
+          "id": "F02.1",
+          "acceptance": "目標0件で記録し、後から目標と条件と取組へ紐付け"
+        },
+        {
+          "id": "F02.2",
+          "acceptance": "記録全欄を編集し、旧revisionと変更履歴を確認"
+        },
+        {
+          "id": "F02.3",
+          "acceptance": "論理取消・復元とリンク解除を履歴付きで実施"
+        },
+        {
+          "id": "F02.4",
+          "acceptance": "題名・結果の検索と日付・目標・取消フィルター"
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "category": "functional",
+      "weight": 5.714285714285714,
+      "title": "計画の検証と採用",
+      "scenarios": [
+        "T03"
+      ],
+      "checks": [
+        {
+          "id": "F03.1",
+          "acceptance": "希望・現状・期限・週時間・除外期間と制約を依頼文コピー"
+        },
+        {
+          "id": "F03.2",
+          "acceptance": "上限8時間案を拒否し、違反箇所付き修正依頼をコピー"
+        },
+        {
+          "id": "F03.3",
+          "acceptance": "有効案の変更前後と未決定・暫定・準備済みを区別"
+        },
+        {
+          "id": "F03.4",
+          "acceptance": "確認取消は無変更、採用は一度だけ反映して再利用拒否"
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "category": "functional",
+      "weight": 2.857142857142857,
+      "title": "依頼対応の厳密さ",
+      "scenarios": [
+        "T05"
+      ],
+      "checks": [
+        {
+          "id": "F04.1",
+          "acceptance": "別request_id・goal_id・goal_revisionの回答を拒否"
+        },
+        {
+          "id": "F04.2",
+          "acceptance": "プレビュー後の目標変更を適用直前に再検証し拒否"
+        },
+        {
+          "id": "F04.3",
+          "acceptance": "関連記録の更新・追加後の古い依頼回答を拒否"
+        },
+        {
+          "id": "F04.4",
+          "acceptance": "依頼再作成による旧依頼消費と、構造不正の回答拒否"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "category": "functional",
+      "weight": 5.714285714285714,
+      "title": "参考評価と採用判断",
+      "scenarios": [
+        "T06"
+      ],
+      "checks": [
+        {
+          "id": "F05.1",
+          "acceptance": "関連条件指定と目標全体の評価依頼を生成"
+        },
+        {
+          "id": "F05.2",
+          "acceptance": "判定4種類、根拠revision、限界、次の行動を表示"
+        },
+        {
+          "id": "F05.3",
+          "acceptance": "条件と取組の一部採用・取消を独立に実行"
+        },
+        {
+          "id": "F05.4",
+          "acceptance": "別対象の根拠・存在しない根拠・未採用の正式扱いを拒否"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "category": "functional",
+      "weight": 5.714285714285714,
+      "title": "失効の範囲と不可逆性",
+      "scenarios": [
+        "T07"
+      ],
+      "checks": [
+        {
+          "id": "F06.1",
+          "acceptance": "採用したc1の根拠r1の編集でc1とa1だけ失効"
+        },
+        {
+          "id": "F06.2",
+          "acceptance": "条件変更／取組変更の対象ごとの失効と現在集計から除外"
+        },
+        {
+          "id": "F06.3",
+          "acceptance": "根拠の取消・直接／間接リンク変更で失効、復元後も復活しない"
+        },
+        {
+          "id": "F06.4",
+          "acceptance": "根拠外r0の変更や別対象操作では既存評価が失効しない"
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "category": "functional",
+      "weight": 2.857142857142857,
+      "title": "キャリア参照",
+      "scenarios": [
+        "T08"
+      ],
+      "checks": [
+        {
+          "id": "F07.1",
+          "acceptance": "現在・達成後・理想の責務レベルと5軸を比較"
+        },
+        {
+          "id": "F07.2",
+          "acceptance": "現在もAI参考、将来は推定と明示"
+        },
+        {
+          "id": "F07.3",
+          "acceptance": "根拠revision・限界・市場条件を確認"
+        },
+        {
+          "id": "F07.4",
+          "acceptance": "目標または根拠変更で古い参考とし復活しない"
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "category": "functional",
+      "weight": 3.4285714285714284,
+      "title": "期間レポートと安全な出力",
+      "scenarios": [
+        "T09",
+        "T10"
+      ],
+      "checks": [
+        {
+          "id": "F08.1",
+          "acceptance": "両端を含む期間・目標選択と取消除外の件数・分集計"
+        },
+        {
+          "id": "F08.2",
+          "acceptance": "期間内の事実と現在時点の判断を分離"
+        },
+        {
+          "id": "F08.3",
+          "acceptance": "週報と面談レポートの文章コピーとHTML・CSV保存"
+        },
+        {
+          "id": "F08.4",
+          "acceptance": "HTML入力を実行せず、CSV式・引用符・改行を安全に保持"
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "category": "functional",
+      "weight": 2.2857142857142856,
+      "title": "保存失敗と競合",
+      "scenarios": [
+        "T11",
+        "T12"
+      ],
+      "checks": [
+        {
+          "id": "F09.1",
+          "acceptance": "再読込で通常保存内容を復元"
+        },
+        {
+          "id": "F09.2",
+          "acceptance": "失敗時に編集を保持し、未保存・再試行・退避を提供"
+        },
+        {
+          "id": "F09.3",
+          "acceptance": "正式状態変更は永続保存成功まで確定しない"
+        },
+        {
+          "id": "F09.4",
+          "acceptance": "複数タブで更新を消失させず競合を表示し退避・再読込"
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "category": "functional",
+      "weight": 2.2857142857142856,
+      "title": "バックアップ復元",
+      "scenarios": [
+        "T13"
+      ],
+      "checks": [
+        {
+          "id": "F10.1",
+          "acceptance": "全履歴と依頼・採用・失効を含むJSON往復"
+        },
+        {
+          "id": "F10.2",
+          "acceptance": "構造・参照不正を拒否し旧状態を維持"
+        },
+        {
+          "id": "F10.3",
+          "acceptance": "置換の影響確認・取消・保存失敗で旧状態を維持"
+        },
+        {
+          "id": "F10.4",
+          "acceptance": "破損した保存値を上書きせず原文退避と復元を提供"
+        }
+      ]
+    },
+    {
+      "id": "U01",
+      "category": "ux",
+      "weight": 8,
+      "title": "人間中心設計",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U01.1",
+          "source_text": "誰が、どの状況で、何を達成したいかを起点にする。",
+          "acceptance": "Record-first and goal-first entry paths name the next achievable action without requiring an existing goal.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U01.2",
+          "source_text": "システム都合ではなく、ユーザーの判断・行動の順序に沿って並べる。",
+          "acceptance": "The first enabled step matches the available state: create a request when none exists, then provide response, compare and adopt.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U01.3",
+          "source_text": "1画面1目的を原則とする。",
+          "acceptance": "Each screen has one primary task; supporting operations are subordinate or progressively disclosed.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U01.4",
+          "source_text": "操作の完了だけでなく、完了後の次の行動まで設計する。",
+          "acceptance": "After save/adoption/failure, a visible action continues the task or recovers without reconstructing context.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    },
+    {
+      "id": "U02",
+      "category": "ux",
+      "weight": 10,
+      "title": "情報設計・認知負荷",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U02.1",
+          "source_text": "今の判断に必要な情報を、優先して見せる。",
+          "acceptance": "Changed fields, current target and decision constraints appear before raw payload/metadata.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U02.2",
+          "source_text": "主情報、判断材料、補助情報、例外を同じ強さで並べない。",
+          "acceptance": "Primary decision, evidence, auxiliary identifiers and exceptions have distinguishable priority.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U02.3",
+          "source_text": "説明を追加する前に、削除・統合・初期値・順序変更を検討する。",
+          "acceptance": "Optional or irrelevant fields are hidden, grouped or sensibly defaulted before adding explanatory prose; assess rendered outcome, not author intent.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U02.4",
+          "source_text": "1画面への詰め込みを避ける。",
+          "acceptance": "A representative populated screen separates stages and avoids showing all independent tasks simultaneously.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U02.5",
+          "source_text": "『初心者向けだから説明文を増やす』とは考えない。",
+          "acceptance": "Novice guidance uses short actionable labels and progressive help rather than repeated prose; do not infer design intent.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    },
+    {
+      "id": "U03",
+      "category": "ux",
+      "weight": 6,
+      "title": "言語・マイクロコピー",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U03.1",
+          "source_text": "タイトルはカテゴリ名だけでなく、何をする画面か分かる表現にする。",
+          "acceptance": "Screen title names the task and agrees with its primary action.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U03.2",
+          "source_text": "ボタン名は『次へ』だけで済ませず、押した結果を予測できる表現にする。",
+          "acceptance": "Button labels predict the actual effect and target before activation.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U03.3",
+          "source_text": "ラベルで済む内容を長文で説明しない。",
+          "acceptance": "Fields have concise labels; instructions are reserved for constraints not expressible by labels.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U03.4",
+          "source_text": "同じ意味をタイトル、サブタイトル、説明文で繰り返さない。",
+          "acceptance": "Repeated title/subtitle/help text adds distinct information; necessary safety repetition is not penalized.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U03.5",
+          "source_text": "必要な言葉は残し、UIの構造・状態・振る舞いで長文説明への依存を減らす。",
+          "acceptance": "Structure and visible state make the main flow usable without interpreting raw identifiers or long instructions.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    },
+    {
+      "id": "U04",
+      "category": "ux",
+      "weight": 6,
+      "title": "アフォーダンス・シグニファイア",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U04.1",
+          "source_text": "押せる・選べる・入力できる・ドラッグできることが見て分かるようにする。",
+          "acceptance": "Available actions and editable/selectable controls are visibly discoverable.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U04.2",
+          "source_text": "選択済み、未選択、無効、処理中などを識別できるようにする。",
+          "acceptance": "Selected, unavailable, pending, saved and unsaved states that occur in the task are distinguished truthfully.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U04.3",
+          "source_text": "アイコンだけ、色だけ、位置だけに意味を依存させない。",
+          "acceptance": "Meaningful controls and states have text/shape cues as well as any color/icon/position.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U04.4",
+          "source_text": "説明文を読まないと操作できることが分からないUIを避ける。",
+          "acceptance": "Main actions can be discovered from controls, without reading a separate instructional paragraph.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    },
+    {
+      "id": "U05",
+      "category": "ux",
+      "weight": 7,
+      "title": "操作の一貫性",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U05.1",
+          "source_text": "同じ見た目のコントロールは、同じ種類の意味・結果を持つ。",
+          "acceptance": "Controls with the same appearance perform the same semantic class of action across representative screens.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U05.2",
+          "source_text": "hover、focus、press、selected、disabled、loading、success、error、completedの意味を揃える。",
+          "acceptance": "Applicable hover/focus/pressed/selected/disabled/loading/success/error/completed states consistently communicate their meaning; enumerate absent or untested states.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U05.3",
+          "source_text": "操作に対して反応を返し、操作中・完了・失敗を明確にする。",
+          "acceptance": "A user action produces immediate feedback and an honest completion/failure outcome; instantaneous local writes need not invent an animation.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U05.4",
+          "source_text": "画面遷移や要素の出現・消失は、操作との因果関係が分かるようにする。",
+          "acceptance": "Navigation and element removal preserve the operation's causal context, draft and usable focus position.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U05.5",
+          "source_text": "モーションは、因果・継続性・位置関係を伝えるために使う。",
+          "acceptance": "Transitions preserve orientation and causality; motion, when present, communicates change without obstructing use; absence of animation is not a defect.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    },
+    {
+      "id": "U06",
+      "category": "ux",
+      "weight": 8,
+      "title": "ユニバーサルデザイン・アクセシビリティ",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U06.1",
+          "source_text": "経験、能力、端末、入力方法の違いで不必要に排除しない。",
+          "acceptance": "Core tasks are understandable without internal technical vocabulary, and do not require one device/ability; state tested user/input conditions.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U06.2",
+          "source_text": "マウス、キーボード、タッチなど、単一の操作手段だけに依存しない。",
+          "acceptance": "Core scenarios can be completed with pointer and keyboard; include linking, confirmation and cancellation.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U06.3",
+          "source_text": "色だけで状態を表さない。",
+          "acceptance": "Statuses including errors and selection use a non-color signal.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U06.4",
+          "source_text": "操作対象の大きさや間隔を十分に確保する。",
+          "acceptance": "Measure representative controls at 360 and 1280px: targets at least 24x24 CSS px or documented spacing exception, text contrast 4.5:1 (large 3:1), no content loss; touch not inferred from size.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U06.5",
+          "source_text": "直接操作を使う場合でも、必要に応じて同等の代替経路を用意する。",
+          "acceptance": "If a direct gesture exists, an equivalent non-gesture path exists; otherwise verify native pointer and keyboard controls achieve the same task.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U06.6",
+          "source_text": "単純化のために、正しい判断に必要な制約まで隠さない。",
+          "acceptance": "Necessary constraints, evidence provenance and uncertainty remain visible before a consequential judgment.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    },
+    {
+      "id": "U07",
+      "category": "ux",
+      "weight": 8,
+      "title": "可逆性・安全性",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U07.1",
+          "source_text": "可能な操作はできるだけ可逆にする。",
+          "acceptance": "Record changes and human adoption can be cancelled/revised/restored without losing unrelated data; temporary draft loss is included.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U07.2",
+          "source_text": "Undo・取消・再編集・復元を優先する。",
+          "acceptance": "Available undo/cancel/re-edit/restore paths recover the intended prior state; evaluate actual paths, not implementation intention.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U07.3",
+          "source_text": "不可逆・破壊的・重大な操作は、実行前に対象・影響範囲・結果・復元不能性が分かるようにする。",
+          "acceptance": "Before destructive replacement or draft abandonment, target, scope and irreversible loss are explicit or safe recovery exists.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U07.4",
+          "source_text": "可逆な低リスク操作に、確認ダイアログを乱用しない。",
+          "acceptance": "Routine reversible low-risk actions do not require redundant confirmations; inspect record save, reference preview/cancel and view navigation.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U07.5",
+          "source_text": "誤操作の防止と操作の摩擦のバランスを取る。",
+          "acceptance": "Prevent meaningful errors without imposing unnecessary steps; compare safe edit/adopt/restore and low-risk navigation paths.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    },
+    {
+      "id": "U08",
+      "category": "ux",
+      "weight": 7,
+      "title": "エラー耐性・部分障害",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U08.1",
+          "source_text": "一部の失敗で、画面全体を不用意にエラーにしない。",
+          "acceptance": "Ordinary validation/copy/save failure leaves the application and unrelated work usable.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U08.2",
+          "source_text": "正常に使える部分は維持し、失敗した範囲だけを局所化する。",
+          "acceptance": "Failure invalidates only the affected state, while retaining unaffected data and recoverable user input.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U08.3",
+          "source_text": "部分障害を隠さない。何が失敗し、何がまだ使え、どう復旧できるかを示す。",
+          "acceptance": "Failure messages identify failed scope, remaining usable data and a recovery path that actually retains needed input.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U08.4",
+          "source_text": "不完全な情報を、完全な結果として見せない。",
+          "acceptance": "Incomplete/stale results are never presented as complete current facts; current draft and persisted state are distinct.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U08.5",
+          "source_text": "欠損によって判断が誤る場合は、その情報に依存する範囲を停止する。",
+          "acceptance": "Removing required evidence disables the dependent judgment, including indirect relationships, while unrelated judgments remain valid.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        },
+        {
+          "id": "U08.6",
+          "source_text": "全画面の停止は、権限・整合性・安全性などの問題が全体に及ぶ場合に限定する。",
+          "acceptance": "Whole-workspace recovery mode is used only for workspace-wide integrity failure; local failures keep unrelated tasks available.",
+          "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
+          "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
+          "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
+          "unknown": "Applicable behavior has not been observed enough to distinguish pass/partial/fail; record the missing probe."
+        }
+      ]
+    }
+  ],
+  "release_blocker_rules": {
+    "data_loss": "保存成功と表示した利用者データの消失、または取消復元による無断置換",
+    "unapproved_judgment": "人間の採用なしの正式達成・制約違反案・失効結果の現行採用",
+    "external_dependency": "外部AI・外部サービスへ送信、または外部取得必須で起動不可",
+    "unsafe_export": "利用者文字列によるHTML実行またはCSV式実行",
+    "unsaved_input_loss": "An ordinary navigation or supported conflict recovery silently loses meaningful unsaved input with no warning or recoverable draft.",
+    "misleading_state": "A consequential current judgment or recovery state is demonstrably presented as valid/safe despite missing required evidence or known loss. A merely ambiguous label without consequential false state is reported as a UX defect, not automatically this blocker."
+  },
+  "semantics": "Functional pass/fail/unknown; UX pass=1 partial=0.5 fail=0 unknown=missing. Partial requires observed benefit and limitation, never substitutes for untested behavior. NA is task-level only, identical for all candidates, evidence required, no cross-domain redistribution. All-NA domain remains unavailable. Blockers never offset by points. Resources reported separately."
+}
