@@ -164,6 +164,10 @@ Write or refresh session state only for:
 
 Do not require session state for trivial edits, one-shot answers, or simple local fixes where the final response fully captures state. Session state is not evidence of correctness, readiness, safety, or no regression; it only preserves resume context, verified evidence, assumptions, unverified items, approval needs, resume instruction, and stop conditions.
 
+## 7.6 Opt-in finding capture
+
+When `.agent-spectrum-kernel/findings/config.json` exists in the current project, follow [finding intake](docs/finding-intake.md) for meaningful task discoveries, user corrections and AI review findings. Prepare and capture the JSON as part of the work; do not ask the user to write it. Preserve source identity, uncertainty and later corrections. Before handoff or completion, check capture receipts and report unresolved storage failures. Collection never approves or applies a rule. Without enabled intake, do not create a store or scan conversation history automatically.
+
 ## 8. Skill routing
 
 `skills/operating-mode-router/SKILL.md` is the top-level routing source when a request may be delivery, adoption, observability, or operation work. `skills/skill-router/SKILL.md` is the canonical delivery/quality router. `AGENTS.md` only decides whether to stay in the kernel, invoke the mode router, invoke the delivery router, or honor an explicitly requested relevant skill.

@@ -125,3 +125,9 @@ ask verification review --repository /absolute/project --store /absolute/evidenc
 `ask rules review --request rule-request.json --observations rule-observations.json`
 は、確認済みの観測情報から見直し・廃止の検討を提案します。ルールは変更せず、
 観測件数だけで再発防止効果が実証されたとは扱いません。
+
+## 作業中の指摘を自動で蓄積する
+
+`ask findings init --project /absolute/project --repository-id project-name` で、そのプロジェクトのJSON蓄積を一度有効にします。以後、ASKの指示を読むAIが作業中の発見・ユーザーの訂正・レビュー指摘を整理して `capture` を呼びます。利用者が毎回JSONを書く必要はありません。ASKの `verification review` は検証済みのレビュー結果からコードで自動保存します。
+
+`list` で確認し、`feedback` で既存の改善候補作成につなげます。保存だけではルールの採用・適用にはなりません。一般のCodex/Claude会話をCLIが直接監視する機能ではなく、接続していない会話は取得できません。保存先・具体例・制限は[指摘の蓄積](finding-intake.md)を参照してください。
