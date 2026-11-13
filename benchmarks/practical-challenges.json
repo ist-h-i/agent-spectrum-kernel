@@ -69,6 +69,71 @@
         ],
         "limits": "One trial per effort; semantic assessor decisions, not a difficulty or comparative significance guarantee."
       }
+    },
+    {
+      "kind": "practical_challenge_registration_v1",
+      "id": "ch08-growth-workspace",
+      "display_id": "CH08",
+      "ordinal": 8,
+      "series": "ui-reconstruction-v1",
+      "input_version": "ui-functional-v1",
+      "workspace": "benchmarks/challenge-candidates/ui-reconstruction-v1/workspace",
+      "freeze_submission": true,
+      "input_manifest": {
+        "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/input-manifests/ch08-growth-workspace.json",
+        "digest": "sha256:eed7f685d6f1b18d1f3b362cfd6686f06c88d37d109b39e232f2de32651d24b4"
+      },
+      "stages": [
+        {
+          "id": "initial",
+          "outputs": [
+            "DELIVERY.md"
+          ],
+          "prompt": "Read task.md and all referenced public specifications. Design, implement and verify the local web UI in app/. Save DELIVERY.md with exact startup and verification instructions, observed results and limitations. Keep all original public files unchanged. Complete runnable artifacts before ending this turn; stage two is read-only and freezes every file, with no dependency symlinks. Use only this workspace, localhost and allowed system toolchains, never external services, host repositories or history. Do not call an actual AI service. Stop after delivery."
+        },
+        {
+          "id": "reassessment",
+          "outputs": [
+            "REASSESSMENT.md"
+          ],
+          "update": {
+            "target": "OPERATIONAL-UPDATE.md",
+            "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/stages/verification-turn.md",
+            "digest": "sha256:6de149a89884c23b93f3cd8e222fcc9aebc9c96c11dd432fda50c2ee89295345"
+          },
+          "prompt": "Continue this same trial. Read OPERATIONAL-UPDATE.md and perform its read-only checks against the frozen implementation. Add REASSESSMENT.md only. Change no existing files and add no other files. Retain the original workspace, local-only network boundary, tools, model and settings. Missing runtime evidence must remain explicit. Stop when the reassessment is saved."
+        }
+      ],
+      "evaluator": {
+        "kind": "external_semantic_assessment",
+        "maximum": 100,
+        "categories": {
+          "functional": 70,
+          "ux": 30
+        },
+        "automatic_semantic_scoring": false,
+        "files": [
+          {
+            "path": "rubric.json",
+            "digest": "sha256:a8a099d34d2d726d07a39599a4577ef54fd74a0e6e2e5f677b092c82840b9353"
+          },
+          {
+            "path": "score.mjs",
+            "digest": "sha256:da4af90b2078037c453f71da34fcd4c1a5e272cb0af18ef5fd7be1d56dd06061"
+          },
+          {
+            "path": "README.md",
+            "digest": "sha256:feb6c8846a81a752ee7ed8ded7f586fe4b848590bd984be5781f1b1ae3b61aa5"
+          }
+        ]
+      },
+      "primary_catalog_member": false,
+      "formal_primary_admission": false,
+      "calibration": {
+        "status": "not_run",
+        "ready_for_measurement": false,
+        "limits": "Registered task and model-free contract checks only. No actual solver trial, correct UI reference implementation or difficulty calibration has been run. Historical seven-challenge acceptance is unchanged."
+      }
     }
   ]
 }

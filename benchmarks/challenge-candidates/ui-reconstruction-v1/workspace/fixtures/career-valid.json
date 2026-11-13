@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "kind": "career",
+  "request_id": "career-1",
+  "goal_id": "g1",
+  "goal_revision": 1,
+  "payload": {
+    "current": {
+      "responsibility_level": "支援を受けた担当",
+      "axes": {
+        "delivery": 2,
+        "design": 3,
+        "collaboration": 2,
+        "leadership": 1,
+        "learning": 3
+      },
+      "evidence": [
+        {
+          "record_id": "r1",
+          "revision": 1
+        }
+      ],
+      "uncertainty": "合成記録に限定した参考推定"
+    },
+    "after_goal": {
+      "responsibility_level": "レビューを進める担当",
+      "axes": {
+        "delivery": 2,
+        "design": 3,
+        "collaboration": 2,
+        "leadership": 1,
+        "learning": 3
+      },
+      "evidence": [],
+      "uncertainty": "合成記録に限定した参考推定"
+    },
+    "ideal": {
+      "responsibility_level": "領域の設計責任者",
+      "axes": {
+        "delivery": 2,
+        "design": 3,
+        "collaboration": 2,
+        "leadership": 1,
+        "learning": 3
+      },
+      "evidence": [],
+      "uncertainty": "合成記録に限定した参考推定"
+    },
+    "market_context": "市場・組織・時期により異なる。給与の確定情報ではない。"
+  }
+}

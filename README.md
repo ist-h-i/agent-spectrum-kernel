@@ -66,7 +66,7 @@ ASKは、共通の判断原則、必要時に使う工程、プロジェクト�
 
 [人間の判断を挟む自己改善ループ](docs/supervised-instruction-loop.md)が、選択したSkillの候補生成、評価ケース選定、試行、レポート、承認後の適用、版管理、後片付けを接続します。人間は**評価ケースと変更の適用**を承認・拒否します。結果だけを見る場合は適用先を指定せずに進められます。候補が勝つことや、完全無人で実行することを完成条件にはしません。
 
-[個人Codex v1の提供範囲](docs/personal-v1-release-preparation-ja.md)と[保存実績のデモ](docs/demos/personal-loop-saved-demo-ja.md)に、実モデル比較から採用・公開ソースへの反映、版の有効化、復旧までの確認範囲をまとめています。通常24課題＋難問7課題は実用評価として受け入れ済みですが、全条件を揃えた正式研究、費用の完全集計、普遍的な品質・速度向上を意味しません。
+[個人Codex v1の提供範囲](docs/personal-v1-release-preparation-ja.md)と[保存実績のデモ](docs/demos/personal-loop-saved-demo-ja.md)に、実モデル比較から採用・公開ソースへの反映、版の有効化、復旧までの確認範囲をまとめています。通常24課題＋難問7課題は実用評価として受け入れ済みですが、全条件を揃えた正式研究、費用の完全集計、普遍的な品質・速度向上を意味しません。 通算8問目として[CH08（文章から実務UIを再構成）](benchmarks/challenge-candidates/ui-reconstruction-v1/README.md)も登録しました。CH08の実モデル試行・難度校正は未実施で、上の受入済み7課題には含めません。
 
 [継続・持ち運び・構成](docs/instruction-improvement-continuity.md)では、次サイクルの準備、個別アセットのファイルexport/import、共通・専門チーム・アプリ・個人の版固定を扱います。importは未評価候補を作り、採用やネットワーク共有は行いません。[従来の個人Prompt CLI](docs/personal-evolution-cli.md)は別の限定入口です。Claude向け準備はありますが、認証済み実アプリでの一巡・適用・復元は今回のCodex個人v1には含めません。
 

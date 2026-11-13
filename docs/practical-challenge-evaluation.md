@@ -228,3 +228,47 @@ Model-free regression command:
 ```sh
 node --experimental-test-module-mocks --test scripts/test-practical-challenge-worker.mjs scripts/test-challenge-evaluation.mjs scripts/test-instruction-loop-practical-runtime.mjs scripts/test-practical-evaluation-runner.mjs
 ```
+
+## CH08: functional UI reconstruction
+
+`ch08-growth-workspace` is registered alongside RC01 as the eighth authored
+challenge (CH01–CH06 plus RC01 precede it; there is no CH07 identifier). It is
+separate from primary24 and from acceptance of the seven historically evaluated
+challenges. [The CH08 package](../benchmarks/challenge-candidates/ui-reconstruction-v1/README.md)
+contains its complete public specification, data contract, 14 scenario families,
+56 checkpoints, and fixed synthetic JSON. No original user HTML, CSS or image is
+distributed. Actual AI APIs and external services are prohibited.
+
+Use the same `challenge-list`, `challenge-prepare`, exact-approval `challenge-start`,
+`challenge-resume`, and semantic handoff/import commands with the CH08 ID. The
+initial stage creates a runnable `app/` and `DELIVERY.md`; the second stage adds
+only `REASSESSMENT.md` after read-only checks. Unlike the review-only RC01,
+CH08 opts into `freeze_submission`: all files, including newly authored app
+sources, are pinned after initial delivery and after reassessment. Every stage
+verification checks those file bytes, and the final inventory rejects late
+additions before scoring. Symlinks are disallowed in that frozen submission;
+each file must fit the common 16 MiB bound. Existing RC01 registrations/runs
+retain their existing behavior. Neither stage executes without model-call
+authorization; synthetic injected sessions are explicitly labeled synthetic.
+
+The three evaluator files are published authoring assets under CH08's
+`evaluator/`; copy them to the external isolated evaluator directory for a run.
+Public `brief/rubric.json` is byte-identical to the evaluator rubric. There are
+no hidden functional requirements. An independent assessor must exercise the
+actual browser interactions and bind decisions to evidence. Functional /70 and
+UX /30 are separate fields in the imported result. Only a fully observed result
+has a combined /100; missing weights stay missing. Observed release blockers
+remain separate from numerical points. The calculator never executes a solver,
+a browser or a scoring model and cannot verify semantic truth by itself.
+
+Provider receipts retain separate initial implementation and reassessment
+stage durations. The standard worker's task duration sums both stages, so report
+initial-stage duration separately when discussing generation time. Token usage
+uses the existing latest cumulative linked-session observation; do not add
+snapshots or treat missing input/output/cached counters as zero. Assessor overhead
+stays in `grading_metrics` and never changes either quality category.
+
+Registration, model-free contracts and synthetic transport are testable now.
+Actual solver trials, difficulty calibration, browser validation of a complete
+correct reference UI, and measurement readiness remain unverified. This task's
+registration must not be counted as another accepted observed result.

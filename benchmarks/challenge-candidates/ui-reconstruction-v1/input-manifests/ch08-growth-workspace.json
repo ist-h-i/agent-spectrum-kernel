@@ -1,0 +1,75 @@
+{
+  "schema": "ask.ui-challenge-input@1",
+  "fixture_id": "ch08-growth-workspace",
+  "counts": {
+    "files": 13,
+    "bytes": 82595
+  },
+  "files": [
+    {
+      "path": "brief/data-contract.md",
+      "sha256": "9bf75da47d160d83ea1c469f02b9ff6c15c3aeb4ab1c27181fb4f3ee40e6dcb9",
+      "bytes": 11658
+    },
+    {
+      "path": "brief/rubric.json",
+      "sha256": "a8a099d34d2d726d07a39599a4577ef54fd74a0e6e2e5f677b092c82840b9353",
+      "bytes": 11431
+    },
+    {
+      "path": "brief/scenarios.json",
+      "sha256": "2d40254555532309041c8fa6a94fa0bc3fa0eb2180f4540599205829e97546b7",
+      "bytes": 12426
+    },
+    {
+      "path": "brief/spec.md",
+      "sha256": "3d10685e5a54c1781f5e93612df7830879eaf67d39d2d2312c991c9a3faf04e8",
+      "bytes": 6221
+    },
+    {
+      "path": "fixtures/assessment-valid.json",
+      "sha256": "e35bac875a8c8a02d3b9814451625d6b51d6dddfb171632930eef04cc8f6f59b",
+      "bytes": 1431
+    },
+    {
+      "path": "fixtures/assessment-wrong-evidence.json",
+      "sha256": "78e4b1707221dcfad8bebfeb675bb279cea97c4487752ac8cb13cef6164fd049",
+      "bytes": 1431
+    },
+    {
+      "path": "fixtures/backup-dangling.json",
+      "sha256": "e978c2588331ef14f92aef414b8a8a7204daf80b7e7e69bdaeea5522c446d08e",
+      "bytes": 14748
+    },
+    {
+      "path": "fixtures/career-valid.json",
+      "sha256": "2dc3989916ff2f7f105533b83c1b35c88ebc516992e1b47210074d7865ce167c",
+      "bytes": 1261
+    },
+    {
+      "path": "fixtures/plan-over-limit.json",
+      "sha256": "c15801b08ae6e63379e7cc7d779a757d7f26e0af3bc5adde54d3068b5c7f277b",
+      "bytes": 1406
+    },
+    {
+      "path": "fixtures/plan-valid.json",
+      "sha256": "00d261038e0c2ff5c226e0fdd9c1949969699d520dc1bd6a84f002c1c35505a2",
+      "bytes": 1406
+    },
+    {
+      "path": "fixtures/plan-wrong-request.json",
+      "sha256": "1ae31eb4e522c116ec2b3f75b48c75e65e68435ac61362dcba0e28926b99c476",
+      "bytes": 1410
+    },
+    {
+      "path": "fixtures/seed.json",
+      "sha256": "16b313e45fa4d9204857a4586b02ac723c2ea3682d9430a344261aec2b66b17e",
+      "bytes": 14743
+    },
+    {
+      "path": "task.md",
+      "sha256": "b7d664b611f6533945f1f0741eac70d834b4dff34402e6f5fda8d035566a1c9c",
+      "bytes": 3023
+    }
+  ]
+}
