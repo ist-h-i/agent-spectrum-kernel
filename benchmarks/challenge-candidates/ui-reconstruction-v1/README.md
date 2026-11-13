@@ -22,13 +22,13 @@ primary24や過去7問の結果・重み・採用状態は変更しない。
 許可しない。初回に起動可能な成果物を作り、第2段階でbuildやcacheを変えない。
 実行失敗や不確かな状態を自動再試行しない。
 
-意味評価bundleは `evaluator/{rubric.json,score.mjs,README.md}` の3ファイル。
+意味評価bundleは `evaluator-v2/{rubric.json,score.mjs,README.md}` の3ファイル。
 公開配点と同一で、非公開の追加機能要件はない。実行時には別の採点ディレクトリへ
 コピーし、solverから分離する。共通 `challenge-score-handoff` と
 `challenge-import-score` を用いる。独立採点者が実装・実操作・ログを評価し、
 計算器はその判断の形と集計だけを検証する。
 
-機能70点とUI/UX30点を別表示し、完全観測時のみ合計100点を出す。
+機能40点とUI/UX60点を別表示し、完全観測時のみ合計100点を出す。
 未観測の配点、公開された安全上のblocker、実装生成時間、確認時間、入出力token、
 採点時間はそれぞれ別に保持する。完了時間やtokenによる品質点の補正は行わない。
 
@@ -62,3 +62,7 @@ node --test benchmarks/challenge-candidates/ui-reconstruction-v1/tools/public-pa
 - V3: RC01/標準workerの回帰、npm配布、独立レビュー、適用CIの成功をmerge条件とする。
 - 不足条件: 試験未実施、fixture/manifestずれ、未解決の独立レビュー指摘、CI失敗は完了根拠にしない。
   UI実行・難度・実測tokenについてはモデル無しの検証で代用せず未実施として残す。
+
+## 採点基準v2
+
+現在の公開入力・登録はui-functional-v2 / rubric 2.0.0です。同じCH08であり問題数は増えません。旧`evaluator/`の3ファイルはv1過去結果の再現用としてbyte不変で保持します。旧入力を凍結した試行へv2を遡及上書きしません。詳細は[evaluator-v2/README.md](evaluator-v2/README.md)。

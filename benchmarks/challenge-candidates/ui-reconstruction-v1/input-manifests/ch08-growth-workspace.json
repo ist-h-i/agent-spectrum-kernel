@@ -3,7 +3,7 @@
   "fixture_id": "ch08-growth-workspace",
   "counts": {
     "files": 13,
-    "bytes": 82595
+    "bytes": 115724
   },
   "files": [
     {
@@ -13,8 +13,8 @@
     },
     {
       "path": "brief/rubric.json",
-      "sha256": "a8a099d34d2d726d07a39599a4577ef54fd74a0e6e2e5f677b092c82840b9353",
-      "bytes": 11431
+      "sha256": "2c014262261d49d006d62abbff8b52210e79304e3a99f2d36789d99dcbb57f18",
+      "bytes": 44214
     },
     {
       "path": "brief/scenarios.json",
@@ -68,8 +68,8 @@
     },
     {
       "path": "task.md",
-      "sha256": "b7d664b611f6533945f1f0741eac70d834b4dff34402e6f5fda8d035566a1c9c",
-      "bytes": 3023
+      "sha256": "6884bc155a34ec1fc26ccb9f8e06572f0d381a2d71b3a112bc7dc0d78e937042",
+      "bytes": 3369
     }
   ]
 }

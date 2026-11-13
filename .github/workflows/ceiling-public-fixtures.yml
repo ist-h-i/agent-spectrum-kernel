@@ -52,4 +52,4 @@ jobs:
       - name: Check CH08 public UI task and semantic scoring contracts (model-free)
         run: |
           node benchmarks/challenge-candidates/ui-reconstruction-v1/tools/manifest.mjs
-          node --test benchmarks/challenge-candidates/ui-reconstruction-v1/tools/public-package.test.mjs
+          node --test benchmarks/challenge-candidates/ui-reconstruction-v1/tools/public-package.test.mjs benchmarks/challenge-candidates/ui-reconstruction-v1/tools/score-v2.test.mjs

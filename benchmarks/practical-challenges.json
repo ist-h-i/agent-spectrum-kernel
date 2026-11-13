@@ -76,12 +76,12 @@
       "display_id": "CH08",
       "ordinal": 8,
       "series": "ui-reconstruction-v1",
-      "input_version": "ui-functional-v1",
+      "input_version": "ui-functional-v2",
       "workspace": "benchmarks/challenge-candidates/ui-reconstruction-v1/workspace",
       "freeze_submission": true,
       "input_manifest": {
         "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/input-manifests/ch08-growth-workspace.json",
-        "digest": "sha256:eed7f685d6f1b18d1f3b362cfd6686f06c88d37d109b39e232f2de32651d24b4"
+        "digest": "sha256:8eeefd3261128127f2598decda94f9f18ec0c1f3e58fa0a028665209000dc9c6"
       },
       "stages": [
         {
@@ -108,22 +108,22 @@
         "kind": "external_semantic_assessment",
         "maximum": 100,
         "categories": {
-          "functional": 70,
-          "ux": 30
+          "functional": 40,
+          "ux": 60
         },
         "automatic_semantic_scoring": false,
         "files": [
           {
             "path": "rubric.json",
-            "digest": "sha256:a8a099d34d2d726d07a39599a4577ef54fd74a0e6e2e5f677b092c82840b9353"
+            "digest": "sha256:2c014262261d49d006d62abbff8b52210e79304e3a99f2d36789d99dcbb57f18"
           },
           {
             "path": "score.mjs",
-            "digest": "sha256:da4af90b2078037c453f71da34fcd4c1a5e272cb0af18ef5fd7be1d56dd06061"
+            "digest": "sha256:2b3f1f6c00a3b4fc8101e2cb9752b68dc63d51843d91f50ab38ca11235ffc658"
           },
           {
             "path": "README.md",
-            "digest": "sha256:feb6c8846a81a752ee7ed8ded7f586fe4b848590bd984be5781f1b1ae3b61aa5"
+            "digest": "sha256:09d1cab6da780eae919301eb2c351a10e0b4b0a58edfad9ea61b83c2abfdfd8b"
           }
         ]
       },
