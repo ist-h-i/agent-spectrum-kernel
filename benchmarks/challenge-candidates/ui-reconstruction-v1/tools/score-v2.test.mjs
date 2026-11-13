@@ -12,7 +12,7 @@ function fixture(){
  return {rubric,assessment};
 }
 const check=(a,id)=>a.requirements.flatMap(r=>r.checks).find(c=>c.id===id);
-const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,`${a} != ${b}`);
+const near=(a,b)=>assert.ok(Math.abs(a-Number(b.toFixed(6)))<1e-9,`${a} != ${b} at six-decimal output precision`);
 test('v2 all pass and all fail keep 40/60, provenance and no semantic certification',()=>{
  const {rubric,assessment}=fixture(),r=score(rubric,assessment);near(r.quality_score,100);near(r.categories.functional.score,40);near(r.categories.ux.score,60);assert.equal(r.blocker_gate_passed,true);assert.equal(r.semantic_truth_verified_by_calculator,false);assert.equal(r.meta.assessment_mode,'retrospective');assert.equal(r.rubric_digest,rubricDigest(rubric));
  for(const c of assessment.requirements.flatMap(x=>x.checks))c.status='fail';near(score(rubric,assessment).quality_score,0);
@@ -73,4 +73,13 @@ test('requirement order preserves exact all-pass maxima for strict downstream co
 });
 test('clear blocker gate at zero points is not an adoption or release approval',()=>{
  const {rubric,assessment}=fixture();for(const c of assessment.requirements.flatMap(x=>x.checks))c.status='fail';const r=score(rubric,assessment);assert.equal(r.quality_score,0);assert.equal(r.blocker_gate_passed,true);assert.equal(Object.hasOwn(r,'release_eligible'),false);assert.equal(r.release_status,'no_observed_blockers');
+});
+
+test('fractional functional failures serialize bounded decimals for the standard importer',()=>{
+ const {rubric,assessment}=fixture();check(assessment,'F01.1').status='fail';const r=score(rubric,assessment);assert.equal(r.known_points,98.857143);assert.equal(r.quality_score,98.857143);assert.equal(r.categories.functional.score,38.857143);assert.match(String(r.known_points),/^\d{1,12}(?:\.\d{1,6})?$/u);
+});
+test('output quantization is final-only; unknown weights remain missing and total null',()=>{
+ const {rubric,assessment}=fixture();for(const id of ['F03.1','F03.2','F03.3']){const c=check(assessment,id);c.status='unknown';delete c.evidence;Object.assign(c,{missing:'No observed branch',next_check:'Exercise branch'});}
+ const r=score(rubric,assessment);assert.equal(r.missing_weight,4.285714);assert.notEqual(r.missing_weight,3*Number((rubric.requirements[2].weight/4).toFixed(6)));assert.equal(r.quality_score,null);
+ const walk=x=>{if(typeof x==='number')assert.match(String(x),/^\d{1,12}(?:\.\d{1,6})?$/u);else if(Array.isArray(x))x.forEach(walk);else if(x&&typeof x==='object')Object.values(x).forEach(walk);};walk(r);
 });

@@ -55,6 +55,12 @@ export async function executeChallengeEvaluationWorker(settings,job,resultPath,{
  return inspectChallengeEvaluationWorker(settings,job,directory);
 }
 function fraction(n){assert.ok(Number.isFinite(n)&&n>=0);const text=String(n);assert.match(text,/^\d{1,12}(?:\.\d{1,6})?$/u,'bounded decimal points required');const [a,b='']=text.split('.');return b?a+b+'/'+String(10**b.length):a;}
+// Add validated decimal scores exactly; JS addition can grow decimal tails.
+function fractionSum(...values){
+ const total=values.reduce((sum,value)=>{const [a,b='1']=fraction(value).split('/');return sum+BigInt(a)*(1000000n/BigInt(b));},0n);
+ assert.ok(total<=999999999999999999n,'bounded decimal points required');
+ return total%1000000n===0n?String(total/1000000n):String(total)+'/1000000';
+}
 async function grade(root){
  const path=join(root,'semantic-assessment.json');if(!existsSync(path))return null;
  const artifact=read(path),m=read(join(root,'manifest.json')),handoff=inspectPracticalChallengeScoreHandoff(root);
@@ -83,7 +89,7 @@ export async function importChallengeSemanticAssessment(root,input){
  for(const f of handoff.evaluator.files)assert.equal(filePin(join(handoff.evaluator.root,f.path)).digest,f.digest,'evaluator input changed');
  const {score}=await import(pathToFileURL(join(handoff.evaluator.root,'score.mjs')).href);
  const result=score(read(join(handoff.evaluator.root,'rubric.json')),input.assessment);
- fraction(result.known_points);fraction(result.known_points+result.missing_weight);
+ fraction(result.known_points);fractionSum(result.known_points,result.missing_weight);
  const output={kind:'practical_challenge_assessment_v1',manifest_digest:state.manifest_digest,handoff_digest:canonicalDigest(handoff),assessment:input.assessment,result,grading_metrics:input.grading_metrics??null,semantic_truth_verified_by_calculator:false};
  save(join(root,'semantic-assessment.json'),output);return output;
 }
@@ -101,7 +107,7 @@ export async function inspectChallengeEvaluationWorker(settings,job,directory){
  // root-only fallback as the complete parent+child cost.
  const assessment=completed?await grade(root):null;let quality=null,gradeRecord=null;
  const artifacts=assessment?[relativePin(directory,'challenge/semantic-assessment.json'),relativePin(directory,'challenge/score-handoff.json')]:[];
- if(assessment){const s=assessment.result;const fixed={kind:'fixed_point_reference_summary_v1',exact_lower:fraction(s.known_points),exact_upper:fraction(s.known_points+s.missing_weight),scale_maximum:'100',mandatory_compliance:null,observation_completeness_reported:s.missing_weight===0,runtime_acceptance_verified:null,critical_status:'undetermined',partial_items:s.requirements.filter(r=>r.status==='partial').length,undetermined_items:s.requirements.filter(r=>r.status==='unknown').length,formal_admission:false,evidence_truth_checked:false,capture_complete:false};
+ if(assessment){const s=assessment.result;const fixed={kind:'fixed_point_reference_summary_v1',exact_lower:fraction(s.known_points),exact_upper:fractionSum(s.known_points,s.missing_weight),scale_maximum:'100',mandatory_compliance:null,observation_completeness_reported:s.missing_weight===0,runtime_acceptance_verified:null,critical_status:'undetermined',partial_items:s.requirements.filter(r=>r.status==='partial').length,undetermined_items:s.requirements.filter(r=>r.status==='unknown').length,formal_admission:false,evidence_truth_checked:false,capture_complete:false};
   quality={kind:'practical_quality_observation_v1',scope:'caller_criteria',outcome:s.quality_score===null?'unknown':s.quality_score===100?'pass':'fail',evidence_refs:artifacts,fixed_reference:fixed};validatePracticalQualityObservation(quality,artifacts);
   gradeRecord={exit_code:0,timed_out:false,signal:null,duration_ms:assessment.grading_metrics?.duration_ms??null,provider_observation:{artifacts,metrics:assessment.grading_metrics??{}}};
  }

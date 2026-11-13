@@ -119,11 +119,11 @@
           },
           {
             "path": "score.mjs",
-            "digest": "sha256:888929f8b4ac6954f270d3396d4cea1507219982055242877f4b0b04263e2462"
+            "digest": "sha256:2b3f1f6c00a3b4fc8101e2cb9752b68dc63d51843d91f50ab38ca11235ffc658"
           },
           {
             "path": "README.md",
-            "digest": "sha256:57c55642b95968d5cf385f1284e2c48c47108bb2c63e2320fd52a5950e26831f"
+            "digest": "sha256:09d1cab6da780eae919301eb2c351a10e0b4b0a58edfad9ea61b83c2abfdfd8b"
           }
         ]
       },

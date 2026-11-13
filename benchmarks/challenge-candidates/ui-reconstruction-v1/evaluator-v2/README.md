@@ -82,3 +82,15 @@ handoff and npm inclusion. Evidence: score-v2.test.mjs, public-package.test.mjs,
 manifest.mjs, shared challenge/worker regressions, independent review and exact-head CI.
 Synthetic tests verify calculator/transport only, not UI quality. Failed or missing tests
 are not completion. No dependency/security setting changes or live model calls.
+
+## Decimal output contract
+
+All scoring arithmetic uses unrounded weights and intermediate sums. Only the completed
+result is serialized to the standard importer's six-decimal precision (nearest decimal,
+using JavaScript toFixed(6)); exact full-pass category and overall maxima remain 40, 60
+and 100. Unknown totals remain null and missing weight remains explicit. Published item
+values can differ from independently rounded category totals by a few millionths; do not
+recompute authoritative totals from those display values. The rubric digest binds the
+original unrounded rubric. Resource measurements and evidence are not quantized by this
+calculator. The standard worker adds validated known/missing decimals in fixed-point
+arithmetic rather than introducing new binary floating-point digits.

@@ -8,6 +8,9 @@ const nonempty=s=>assert.ok(typeof s==='string'&&s.trim(),'nonempty evidence tex
 const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,`rubric weights changed: ${a} != ${b}`);
 // Normalize only numerical noise at exact maximum totals; never round item evidence.
 const atMaximum=(value,maximum)=>Math.abs(value-maximum)<1e-9?maximum:value;
+// The standard importer accepts decimal values with at most six fractional digits.
+// Quantize only the completed output tree, never intermediate weights or sums.
+const outputDecimal=x=>typeof x==='number'?Number(x.toFixed(6)):Array.isArray(x)?x.map(outputDecimal):x&&typeof x==='object'?Object.fromEntries(Object.entries(x).map(([k,v])=>[k,outputDecimal(v)])):x;
 const canonical=x=>Array.isArray(x)?x.map(canonical):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
 export const rubricDigest=r=> 'sha256:'+createHash('sha256').update(JSON.stringify(canonical(r))).digest('hex');
 function evidence(rows){
@@ -71,8 +74,8 @@ export function score(rubric,assessment){
  }
  const known_points=atMaximum(requirements.reduce((s,r)=>s+r.points,0),rubric.maximum),missing_weight=requirements.reduce((s,r)=>s+r.missing_weight,0);
  const blocked=assessment.release_blockers.some(r=>r.status==='observed'),unknownBlocker=assessment.release_blockers.some(r=>r.status==='unknown');
- return {kind:'ch08_score_v2',rubric_version:rubric.version,rubric_digest:rubricDigest(rubric),meta:{...assessment.meta},known_points,missing_weight,quality_score:missing_weight?null:known_points,categories,requirements,release_blockers:assessment.release_blockers,
-  release_status:blocked?'blocked':unknownBlocker?'unknown':'no_observed_blockers',blocker_gate_passed:blocked?false:unknownBlocker||missing_weight?null:true,semantic_truth_verified_by_calculator:false};
+ return outputDecimal({kind:'ch08_score_v2',rubric_version:rubric.version,rubric_digest:rubricDigest(rubric),meta:{...assessment.meta},known_points,missing_weight,quality_score:missing_weight?null:known_points,categories,requirements,release_blockers:assessment.release_blockers,
+  release_status:blocked?'blocked':unknownBlocker?'unknown':'no_observed_blockers',blocker_gate_passed:blocked?false:unknownBlocker||missing_weight?null:true,semantic_truth_verified_by_calculator:false});
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  try{const [,,rubric,assessment]=process.argv;assert.ok(rubric&&assessment,'usage: node score.mjs RUBRIC ASSESSMENT');console.log(JSON.stringify(score(JSON.parse(readFileSync(rubric)),JSON.parse(readFileSync(assessment))),null,2));}
