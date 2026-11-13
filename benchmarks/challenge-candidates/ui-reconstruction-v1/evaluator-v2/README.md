@@ -82,4 +82,3 @@ handoff and npm inclusion. Evidence: score-v2.test.mjs, public-package.test.mjs,
 manifest.mjs, shared challenge/worker regressions, independent review and exact-head CI.
 Synthetic tests verify calculator/transport only, not UI quality. Failed or missing tests
 are not completion. No dependency/security setting changes or live model calls.
-
