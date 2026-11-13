@@ -1,0 +1,404 @@
+{
+  "kind": "ch08_semantic_rubric_v1",
+  "maximum": 100,
+  "categories": {
+    "functional": 70,
+    "ux": 30
+  },
+  "requirements": [
+    {
+      "id": "F01",
+      "category": "functional",
+      "weight": 8,
+      "title": "目標・条件・取組",
+      "scenarios": [
+        "T01",
+        "T04"
+      ],
+      "checks": [
+        {
+          "id": "F01.1",
+          "acceptance": "複数目標の作成と切替、期限と週時間の編集"
+        },
+        {
+          "id": "F01.2",
+          "acceptance": "条件と取組の独立表示、取組の所要時間と成果物"
+        },
+        {
+          "id": "F01.3",
+          "acceptance": "次アクション、保留と置換の履歴を確認"
+        },
+        {
+          "id": "F01.4",
+          "acceptance": "全取組doneでも条件を自動達成にしない"
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "category": "functional",
+      "weight": 8,
+      "title": "先行記録と履歴",
+      "scenarios": [
+        "T01",
+        "T02"
+      ],
+      "checks": [
+        {
+          "id": "F02.1",
+          "acceptance": "目標0件で記録し、後から目標と条件と取組へ紐付け"
+        },
+        {
+          "id": "F02.2",
+          "acceptance": "記録全欄を編集し、旧revisionと変更履歴を確認"
+        },
+        {
+          "id": "F02.3",
+          "acceptance": "論理取消・復元とリンク解除を履歴付きで実施"
+        },
+        {
+          "id": "F02.4",
+          "acceptance": "題名・結果の検索と日付・目標・取消フィルター"
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "category": "functional",
+      "weight": 10,
+      "title": "計画の検証と採用",
+      "scenarios": [
+        "T03"
+      ],
+      "checks": [
+        {
+          "id": "F03.1",
+          "acceptance": "希望・現状・期限・週時間・除外期間と制約を依頼文コピー"
+        },
+        {
+          "id": "F03.2",
+          "acceptance": "上限8時間案を拒否し、違反箇所付き修正依頼をコピー"
+        },
+        {
+          "id": "F03.3",
+          "acceptance": "有効案の変更前後と未決定・暫定・準備済みを区別"
+        },
+        {
+          "id": "F03.4",
+          "acceptance": "確認取消は無変更、採用は一度だけ反映して再利用拒否"
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "category": "functional",
+      "weight": 5,
+      "title": "依頼対応の厳密さ",
+      "scenarios": [
+        "T05"
+      ],
+      "checks": [
+        {
+          "id": "F04.1",
+          "acceptance": "別request_id・goal_id・goal_revisionの回答を拒否"
+        },
+        {
+          "id": "F04.2",
+          "acceptance": "プレビュー後の目標変更を適用直前に再検証し拒否"
+        },
+        {
+          "id": "F04.3",
+          "acceptance": "関連記録の更新・追加後の古い依頼回答を拒否"
+        },
+        {
+          "id": "F04.4",
+          "acceptance": "依頼再作成による旧依頼消費と、構造不正の回答拒否"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "category": "functional",
+      "weight": 10,
+      "title": "参考評価と採用判断",
+      "scenarios": [
+        "T06"
+      ],
+      "checks": [
+        {
+          "id": "F05.1",
+          "acceptance": "関連条件指定と目標全体の評価依頼を生成"
+        },
+        {
+          "id": "F05.2",
+          "acceptance": "判定4種類、根拠revision、限界、次の行動を表示"
+        },
+        {
+          "id": "F05.3",
+          "acceptance": "条件と取組の一部採用・取消を独立に実行"
+        },
+        {
+          "id": "F05.4",
+          "acceptance": "別対象の根拠・存在しない根拠・未採用の正式扱いを拒否"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "category": "functional",
+      "weight": 10,
+      "title": "失効の範囲と不可逆性",
+      "scenarios": [
+        "T07"
+      ],
+      "checks": [
+        {
+          "id": "F06.1",
+          "acceptance": "採用したc1の根拠r1の編集でc1とa1だけ失効"
+        },
+        {
+          "id": "F06.2",
+          "acceptance": "条件変更／取組変更の対象ごとの失効と現在集計から除外"
+        },
+        {
+          "id": "F06.3",
+          "acceptance": "根拠の取消・直接／間接リンク変更で失効、復元後も復活しない"
+        },
+        {
+          "id": "F06.4",
+          "acceptance": "根拠外r0の変更や別対象操作では既存評価が失効しない"
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "category": "functional",
+      "weight": 5,
+      "title": "キャリア参照",
+      "scenarios": [
+        "T08"
+      ],
+      "checks": [
+        {
+          "id": "F07.1",
+          "acceptance": "現在・達成後・理想の責務レベルと5軸を比較"
+        },
+        {
+          "id": "F07.2",
+          "acceptance": "現在もAI参考、将来は推定と明示"
+        },
+        {
+          "id": "F07.3",
+          "acceptance": "根拠revision・限界・市場条件を確認"
+        },
+        {
+          "id": "F07.4",
+          "acceptance": "目標または根拠変更で古い参考とし復活しない"
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "category": "functional",
+      "weight": 6,
+      "title": "期間レポートと安全な出力",
+      "scenarios": [
+        "T09",
+        "T10"
+      ],
+      "checks": [
+        {
+          "id": "F08.1",
+          "acceptance": "両端を含む期間・目標選択と取消除外の件数・分集計"
+        },
+        {
+          "id": "F08.2",
+          "acceptance": "期間内の事実と現在時点の判断を分離"
+        },
+        {
+          "id": "F08.3",
+          "acceptance": "週報と面談レポートの文章コピーとHTML・CSV保存"
+        },
+        {
+          "id": "F08.4",
+          "acceptance": "HTML入力を実行せず、CSV式・引用符・改行を安全に保持"
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "category": "functional",
+      "weight": 4,
+      "title": "保存失敗と競合",
+      "scenarios": [
+        "T11",
+        "T12"
+      ],
+      "checks": [
+        {
+          "id": "F09.1",
+          "acceptance": "再読込で通常保存内容を復元"
+        },
+        {
+          "id": "F09.2",
+          "acceptance": "失敗時に編集を保持し、未保存・再試行・退避を提供"
+        },
+        {
+          "id": "F09.3",
+          "acceptance": "正式状態変更は永続保存成功まで確定しない"
+        },
+        {
+          "id": "F09.4",
+          "acceptance": "複数タブで更新を消失させず競合を表示し退避・再読込"
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "category": "functional",
+      "weight": 4,
+      "title": "バックアップ復元",
+      "scenarios": [
+        "T13"
+      ],
+      "checks": [
+        {
+          "id": "F10.1",
+          "acceptance": "全履歴と依頼・採用・失効を含むJSON往復"
+        },
+        {
+          "id": "F10.2",
+          "acceptance": "構造・参照不正を拒否し旧状態を維持"
+        },
+        {
+          "id": "F10.3",
+          "acceptance": "置換の影響確認・取消・保存失敗で旧状態を維持"
+        },
+        {
+          "id": "F10.4",
+          "acceptance": "破損した保存値を上書きせず原文退避と復元を提供"
+        }
+      ]
+    },
+    {
+      "id": "U01",
+      "category": "ux",
+      "weight": 8,
+      "title": "判断に必要な情報の構成",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U01.1",
+          "acceptance": "現在の目標・次アクションを容易に特定"
+        },
+        {
+          "id": "U01.2",
+          "acceptance": "事実・自己評価・AI参考・人間採用・失効が見分けられる"
+        },
+        {
+          "id": "U01.3",
+          "acceptance": "計画比較や根拠を対象と近接して確認できる"
+        },
+        {
+          "id": "U01.4",
+          "acceptance": "情報量に応じた階層があり360pxでも主要内容が切れない"
+        }
+      ]
+    },
+    {
+      "id": "U02",
+      "category": "ux",
+      "weight": 6,
+      "title": "シナリオの連続性",
+      "scenarios": [
+        "T01",
+        "T03",
+        "T11",
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U02.1",
+          "acceptance": "記録から紐付けまで現在の対象を見失わない"
+        },
+        {
+          "id": "U02.2",
+          "acceptance": "エラー修正後に入力と文脈が保たれる"
+        },
+        {
+          "id": "U02.3",
+          "acceptance": "確認・取消・復帰で選択と入力を失わない"
+        },
+        {
+          "id": "U02.4",
+          "acceptance": "主要操作の起点と完了が分かり、二重送信を抑止"
+        }
+      ]
+    },
+    {
+      "id": "U03",
+      "category": "ux",
+      "weight": 8,
+      "title": "キーボードと知覚可能性",
+      "scenarios": [
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U03.1",
+          "acceptance": "主要シナリオをキーボードのみで完了"
+        },
+        {
+          "id": "U03.2",
+          "acceptance": "ラベル・見えるフォーカス・非色依存の状態表現"
+        },
+        {
+          "id": "U03.3",
+          "acceptance": "ダイアログ利用時のフォーカス拘束・Esc・起点復帰（未使用なら同等の取消と復帰）"
+        },
+        {
+          "id": "U03.4",
+          "acceptance": "1280pxと360pxで読める文字・コントラスト・操作領域"
+        }
+      ]
+    },
+    {
+      "id": "U04",
+      "category": "ux",
+      "weight": 8,
+      "title": "進行・失敗・復旧の伝達",
+      "scenarios": [
+        "T11",
+        "T12",
+        "T14"
+      ],
+      "checks": [
+        {
+          "id": "U04.1",
+          "acceptance": "空・保存中・成功を判断できる"
+        },
+        {
+          "id": "U04.2",
+          "acceptance": "入力エラー・保存失敗・競合が区別でき、次の操作がある"
+        },
+        {
+          "id": "U04.3",
+          "acceptance": "コピー失敗時に手動コピー可能で成功と誤表示しない"
+        },
+        {
+          "id": "U04.4",
+          "acceptance": "未保存で離脱しても警告または復帰できる下書き"
+        }
+      ]
+    }
+  ],
+  "release_blocker_rules": {
+    "data_loss": "保存成功と表示した利用者データの消失、または取消復元による無断置換",
+    "unapproved_judgment": "人間の採用なしの正式達成・制約違反案・失効結果の現行採用",
+    "external_dependency": "外部AI・外部サービスへ送信、または外部取得必須で起動不可",
+    "unsafe_export": "利用者文字列によるHTML実行またはCSV式実行"
+  },
+  "semantics": "各checkはpass/fail/unknown。配点はweight/4ずつ。unknown分は欠測として残し、カテゴリ満点への再重み付けはしない。blockerは観測した違反にだけ付け、数値とは別に報告する。"
+}

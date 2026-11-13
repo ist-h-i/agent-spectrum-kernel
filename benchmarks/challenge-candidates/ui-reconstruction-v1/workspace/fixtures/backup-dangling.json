@@ -1,0 +1,565 @@
+{
+  "schema_version": 1,
+  "workspace_id": "growth-synthetic",
+  "revision": 1,
+  "goals": [
+    {
+      "id": "g1",
+      "revision": 1,
+      "title": "設計レビューを自力で進める",
+      "wish": "レビューを任されたい",
+      "current": "先輩の支援あり",
+      "capability": "設計判断を説明する",
+      "due": "2026-12-31",
+      "weekly_hours": 4,
+      "exclusions": [
+        {
+          "from": "2026-12-24",
+          "to": "2026-12-30"
+        }
+      ],
+      "plan_state": "ready"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "c1",
+      "revision": 1,
+      "goal_id": "g1",
+      "title": "設計根拠",
+      "standard": "独力で設計案と代替案の根拠を説明できる"
+    },
+    {
+      "id": "c2",
+      "revision": 1,
+      "goal_id": "g1",
+      "title": "合意形成",
+      "standard": "関係者の懸念を整理し合意を得る"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a1",
+      "revision": 1,
+      "goal_id": "g1",
+      "condition_ids": [
+        "c1"
+      ],
+      "title": "設計案を書く",
+      "next_action": "代替案を追記",
+      "artifact": "design.md",
+      "minutes": 60,
+      "status": "todo",
+      "replaces_id": null
+    },
+    {
+      "id": "a2",
+      "revision": 1,
+      "goal_id": "g1",
+      "condition_ids": [
+        "c2"
+      ],
+      "title": "レビュー会",
+      "next_action": "懸念を確認",
+      "artifact": "",
+      "minutes": 30,
+      "status": "held",
+      "replaces_id": null
+    }
+  ],
+  "records": [
+    {
+      "id": "r0",
+      "revision": 1,
+      "date": "2026-11-09",
+      "title": "目標未設定のふり返り",
+      "result": "根拠を説明した。支援の限界を残す。",
+      "self_rating": "partial",
+      "artifact": "notes/r0.md",
+      "minutes": 20,
+      "assisted": true,
+      "goal_id": null,
+      "condition_ids": [],
+      "action_ids": [],
+      "voided": false,
+      "history": []
+    },
+    {
+      "id": "r1",
+      "revision": 1,
+      "date": "2026-11-10",
+      "title": "設計説明",
+      "result": "根拠を説明した。支援の限界を残す。",
+      "self_rating": "partial",
+      "artifact": "notes/r1.md",
+      "minutes": 60,
+      "assisted": true,
+      "goal_id": "g1",
+      "condition_ids": [
+        "c1"
+      ],
+      "action_ids": [
+        "missing"
+      ],
+      "voided": false,
+      "history": []
+    },
+    {
+      "id": "r2",
+      "revision": 1,
+      "date": "2026-11-12",
+      "title": "関係者相談",
+      "result": "根拠を説明した。支援の限界を残す。",
+      "self_rating": "partial",
+      "artifact": "notes/r2.md",
+      "minutes": 30,
+      "assisted": true,
+      "goal_id": "g1",
+      "condition_ids": [
+        "c2"
+      ],
+      "action_ids": [
+        "a2"
+      ],
+      "voided": false,
+      "history": []
+    },
+    {
+      "id": "r3",
+      "revision": 1,
+      "date": "2026-10-31",
+      "title": "以前の設計",
+      "result": "根拠を説明した。支援の限界を残す。",
+      "self_rating": "partial",
+      "artifact": "notes/r3.md",
+      "minutes": 40,
+      "assisted": true,
+      "goal_id": "g1",
+      "condition_ids": [
+        "c1"
+      ],
+      "action_ids": [],
+      "voided": false,
+      "history": []
+    }
+  ],
+  "requests": [
+    {
+      "id": "plan-1",
+      "kind": "plan",
+      "goal_id": "g1",
+      "goal_revision": 1,
+      "scope": "all",
+      "snapshot": {
+        "goal": {
+          "id": "g1",
+          "revision": 1,
+          "title": "設計レビューを自力で進める",
+          "wish": "レビューを任されたい",
+          "current": "先輩の支援あり",
+          "capability": "設計判断を説明する",
+          "due": "2026-12-31",
+          "weekly_hours": 4,
+          "exclusions": [
+            {
+              "from": "2026-12-24",
+              "to": "2026-12-30"
+            }
+          ],
+          "plan_state": "ready"
+        },
+        "conditions": [
+          {
+            "id": "c1",
+            "revision": 1,
+            "goal_id": "g1",
+            "title": "設計根拠",
+            "standard": "独力で設計案と代替案の根拠を説明できる"
+          },
+          {
+            "id": "c2",
+            "revision": 1,
+            "goal_id": "g1",
+            "title": "合意形成",
+            "standard": "関係者の懸念を整理し合意を得る"
+          }
+        ],
+        "actions": [
+          {
+            "id": "a1",
+            "revision": 1,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "title": "設計案を書く",
+            "next_action": "代替案を追記",
+            "artifact": "design.md",
+            "minutes": 60,
+            "status": "todo",
+            "replaces_id": null
+          },
+          {
+            "id": "a2",
+            "revision": 1,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c2"
+            ],
+            "title": "レビュー会",
+            "next_action": "懸念を確認",
+            "artifact": "",
+            "minutes": 30,
+            "status": "held",
+            "replaces_id": null
+          }
+        ],
+        "records": [
+          {
+            "id": "r1",
+            "revision": 1,
+            "date": "2026-11-10",
+            "title": "設計説明",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r1.md",
+            "minutes": 60,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "action_ids": [
+              "a1"
+            ],
+            "voided": false
+          },
+          {
+            "id": "r2",
+            "revision": 1,
+            "date": "2026-11-12",
+            "title": "関係者相談",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r2.md",
+            "minutes": 30,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c2"
+            ],
+            "action_ids": [
+              "a2"
+            ],
+            "voided": false
+          },
+          {
+            "id": "r3",
+            "revision": 1,
+            "date": "2026-10-31",
+            "title": "以前の設計",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r3.md",
+            "minutes": 40,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "action_ids": [],
+            "voided": false
+          }
+        ],
+        "constraints": [
+          {
+            "field": "due",
+            "mode": "fixed",
+            "value": "2026-12-31"
+          },
+          {
+            "field": "weekly_hours",
+            "mode": "maximum",
+            "value": 4
+          },
+          {
+            "field": "exclusions",
+            "mode": "fixed",
+            "value": [
+              {
+                "from": "2026-12-24",
+                "to": "2026-12-30"
+              }
+            ]
+          }
+        ]
+      },
+      "consumed": false
+    },
+    {
+      "id": "assessment-1",
+      "kind": "assessment",
+      "goal_id": "g1",
+      "goal_revision": 1,
+      "scope": "all",
+      "snapshot": {
+        "goal": {
+          "id": "g1",
+          "revision": 1,
+          "title": "設計レビューを自力で進める",
+          "wish": "レビューを任されたい",
+          "current": "先輩の支援あり",
+          "capability": "設計判断を説明する",
+          "due": "2026-12-31",
+          "weekly_hours": 4,
+          "exclusions": [
+            {
+              "from": "2026-12-24",
+              "to": "2026-12-30"
+            }
+          ],
+          "plan_state": "ready"
+        },
+        "conditions": [
+          {
+            "id": "c1",
+            "revision": 1,
+            "goal_id": "g1",
+            "title": "設計根拠",
+            "standard": "独力で設計案と代替案の根拠を説明できる"
+          },
+          {
+            "id": "c2",
+            "revision": 1,
+            "goal_id": "g1",
+            "title": "合意形成",
+            "standard": "関係者の懸念を整理し合意を得る"
+          }
+        ],
+        "actions": [
+          {
+            "id": "a1",
+            "revision": 1,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "title": "設計案を書く",
+            "next_action": "代替案を追記",
+            "artifact": "design.md",
+            "minutes": 60,
+            "status": "todo",
+            "replaces_id": null
+          },
+          {
+            "id": "a2",
+            "revision": 1,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c2"
+            ],
+            "title": "レビュー会",
+            "next_action": "懸念を確認",
+            "artifact": "",
+            "minutes": 30,
+            "status": "held",
+            "replaces_id": null
+          }
+        ],
+        "records": [
+          {
+            "id": "r1",
+            "revision": 1,
+            "date": "2026-11-10",
+            "title": "設計説明",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r1.md",
+            "minutes": 60,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "action_ids": [
+              "a1"
+            ],
+            "voided": false
+          },
+          {
+            "id": "r2",
+            "revision": 1,
+            "date": "2026-11-12",
+            "title": "関係者相談",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r2.md",
+            "minutes": 30,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c2"
+            ],
+            "action_ids": [
+              "a2"
+            ],
+            "voided": false
+          },
+          {
+            "id": "r3",
+            "revision": 1,
+            "date": "2026-10-31",
+            "title": "以前の設計",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r3.md",
+            "minutes": 40,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "action_ids": [],
+            "voided": false
+          }
+        ],
+        "constraints": []
+      },
+      "consumed": false
+    },
+    {
+      "id": "career-1",
+      "kind": "career",
+      "goal_id": "g1",
+      "goal_revision": 1,
+      "scope": "all",
+      "snapshot": {
+        "goal": {
+          "id": "g1",
+          "revision": 1,
+          "title": "設計レビューを自力で進める",
+          "wish": "レビューを任されたい",
+          "current": "先輩の支援あり",
+          "capability": "設計判断を説明する",
+          "due": "2026-12-31",
+          "weekly_hours": 4,
+          "exclusions": [
+            {
+              "from": "2026-12-24",
+              "to": "2026-12-30"
+            }
+          ],
+          "plan_state": "ready"
+        },
+        "conditions": [
+          {
+            "id": "c1",
+            "revision": 1,
+            "goal_id": "g1",
+            "title": "設計根拠",
+            "standard": "独力で設計案と代替案の根拠を説明できる"
+          },
+          {
+            "id": "c2",
+            "revision": 1,
+            "goal_id": "g1",
+            "title": "合意形成",
+            "standard": "関係者の懸念を整理し合意を得る"
+          }
+        ],
+        "actions": [
+          {
+            "id": "a1",
+            "revision": 1,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "title": "設計案を書く",
+            "next_action": "代替案を追記",
+            "artifact": "design.md",
+            "minutes": 60,
+            "status": "todo",
+            "replaces_id": null
+          },
+          {
+            "id": "a2",
+            "revision": 1,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c2"
+            ],
+            "title": "レビュー会",
+            "next_action": "懸念を確認",
+            "artifact": "",
+            "minutes": 30,
+            "status": "held",
+            "replaces_id": null
+          }
+        ],
+        "records": [
+          {
+            "id": "r1",
+            "revision": 1,
+            "date": "2026-11-10",
+            "title": "設計説明",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r1.md",
+            "minutes": 60,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "action_ids": [
+              "a1"
+            ],
+            "voided": false
+          },
+          {
+            "id": "r2",
+            "revision": 1,
+            "date": "2026-11-12",
+            "title": "関係者相談",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r2.md",
+            "minutes": 30,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c2"
+            ],
+            "action_ids": [
+              "a2"
+            ],
+            "voided": false
+          },
+          {
+            "id": "r3",
+            "revision": 1,
+            "date": "2026-10-31",
+            "title": "以前の設計",
+            "result": "根拠を説明した。支援の限界を残す。",
+            "self_rating": "partial",
+            "artifact": "notes/r3.md",
+            "minutes": 40,
+            "assisted": true,
+            "goal_id": "g1",
+            "condition_ids": [
+              "c1"
+            ],
+            "action_ids": [],
+            "voided": false
+          }
+        ],
+        "constraints": []
+      },
+      "consumed": false
+    }
+  ],
+  "evaluations": [],
+  "approvals": [],
+  "careers": []
+}

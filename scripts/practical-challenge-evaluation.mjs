@@ -85,11 +85,17 @@ function load(root){
 }
 function frozen(root,m){for(const f of [...m.files,...(m.instructions?.files??[])])verified({path:join(root,'workspace',f.path),digest:f.digest});}
 function result(root,stage){const path=join(root,stage,'stage-result.json');return existsSync(path)?readJsonFileStrict(path):null;}
-function verifyStage(root,stage){const r=result(root,stage);assert.ok(r?.completed,'previous stage incomplete or unknown; do not retry');
+function verifyStage(root,stage,{reassessmentSpec=null}={}){const r=result(root,stage);assert.ok(r?.completed,'previous stage incomplete or unknown; do not retry');
  const stored=readJsonFileStrict(join(root,stage,'task-codex-provider.json'));assert.deepEqual(stored,r.receipt,'stage receipt changed');
  for(const a of r.receipt.observation.artifacts)verified({path:join(root,stage,a.path),digest:a.digest});
  if(r.usage_snapshot)verified({path:join(root,stage,r.usage_snapshot.path),digest:r.usage_snapshot.digest});
- for(const a of r.outputs)verified({path:join(root,'workspace',a.path),digest:a.digest});return r;
+ for(const a of r.outputs)verified({path:join(root,'workspace',a.path),digest:a.digest});
+ if(r.submission_files){
+  for(const f of r.submission_files)verified({path:join(root,'workspace',f.path),digest:f.digest});
+  const additions=stage==='initial'&&reassessmentSpec?new Set([reassessmentSpec.update.target,...reassessmentSpec.outputs]):new Set();
+  assert.deepEqual(tree(join(root,'workspace')).filter(f=>!additions.has(f.path)),r.submission_files,'submission inventory changed');
+ }
+ return r;
 }
 export function inspectPracticalChallenge(root){
  root=resolve(root);const m=load(root),first=result(root,'initial'),second=result(root,'reassessment');
@@ -105,9 +111,9 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  assert.equal(process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED,'1','standard runtime model authorization required');
  assert.ok(['initial','reassessment'].includes(stage));frozen(root,m);
  const spec=m.registration.stages.find(s=>s.id===stage),workspace=join(root,'workspace');
+ assert.ok(!existsSync(join(root,stage)),'stage consumed or unknown; inspect, never replay');
  let previous=null;
  if(stage==='reassessment'){previous=verifyStage(root,'initial');assert.ok(previous.receipt.session_id,'same-session resume requires observed session id');verified(m.update);}
- assert.ok(!existsSync(join(root,stage)),'stage consumed or unknown; inspect, never replay');
  for(const output of spec.outputs)assert.ok(!existsSync(join(workspace,output)),'stage output must not preexist');
  const before=tree(workspace,true);mkdirSync(join(root,stage),{mode:0o700});save(join(root,stage,'before.json'),before);
  if(stage==='reassessment')writeFileSync(join(workspace,spec.update.target),verified(m.update),{flag:'wx',mode:0o644});
@@ -118,7 +124,7 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  let integrityError=null,outputs=[];
  try{
   frozen(root,m);
-  if(previous){verifyStage(root,'initial');for(const f of before){if(f.link!==undefined)assert.equal(readlinkSync(join(workspace,f.path)),f.link,'runtime link changed');else verified({path:join(workspace,f.path),digest:f.digest});}
+  if(previous){verifyStage(root,'initial',{reassessmentSpec:spec});for(const f of before){if(f.link!==undefined)assert.equal(readlinkSync(join(workspace,f.path)),f.link,'runtime link changed');else verified({path:join(workspace,f.path),digest:f.digest});}
    const allowed=new Set([...before.map(f=>f.path),spec.update.target,...spec.outputs]);assert.ok(tree(workspace,true).every(f=>allowed.has(f.path)),'reassessment may only add REASSESSMENT.md');
    verified({path:join(workspace,spec.update.target),digest:spec.update.digest});
    assert.equal(outcome.receipt.session_id,previous.receipt.session_id,'resume session changed');
@@ -132,16 +138,17 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  const usage=collectPracticalSessionUsage({sessionRoots:m.session_roots,workspace,rootSessionId:outcome.receipt.session_id,rootTurnLowerBound:outcome.receipt.observation.metrics});
  save(join(root,stage,'usage-hierarchy.json'),usage);
  const record={...outcome,usage_snapshot:{path:'usage-hierarchy.json',digest:hash(bytes(join(root,stage,'usage-hierarchy.json')))},completed:outcome.completed&&turnCompleted&&!integrityError,integrity_error:integrityError,outputs,
-  initial_written_before_investigation:'not_automatically_verified; semantic assessor checks transcript',automatic_semantic_scoring:false};
+  initial_written_before_investigation:'not_automatically_verified; semantic assessor checks transcript',automatic_semantic_scoring:false,
+  ...(m.registration.freeze_submission?{submission_files:tree(workspace)}:{})};
  save(join(root,stage,'stage-result.json'),record);return inspectPracticalChallenge(root);
 }
 function challengeScorePacket(root,{evaluatorRoot=null}={}){
- root=resolve(root);const m=load(root);frozen(root,m);const stages=m.registration.stages.map(s=>verifyStage(root,s.id));
+ root=resolve(root);const m=load(root);frozen(root,m);const stages=m.registration.stages.map(s=>verifyStage(root,s.id,{reassessmentSpec:m.registration.stages[1]}));
  assert.ok(evaluatorRoot||m.evaluator?.root,'external semantic evaluator assets required');
  const evaluator=bindEvaluator(m.registration,evaluatorRoot??m.evaluator.root,root);
  for(const p of m.toolchain_roots)assert.ok(outside(p,evaluator.root),'evaluator overlaps solver toolchain access');
  const packet={kind:'practical_challenge_semantic_handoff_v1',fixture_id:m.registration.id,manifest_digest:canonicalDigest(m),
-  evaluator,stages:stages.map((s,i)=>({id:m.registration.stages[i].id,outputs:s.outputs,receipt:pin(join(root,m.registration.stages[i].id,'task-codex-provider.json')),usage_snapshot:pin(join(root,m.registration.stages[i].id,'usage-hierarchy.json'))})),
+  evaluator,stages:stages.map((s,i)=>({id:m.registration.stages[i].id,outputs:s.outputs,...(s.submission_files?{submission_files:s.submission_files}:{}),receipt:pin(join(root,m.registration.stages[i].id,'task-codex-provider.json')),usage_snapshot:pin(join(root,m.registration.stages[i].id,'usage-hierarchy.json'))})),
   workspace:join(root,'workspace'),quality_score:null,semantic_assessment_required:true,automatic_semantic_scoring:false,
   method:'External semantic assessor evaluates frozen rubric against answer/source/transcript evidence; the pinned external score.mjs validates and totals those decisions only.',
   comparison_limits:m.comparison_limits};

@@ -52,6 +52,9 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     assert.equal(managedSetupIdentities(target)[0].source_revision,created.source_revision);
     const challenges=JSON.parse(okay(invoke(['evaluate','challenge-list'])));
     assert.ok(challenges.some(c=>c.id==='rc01-shared-review-platform'));
+    assert.ok(challenges.some(c=>c.id==='ch08-growth-workspace'));
+    assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','workspace','task.md')));
+    assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','evaluator','score.mjs')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','review-ceiling-v1','workspace','task.md')));
     assert.ok(existsSync(join(target,'.agent-spectrum-kernel','codex-install-state.json')));
     const copy=readFileSync(join(workspace,'source','skills','review-router','SKILL.md'));

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "kind": "assessment",
+  "request_id": "assessment-1",
+  "goal_id": "g1",
+  "goal_revision": 1,
+  "payload": {
+    "results": [
+      {
+        "target_type": "condition",
+        "target_id": "c1",
+        "judgment": "partial",
+        "evidence": [
+          {
+            "record_id": "r1",
+            "revision": 1
+          }
+        ],
+        "rationale": "該当記録に部分的な根拠がある",
+        "limits": "一度の実績で再現性は未確認",
+        "next_action": "支援なしで再実施して記録する"
+      },
+      {
+        "target_type": "action",
+        "target_id": "a1",
+        "judgment": "achieved",
+        "evidence": [
+          {
+            "record_id": "r1",
+            "revision": 1
+          }
+        ],
+        "rationale": "該当記録に部分的な根拠がある",
+        "limits": "一度の実績で再現性は未確認",
+        "next_action": "支援なしで再実施して記録する"
+      },
+      {
+        "target_type": "condition",
+        "target_id": "c2",
+        "judgment": "insufficient",
+        "evidence": [
+          {
+            "record_id": "r2",
+            "revision": 1
+          }
+        ],
+        "rationale": "該当記録に部分的な根拠がある",
+        "limits": "一度の実績で再現性は未確認",
+        "next_action": "支援なしで再実施して記録する"
+      }
+    ]
+  }
+}

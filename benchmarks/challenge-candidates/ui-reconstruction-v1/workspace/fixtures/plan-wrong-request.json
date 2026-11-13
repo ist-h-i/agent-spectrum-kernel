@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "kind": "plan",
+  "request_id": "plan-other",
+  "goal_id": "g1",
+  "goal_revision": 1,
+  "payload": {
+    "goal": {
+      "title": "設計根拠と合意形成を説明する",
+      "wish": "レビューを任されたい",
+      "current": "先輩の支援あり",
+      "capability": "設計判断を説明する",
+      "due": "2026-12-31",
+      "weekly_hours": 4,
+      "exclusions": [
+        {
+          "from": "2026-12-24",
+          "to": "2026-12-30"
+        }
+      ]
+    },
+    "conditions": [
+      {
+        "id": "c1",
+        "title": "設計根拠",
+        "standard": "独力で設計案と代替案の根拠を説明できる"
+      },
+      {
+        "id": "c2",
+        "title": "合意形成",
+        "standard": "関係者の懸念を整理し合意を得る"
+      }
+    ],
+    "actions": [
+      {
+        "id": "a1",
+        "condition_ids": [
+          "c1"
+        ],
+        "title": "設計案を書く",
+        "next_action": "代替案を追記",
+        "artifact": "design.md",
+        "minutes": 60,
+        "status": "todo",
+        "replaces_id": null
+      },
+      {
+        "id": "a2",
+        "condition_ids": [
+          "c2"
+        ],
+        "title": "レビュー会",
+        "next_action": "懸念を確認",
+        "artifact": "",
+        "minutes": 30,
+        "status": "held",
+        "replaces_id": null
+      }
+    ]
+  }
+}

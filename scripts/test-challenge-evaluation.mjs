@@ -32,7 +32,7 @@ function setup(t){
  return {base,root,config,ready,calls,fake,run};
 }
 test('catalog is separate from unchanged primary24 and discoverable through standard CLI',()=>{
- const rows=listPracticalChallenges();assert.equal(rows.length,1);assert.equal(rows[0].id,id);
+ const rows=listPracticalChallenges();assert.equal(rows.length,2);assert.deepEqual(rows.map(c=>c.id),[id,'ch08-growth-workspace']);
  assert.equal(rows[0].primary_catalog_member,false);
  assert.equal(Object.keys(PRIMARY_FIXTURE_REGISTRY).length,24);
  const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs','challenge-list'],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout)[0].id,id);
