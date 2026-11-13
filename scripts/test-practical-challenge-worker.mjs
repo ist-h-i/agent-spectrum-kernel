@@ -35,13 +35,49 @@ test('a standard staged trial dispatches exactly two linked turns; inspect and f
   return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:12,stdout:Buffer.from([{type:'thread.started',thread_id:'synthetic-session'},{type:'turn.completed',usage:{input_tokens:10,output_tokens:2,cached_input_tokens:0}}].map(JSON.stringify).join('\n')+'\n'),stderr:Buffer.alloc(0)};
  };
  const result=await worker.executeChallengeEvaluationWorker(settings,job,join(root,'result.json'),{session});
- assert.equal(calls,2);assert.equal(handoffs,1);assert.equal(result.status,'completed');assert.equal(result.output.semantic_assessment_required,true);assert.equal(result.output.cli_seconds,.024);
+ assert.equal(calls,2);assert.equal(handoffs,1);assert.equal(result.status,'completed');assert.equal(result.output.ready_for_next_root,true);assert.equal(result.output.semantic_assessment_required,true);assert.equal(result.output.cli_seconds,.024);
  assert.equal(result.output.notes.metrics.input_tokens,null,'missing hierarchy is not reported as complete root-only cost');
  await worker.inspectChallengeEvaluationWorker(settings,job,root);await worker.inspectChallengeEvaluationWorker(settings,job,root);assert.equal(calls,2);
  await assert.rejects(worker.executeChallengeEvaluationWorker(settings,job,join(root,'result.json'),{session}),/consumed/);assert.equal(calls,2);
  const bad=join(root,'failed');mkdirSync(bad);let failcalls=0;
  await worker.executeChallengeEvaluationWorker(settings,job,join(bad,'result.json'),{session:async request=>{failcalls++;if(failcalls===1)return session(request);return {spawnObserved:false,terminationConfirmed:true,exitCode:null,error:{message:'test failure'},stdout:Buffer.alloc(0),stderr:Buffer.alloc(0)};}});
- const failed=await worker.inspectChallengeEvaluationWorker(settings,job,bad);assert.equal(failed.status,'failed');assert.equal(failcalls,2);assert.equal(handoffs,1);
+ const failed=await worker.inspectChallengeEvaluationWorker(settings,job,bad);assert.equal(failed.status,'failed');assert.equal(failed.output.ready_for_next_root,true);assert.equal(failcalls,2);assert.equal(handoffs,1);
+});
+
+test('stage closure requires terminal results for required or allocated stages without replay or evidence repair',async t=>{
+ t.mock.module('./practical-challenge-evaluation.mjs',{namedExports:{...challenge,preparePracticalChallengeScoreHandoff:()=>({semantic_assessment_required:true})}});
+ const worker=await import('./practical-challenge-worker.mjs?allocated-stage-closure');
+ const files=worker.registeredChallengeFiles(id),pub=canonicalDigest(files.map(({target,digest})=>({target,digest})));
+ const settings={evidence_kind:'synthetic',cases:{[id]:{files,challenge:{id,toolchainRoots:['/usr']}}},conditions:{baseline:{files:[],codex:{executable:realpathSync('/bin/echo'),model:'synthetic',reasoning:'low',task_file:'task.md',timeout_ms:1000}}}};
+ const job={kind:'trial',key:'closure',input:{row:{case_id:id,condition:'baseline',public_input_digest:pub}}};
+ const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';t.after(()=>{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;});
+ for(const scenario of [
+  {name:'allocated reassessment loses its result and provider receipt',missing:true,removeReceipt:true,ready:false},
+  {name:'a surviving provider receipt cannot replace a missing stage result',missing:true,ready:false},
+  {name:'a successful initial stage alone cannot close its required reassessment',missing:true,removeStage:true,ready:false},
+  {name:'a recorded unconfirmed reassessment remains blocked',failureAt:2,terminal:false,ready:false},
+  {name:'a recorded terminal initial failure remains closed',failureAt:1,terminal:true,ready:true}
+ ])await t.test(scenario.name,async t=>{
+  const directory=tmp(t);let calls=0;
+  const session=async request=>{
+   calls++;
+   if(calls===scenario.failureAt)return {spawnObserved:!scenario.terminal,terminationConfirmed:scenario.terminal,exitCode:null,error:{message:'synthetic interruption'},stdout:Buffer.alloc(0),stderr:Buffer.alloc(0)};
+   for(const name of calls===1?['INITIAL.md','REVIEW.md']:['REASSESSMENT.md'])writeFileSync(join(request.cwd,name),'Synthetic '+name);
+   return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:12,stdout:Buffer.from([{type:'thread.started',thread_id:'synthetic-closure-session'},{type:'turn.completed',usage:{input_tokens:10,output_tokens:2,cached_input_tokens:0}}].map(JSON.stringify).join('\n')+'\n'),stderr:Buffer.alloc(0)};
+  };
+  await worker.executeChallengeEvaluationWorker(settings,job,join(directory,'result.json'),{session});
+  const control=join(directory,'challenge'),initialPath=join(control,'initial','stage-result.json'),initial=readFileSync(initialPath),resultPath=join(control,'reassessment','stage-result.json');
+  if(scenario.removeStage)rmSync(join(control,'reassessment'),{recursive:true});
+  else if(scenario.missing){rmSync(resultPath);if(scenario.removeReceipt)rmSync(join(control,'reassessment','task-codex-provider.json'));}
+  for(let i=0;i<2;i++){
+   const result=await worker.inspectChallengeEvaluationWorker(settings,job,directory);
+   assert.equal(result.output.ready_for_next_root,scenario.ready);
+   assert.equal(result.status,'failed');assert.equal(result.output.execution_completed,false);
+  }
+  assert.equal(calls,scenario.failureAt===1?1:2,'inspection must never dispatch another solver turn');
+  assert.deepEqual(readFileSync(initialPath),initial,'inspection must not rewrite retained stage evidence');
+  if(scenario.missing)assert.equal(existsSync(resultPath),false,'inspection must not fabricate a missing result');
+ });
 });
 
 test('refreshable standard command inspection retains prior result and resumes grade-only recovery without solver replay',async t=>{
