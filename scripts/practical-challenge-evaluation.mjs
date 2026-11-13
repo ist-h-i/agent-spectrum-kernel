@@ -121,7 +121,7 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  const outcome=await executeCodexPracticalAdapter({settings:{kind:'practical_codex_settings_v1',...m.options,evidence_kind:m.evidence_kind},
   controlRoot:join(root,stage),requestDigest:confirmation,commandDigest:canonicalDigest(m.options),invocationDigest,role:'task'},session,
   {workspace,prompt:spec.prompt,resume_session_id:previous?.receipt.session_id??null,toolchain_roots:m.toolchain_roots});
- let integrityError=null,outputs=[];
+ let integrityError=null,outputs=[],submissionFiles=null;
  try{
   frozen(root,m);
   if(previous){verifyStage(root,'initial',{reassessmentSpec:spec});for(const f of before){if(f.link!==undefined)assert.equal(readlinkSync(join(workspace,f.path)),f.link,'runtime link changed');else verified({path:join(workspace,f.path),digest:f.digest});}
@@ -131,6 +131,7 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
   }
   outputs=spec.outputs.map(path=>({path,digest:hash(bytes(join(workspace,path)))}));
   for(const f of outputs)assert.ok(bytes(join(workspace,f.path)).length>0,'empty stage output');
+  if(m.registration.freeze_submission)submissionFiles=tree(workspace);
  }catch(error){integrityError=String(error.message);}
  // Root process exit alone cannot establish a completed turn.
  const events=readFileSync(join(root,stage,'task-codex.stdout.jsonl'),'utf8').trim().split('\n');
@@ -139,7 +140,7 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  save(join(root,stage,'usage-hierarchy.json'),usage);
  const record={...outcome,usage_snapshot:{path:'usage-hierarchy.json',digest:hash(bytes(join(root,stage,'usage-hierarchy.json')))},completed:outcome.completed&&turnCompleted&&!integrityError,integrity_error:integrityError,outputs,
   initial_written_before_investigation:'not_automatically_verified; semantic assessor checks transcript',automatic_semantic_scoring:false,
-  ...(m.registration.freeze_submission?{submission_files:tree(workspace)}:{})};
+  ...(submissionFiles?{submission_files:submissionFiles}:{})};
  save(join(root,stage,'stage-result.json'),record);return inspectPracticalChallenge(root);
 }
 function challengeScorePacket(root,{evaluatorRoot=null}={}){

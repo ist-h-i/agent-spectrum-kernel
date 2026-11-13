@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,realpathSync,rmSync,readFileSync,writeFileSync,mkdirSync,cpSync,existsSync} from 'node:fs';
+import {mkdtempSync,realpathSync,rmSync,readFileSync,writeFileSync,mkdirSync,cpSync,existsSync,symlinkSync,truncateSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {seal,root,id,source,inventory} from './manifest.mjs';
@@ -27,7 +27,7 @@ function fixture(t){
  };
  const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
  t.after(()=>{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;});
- return {base,run,ready,evaluator,session,calls:()=>calls,start:stage=>startPracticalChallenge(run,ready.manifest_digest,{allowModelCalls:true,stage,session})};
+ return {base,run,ready,evaluator,session,calls:()=>calls,start:(stage,injected=session)=>startPracticalChallenge(run,ready.manifest_digest,{allowModelCalls:true,stage,session:injected})};
 }
 test('sealed public inputs, public rubric and scenarios are complete and consistently registered',()=>{
  assert.equal(seal().files,13);assert.deepEqual(read('workspace/brief/rubric.json'),rubric);
@@ -103,6 +103,21 @@ test('synthetic staged delivery freezes app sources, binds handoff and imports s
 test('app modification between stages is refused before another injected dispatch',async t=>{
  const f=fixture(t);await f.start('initial');writeFileSync(join(f.run,'workspace/app/index.html'),'changed');
  await assert.rejects(f.start('reassessment'),/drift/);assert.equal(f.calls(),1);
+});
+for(const stage of ['initial','reassessment'])for(const invalid of ['symlink','oversized'])test(`${stage} ${invalid} submission records an inspectable consumed integrity failure`,async t=>{
+ const f=fixture(t);if(stage==='reassessment')await f.start('initial');
+ const end=await f.start(stage,async request=>{
+  const outcome=await f.session(request),path=join(request.cwd,'app/invalid');
+  if(invalid==='symlink')symlinkSync('index.html',path);
+  else{writeFileSync(path,'');truncateSync(path,16*1024*1024+1);}
+  return outcome;
+ });
+ const record=end.stages[stage];assert.equal(end.status,stage+'_consumed_or_unknown');
+ assert.equal(record.completed,false);assert.ok(record.integrity_error);assert.equal(record.receipt.session_id,'synthetic-ch08');
+ assert.ok(existsSync(join(f.run,stage,'stage-result.json')));assert.ok(existsSync(join(f.run,stage,record.usage_snapshot.path)));
+ assert.equal(record.receipt.observation.metrics.input_tokens,9);
+ const calls=f.calls();await assert.rejects(f.start(stage),/consumed/);assert.equal(f.calls(),calls);
+ assert.throws(()=>preparePracticalChallengeScoreHandoff(f.run));assert.equal(existsSync(join(f.run,'score-handoff.json')),false);
 });
 test('new files between stages are refused before reassessment and never become frozen answers',async t=>{
  const f=fixture(t);await f.start('initial');writeFileSync(join(f.run,'workspace/app/late.js'),'late');

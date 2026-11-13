@@ -13,6 +13,7 @@ Artifact: CH08-IMPLEMENT-1。上流: CH08-SPEC-1 / CH08-PACKAGE-1。
 | E5 | V1/V2/V3 | 別担当が仕様・採点・登録・提出固定を独立レビュー。`node --test scripts/test-challenge-evaluation.mjs benchmarks/challenge-candidates/ui-reconstruction-v1/tools/public-package.test.mjs` | 27 pass / 0 fail、未解決のmerge blockerなし |
 | E6 | V3 | `git diff --check` | exit 0 |
 | E7 | V1/V2/V3 | main `73cf6315` 統合後にE2、E4、E5を再実行。`TMPDIR=/private/tmp node --test --test-concurrency=1 scripts/test-npm-package.mjs scripts/test-finding-intake.mjs scripts/test-verification-review-dispatch.mjs` | 回帰60件、独立確認27件、実配布・finding・dispatch関連28件すべて成功。Repository validation passed。競合・変更ファイルの重複なし |
+| E8 | V2/V3 | PRのP2指摘を初回・再確認 × symlink・16MiB超過の4ケースで再現後、提出inventory検査を整合性エラー処理内へ移動。E2/E4とCH08＋RC01を再実行し別担当が独立確認 | 修正前は追加4件すべて失敗。修正後は31件、標準回帰60件、repository validationが成功。receipt・usage・stage-resultを残し、不完全結果の再試行と採点を拒否。独立レビューで未解決blockerなし |
 
 独立レビューで見つかった初回〜確認間のファイル追加を完全inventory照合で拒否した。
 型表記、依頼消費、同時刻イベント順序、間接根拠リンクの失効も修正し、再検証した。
