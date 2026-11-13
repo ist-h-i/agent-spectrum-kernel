@@ -92,7 +92,12 @@ export async function inspectChallengeEvaluationWorker(settings,job,directory){
  if(!spec.challenge){const p=join(directory,'local-completion.json');return existsSync(p)?read(p):{request_digest:canonicalDigest(job),status:'unknown'};}
  if(!existsSync(join(root,'manifest.json')))return {request_digest:canonicalDigest(job),status:'unknown',output:{ready_for_next_root:false}};
  bind(root,job);const state=inspectPracticalChallenge(root),stages=Object.values(state.stages).filter(Boolean);
- const completed=state.status==='awaiting_semantic_assessment';const closed=stages.length>0&&stages.every(s=>s.terminal===true);
+ const completed=state.status==='awaiting_semantic_assessment';
+ // A successful initial turn still requires reassessment. Missing results for
+ // required or allocated stages never prove closure of the whole worker.
+ const closureStages=['initial'];
+ if(state.stages.initial?.completed||state.stages.reassessment||existsSync(join(root,'reassessment')))closureStages.push('reassessment');
+ const closed=closureStages.every(stage=>state.stages[stage]?.terminal===true);
  const durations=stages.map(s=>s.receipt.observation.provider_duration_ms),duration=durations.every(v=>Number.isFinite(v)&&v>=0)?durations.reduce((a,b)=>a+b,0):null;
  const latest=state.stages.reassessment??state.stages.initial;
  const usage=latest?.usage_snapshot?read(join(root,state.stages.reassessment?'reassessment':'initial',latest.usage_snapshot.path)):null;
