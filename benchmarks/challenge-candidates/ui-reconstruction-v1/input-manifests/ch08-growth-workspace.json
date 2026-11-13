@@ -3,7 +3,7 @@
   "fixture_id": "ch08-growth-workspace",
   "counts": {
     "files": 13,
-    "bytes": 82411
+    "bytes": 82595
   },
   "files": [
     {
@@ -68,8 +68,8 @@
     },
     {
       "path": "task.md",
-      "sha256": "ba53356968fcd39f59cfbe6cd1dd59f2fa64ad66044972086719d7186d429246",
-      "bytes": 2839
+      "sha256": "b7d664b611f6533945f1f0741eac70d834b4dff34402e6f5fda8d035566a1c9c",
+      "bytes": 3023
     }
   ]
 }

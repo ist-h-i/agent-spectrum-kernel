@@ -81,7 +81,7 @@
       "freeze_submission": true,
       "input_manifest": {
         "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/input-manifests/ch08-growth-workspace.json",
-        "digest": "sha256:7da2937940e498c986efdb926d948fa0d5bb966f409212d8818b6eb48b676043"
+        "digest": "sha256:eed7f685d6f1b18d1f3b362cfd6686f06c88d37d109b39e232f2de32651d24b4"
       },
       "stages": [
         {
