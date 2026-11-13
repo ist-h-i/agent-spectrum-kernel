@@ -1,5 +1,7 @@
 // Common installed-ASK review dispatch. Material is read from the bound Git trees,
 // supplied only to an explicitly trusted reviewer, and never saved in the result.
+import {randomUUID} from 'node:crypto';
+import { captureReviewFindings } from './finding-intake.mjs';
 import { spawnSync } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { canonicalDigest, parseJsonRejectDuplicateKeys, stableCanonicalJson } from './content-addressed-store.mjs';
@@ -97,10 +99,10 @@ function validateUsage(raw){
 }
 
 export async function dispatchVerificationReview({repositoryRoot,storeRoot,targetRevision,reviewer}){
-  const started=performance.now(), options={repositoryRoot,storeRoot,targetRevision};
+  const executionId=randomUUID(), started=performance.now(), options={repositoryRoot,storeRoot,targetRevision};
   let request=null, plan=null, calls=0, timer, observedUsage=validateUsage(null);
   const finish=(status,extra={})=>{
-    const body={schema_version:'1.0.0',program:'ask_verification_review_dispatch',status,target_revision:typeof targetRevision==='string'&&/^[a-f0-9]{40}$/u.test(targetRevision)?targetRevision:null,
+    const body={schema_version:'1.0.0',program:'ask_verification_review_dispatch',execution_id:executionId,status,target_revision:typeof targetRevision==='string'&&/^[a-f0-9]{40}$/u.test(targetRevision)?targetRevision:null,
       completion_plan_digest:plan?.artifact_digest??null,request_digest:request?.request_digest??null,
       scope:request?{paths:request.paths,obligations:request.obligations,judgment_refs:request.judgment_refs}:null,
       reviewer_calls:calls,elapsed_ms:Math.max(0,Math.round(performance.now()-started)),usage:observedUsage,
@@ -131,7 +133,11 @@ export async function dispatchVerificationReview({repositoryRoot,storeRoot,targe
     current(repositoryRoot,targetRevision);
     const confirmed=prepareVerificationCompletion(options);
     if(!equal(plan,confirmed)||!equal(request,requestFor(options,confirmed))||performance.now()-started>DEADLINE)throw new Error('decision inputs changed');
-    return finish('reviewed',checked);
+    let finding_capture;
+    try{finding_capture=captureReviewFindings(repositoryRoot,checked.result,executionId);}
+    catch{finding_capture={status:'failed',reason_code:'finding_capture_failed',events:[]};}
+    // Persistence failures must be visible without discarding or rerunning a valid review.
+    return finish('reviewed',{...checked,finding_capture});
   }catch{
     return finish('blocked',{reason_code:'review_scope_state_or_response_invalid'});
   }finally{clearTimeout(timer);controller.abort();}

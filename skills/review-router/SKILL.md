@@ -73,6 +73,8 @@ Do not create another signal map in prose or in an adapter.
    - Order merge blockers first, then blocker/major/minor/nit, then Finding ID in code-unit order.
    - Category is metadata. Do not emit empty category sections.
 
+   - If this project enabled `.agent-spectrum-kernel/findings/config.json`, capture meaningful findings using [finding intake](../../docs/finding-intake.md). Reuse source/Finding IDs on retries, retain evidence status, and keep current review blockers in this review. Saving a finding does not confirm it or authorize a durable rule.
+
 7. Run review-final-merge-gate only when a final decision is explicitly requested.
    - It runs after baseline and every required additional gate.
    - Missing required gate evidence remains insufficient evidence.

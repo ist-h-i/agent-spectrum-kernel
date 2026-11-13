@@ -294,3 +294,7 @@ to reconcile its application. `ask rules review --request rule-request.json
 host-reviewed observations without changing the rule. Preparation does not edit the target or grant
 approval. See [project-local review rule lifecycle](review-rule-lifecycle.md)
 for promotion criteria, update/retirement, and evidence limits.
+
+## Project-local finding capture
+
+`ask findings init|capture|list|feedback` enables local JSON collection of task discoveries, user corrections and AI review findings. See [finding intake](finding-intake.md) for host connections, privacy and limits. Collection does not approve or apply rules.
