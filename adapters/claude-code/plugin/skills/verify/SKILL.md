@@ -2,7 +2,7 @@
 name: verify
 description: Verify behavior through the fixed-entry Agent Spectrum Kernel profile.
 ---
-<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"verification","k":"p","r":"ask-fixed-entry-assets-v1","p":"dd2c1e11ab52de78487f0ca09e30da7ac977167c751444874be6ba87f53ed3e6","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"verification","k":"p","r":"ask-fixed-entry-assets-v1","p":"696f1f341f460f1e89b8522480078a4a995158b306e9fe145ce3b3c5709a7da5","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Verify
 

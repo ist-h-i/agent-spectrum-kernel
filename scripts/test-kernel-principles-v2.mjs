@@ -125,7 +125,7 @@ test("historical source retains exact v1, candidate and v2 body and generation i
 test("current scope principles use a distinct reviewed revision without new procedure dependencies", () => {
   for (const render of [renderKernelPrinciples, renderKernelPrinciplesV2Candidate, renderKernelPrinciplesV2]) {
     const entry = render(source);
-    assert.equal(entry.generation.renderer_revision, 2);
+    assert.equal(entry.generation.renderer_revision, 3);
     assert.equal(entry.generation.source_digest, `sha256:${digest(source)}`);
     assert.match(entry.body, /sufficient change boundary before keeping it narrow/u);
     assert.match(entry.body, /Retire paths, state, and configuration made obsolete by this change/u);

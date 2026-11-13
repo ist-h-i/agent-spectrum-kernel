@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 
 export const KERNEL_PRINCIPLES_ID = "kernel_principles_v1";
-export const KERNEL_PRINCIPLES_SOURCE_DIGEST = "sha256:9246ccde37219850da235544c158100efd0b473112ad59c7b692fc930e4538ee";
+export const KERNEL_PRINCIPLES_SOURCE_DIGEST = "sha256:8d67bf4adc14a3887f0b2a6707c0467fc099e8d71e738398a8e1367827517c51";
 // Retain the reviewed 5f36081 source for replay; new sources never inherit a seal.
 const reviewedSourceRevisions = new Map([
   ["sha256:173b0ae1cbb3a92cb434b60c5d233dbd0e2b68b75be9732818d8b53cbb3b5d6c", 1],
-  [KERNEL_PRINCIPLES_SOURCE_DIGEST, 2],
+  ["sha256:9246ccde37219850da235544c158100efd0b473112ad59c7b692fc930e4538ee", 2],
+  // Reviewed addition: section 7.6 is opt-in persistence procedure, not a
+  // dependency-free engineering principle. Keep its commands out of this condition.
+  [KERNEL_PRINCIPLES_SOURCE_DIGEST, 3],
 ]);
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 
@@ -58,7 +61,7 @@ export function renderKernelPrinciples(source) {
   included.push({ section: "0. Task classification", paragraphs: [3], part: "first sentence" });
   return { body, generation: { id: KERNEL_PRINCIPLES_ID, renderer_revision: rendererRevision, source_path: "AGENTS.md",
     source_digest: sourceDigest, generated_digest: hash(body), included,
-    excluded: ["AGENTS preamble", "0:mode router and Skill invocation", "1:machine-readable contract reference", "7:formal proof policy", "7.5:formal state contract reference", "8:Skill routing", "10:formal output protocols"],
+    excluded: ["AGENTS preamble", "0:mode router and Skill invocation", "1:machine-readable contract reference", "7:formal proof policy", "7.5:formal state contract reference", ...(rendererRevision >= 3 ? ["7.6:opt-in finding capture procedure"] : []), "8:Skill routing", "10:formal output protocols"],
     dependencies: [], supported_task_classes: ["implementation", "trivial"] } };
 }
 
