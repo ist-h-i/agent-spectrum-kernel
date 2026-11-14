@@ -10,7 +10,7 @@ import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs } from "./ask-shared.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const refs = ["principles.md", "decision-patterns.md", "anti-patterns.md", "ui-capability-contract.md"];
+const refs = ["principles.md", "decision-patterns.md", "anti-patterns.md", "ui-capability-contract.md", "working-state.md"];
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const definitions = [
   { adapter: "claude", surface: ".claude", plan: buildClaudeProjectionPlan },
