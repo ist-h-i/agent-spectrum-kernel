@@ -28,7 +28,8 @@ When a versioned contract is adopted or requested, use the producer's artifact f
 - action priority, information hierarchy, grouping and placement;
 - first information to notice, text roles and wrapping, alignment anchors, section rhythm and imagery in relation to the task;
 - tokens and their component bindings, rather than token values alone;
-- interaction states, transitions, feedback and consequence/recovery limits;
+- interaction states, transitions, actual action effects, feedback and consequence/recovery limits;
+- draft/baseline ownership and retention boundaries, commitment/validation behavior and result-to-input revision relationships when applicable;
 - responsive behavior with evidenced viewport/device assumptions;
 - observable static and interactive verification criteria.
 
@@ -41,7 +42,9 @@ Link each applicable UX obligation to its ASK principle/pattern, adopted contrac
 | goal and task sequence | sourced task, action priority, completion and next action | rendered hierarchy and exercised task path |
 | information | required meaning, grouping, density and labels | actual screen at supported viewports |
 | visual finish | text hierarchy, alignment, spacing and component relationships | whole-screen and detail inspection distinct from functional results |
-| interaction and feedback | geometry, signifiers, states and transitions | screen plus exercised controls and resulting state |
+| interaction and feedback | geometry, signifiers, states, transitions and actual action effects | screen plus exercised controls and resulting visible/underlying state |
+| draft continuity and status | distinct working draft, acknowledged baseline and view state | context change/return and rejected save retain work; completion does not mark newer edits saved |
+| state replacement and derived truth | validation before commitment, supported apply semantics and source revision linkage | real controls apply valid state, reject invalid state without mutation, and expose stale results when relevant inputs change |
 | inclusion | equivalent paths and meaning beyond single cues | keyboard/focus and applicable access checks |
 | reversibility | cancellation, actual undo, compensation and limits | underlying state before/after the action |
 | partial failure and blocking | dependency boundary, retained input and scoped retry | exercise independent/foundational failure and retry |
@@ -55,7 +58,9 @@ For implemented UI, `ui-review` must inspect actual rendered screens and exercis
 
 Keep visual finish, task usability and functionality on separate evidence. A contract-only review cannot approve actual rendering. Screenshots support static claims only; missing runtime access limits interaction judgments while supplied screenshots can still support scoped visual findings. Source inspection, mock fixtures and passing automated checks do not replace actual-screen review. A missing private contract does not bar a task-based critique of an available screen; missing context limits only dependent judgments. ASK gates retain their own existing statuses and final merge authority; do not substitute external `ui-review` verdicts for executed ASK gate evidence.
 
-Include these probes when the relevant controls exist (otherwise record applicability):
+For stateful work, use `working-state.md` to select a representative running task path and the relevant loss-of-work, commitment or freshness boundary. Observe the actual control's effect as well as its feedback; a displayed confirmation or success message is not the effect. Select from the authorized task and adopted decisions, without prescribing an expected review verdict. Keep the decisive observations in the existing evidence record; do not require every example or a second report.
+
+Use the relevant parts of these visual and interaction probes when the controls are in the affected scope; omit absent concerns:
 
 - Select control: inspect the arrow's trailing space, arrow/text separation, clipping and alignment at supported widths, with long labels and applicable focus/disabled states; exercise keyboard selection. State the intended trailing inset and text reserve in applicable design decisions. Text clearance or CSS padding does not measure a native arrow's edge clearance. If exact geometry is unavailable, keep dimensions unverified while reporting visible crowding and its relation to neighboring controls; do not replace native semantics solely to make measurement easier.
 - Editable table: inspect relative prominence of primary edit/save versus secondary/cancel actions, row/column/control alignment and dense/narrow layouts; exercise edit, save, cancel and error states and verify retained data/input. Bind the judgment to evidenced action priority and geometry rather than taste.

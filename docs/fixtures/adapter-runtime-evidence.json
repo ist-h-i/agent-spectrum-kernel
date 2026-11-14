@@ -54,7 +54,7 @@
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:7f3e3396517b145fc5a555651f8d3b966a8fbaa2ac82ddae7cec8abd3f6bd06d"
+      "profile_fingerprint": "sha256:8f9443a22b432703228170f8a761741590b9c9c71a970ee2cec606adc82972b2"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
