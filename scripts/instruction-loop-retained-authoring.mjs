@@ -55,8 +55,16 @@ function inspectClosed({root,profilePath,configPath,preEvaluation=false,reselect
  assert.equal(execution.stdout.truncated,false,'truncated authoring transcript cannot bind a retained answer');
  assert.equal(execution.stdout.total_bytes,Buffer.byteLength(execution.stdout.text));
  const events=execution.stdout.text.trim().split('\n').filter(Boolean).map(line=>parseJsonRejectDuplicateKeys(line,'authoring event'));
- const answers=events.filter(e=>e.type==='item.completed'&&e.item?.type==='agent_message');
+ const messages=events.filter(e=>e.type==='item.completed'&&e.item?.type==='agent_message');
+ // Codex progress commentary and the final answer share agent_message. Retain
+ // only one structured answer, last in that stream and bound to last-message.
+ const answers=messages.filter(e=>{
+  assert.equal(typeof e.item.text,'string');
+  try{parseJsonRejectDuplicateKeys(e.item.text,'retained authoring answer candidate');return true;}
+  catch(error){assert.ok(!/^[\s]*[\[{]/u.test(e.item.text),'ambiguous structured authoring message');return false;}
+ });
  assert.equal(answers.length,1,'one unambiguous retained authoring answer required');
+ assert.equal(answers[0],messages.at(-1),'retained answer must be the final agent message');
  assert.equal(events.filter(e=>e.type==='turn.completed').length,1,'positive terminal provider event required');
  const completed=events.findIndex(e=>e.type==='turn.completed'),started=events.filter(e=>e.type==='turn.started');
  assert.equal(completed,events.length-1,'activity after provider completion leaves later work unconfirmed');
