@@ -418,3 +418,13 @@ closure, historical regression detection or sufficient observation samples.
 Both `selection_enabled` and `selection_ready` remain false. No workflow/job or
 skip condition changes. A mixed CI-code PR cannot supply the still-missing actual
 eligible-docs observation. No time or runner-minute saving is claimed here.
+
+## Task metadata descriptor contract ownership
+
+`test-kernel-principles-v2-metadata-contract.mjs` runs exactly once in the existing
+local-eval Ubuntu kernel-principles step. It exercises pure JSON/digest/descriptor
+logic against repository fixture bytes, including unknown-field, forged evidence,
+context and source-projection boundaries; no process, permission, model, evaluator
+or OS-specific execution is used. Historical CI inventory stays immutable;
+`test-ci-full-run.mjs` accounts for this explicit addition without dropping any
+previous file/flag coverage or duplicating a Mac owner.
