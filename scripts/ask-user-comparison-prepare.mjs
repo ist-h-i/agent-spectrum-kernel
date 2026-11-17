@@ -772,7 +772,7 @@ export function prepareUserComparison(options = {}) {
     arms[id] = { id, label, path, baseline_path: baselinePath, baseline_commit: baselineCommit, baseline_inventory: baseline,
       baseline_digest: comparisonHash(jsonBytes(baseline)), git_metadata: inventoryComparisonGitMetadata(armRoot), assets,
       capability: id === "kernel_only" ? kernelCapability(baseline, config) : id === KERNEL_PRINCIPLES_V2_ID
-        ? principlesV2Capability(descriptor) : id === KERNEL_PRINCIPLES_ID
+        ? principlesV2Capability(descriptor, { metadataBytes }) : id === KERNEL_PRINCIPLES_ID
         ? principlesCapability(canonicalBytes, principles.body, principles.generation, config.task_class) : { status: "available", required: [], available: [], missing: [] },
       configuration: id === "plain" ? "No project ASK assets added; preserved custom instructions and global Skills may apply."
         : id === "kernel_only" ? "Canonical AGENTS only; no ASK Skills added; preserved custom/global capabilities may apply."

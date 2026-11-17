@@ -84,10 +84,26 @@ test('default single catalog v7 preparation uses real public task inputs and lea
   assert.deepEqual(subset.manifest.fixture_ids,subsetIds);assert.equal(subset.slots.length,6);assert.equal(subset.model_calls,0);
   assert.equal(subset.manifest.limits.token_budget,10000000);assert.ok(subset.slots.every(slot=>slot.quality===null));
   const added=prepared.manifest.blocks.find(block=>block.fixture_id==='hi-authorization-exception');
-  const plan=readUserComparisonPlan(added.root).plan,extension=plan.kernel_definition.renderer_closure.at(-1);
+  const plan=readUserComparisonPlan(added.root).plan,extension=plan.kernel_definition.renderer_closure.find(entry=>entry.source_path==='scripts/kernel-principles-v2-catalog24.mjs');
   assert.equal(extension.source_path,'scripts/kernel-principles-v2-catalog24.mjs');
   const path=join(added.root,extension.path),original=readFileSync(path);writeFileSync(path,'drift');
   assert.throws(()=>readUserComparisonPlan(added.root));writeFileSync(path,original);
   assert.equal(inspectUserComparison(added.root).execution.start_consumed,false);
+  const semanticBlock=prepared.manifest.blocks.find(block=>block.fixture_id==='hi-financial-state-integrity');
+  const semanticPlan=readUserComparisonPlan(semanticBlock.root).plan;
+  const metadataPath=join(semanticBlock.root,semanticPlan.kernel_definition.task_metadata.path),metadata=readFileSync(metadataPath);
+  const planPath=join(semanticBlock.root,'control/plan.json'),planBytes=readFileSync(planPath),planDigest=readFileSync(join(semanticBlock.root,'control/plan.digest'));
+  const changedMetadata=Buffer.concat([metadata,Buffer.from('\n')]);writeFileSync(metadataPath,changedMetadata);
+  assert.throws(()=>readUserComparisonPlan(semanticBlock.root),'raw bytes stay pinned even for semantics-preserving whitespace');
+  const replaced=structuredClone(semanticPlan);replaced.kernel_definition.task_metadata.digest=comparisonHash(changedMetadata);
+  const replacedBytes=Buffer.from(JSON.stringify(replaced));writeFileSync(planPath,replacedBytes);writeFileSync(join(semanticBlock.root,'control/plan.digest'),comparisonHash(replacedBytes));
+  assert.throws(()=>readUserComparisonPlan(semanticBlock.root),'updating raw plan digest does not update sealed descriptor refs');
+  writeFileSync(metadataPath,metadata);writeFileSync(planPath,planBytes);writeFileSync(join(semanticBlock.root,'control/plan.digest'),planDigest);
+  for(const entry of semanticPlan.kernel_definition.renderer_closure.filter(entry=>['scripts/ask-primary-metadata-task-contract.mjs','scripts/content-addressed-store.mjs'].includes(entry.source_path))){
+   const helperPath=join(semanticBlock.root,entry.path),bytes=readFileSync(helperPath);writeFileSync(helperPath,'changed');
+   assert.throws(()=>readUserComparisonPlan(semanticBlock.root),'semantic helper bytes remain pinned');writeFileSync(helperPath,bytes);
+  }
+  assert.equal(readUserComparisonPlan(semanticBlock.root).plan.fixture_id,semanticPlan.fixture_id);
+
  }finally{rmSync(area,{recursive:true,force:true});}
 });

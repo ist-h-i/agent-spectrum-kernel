@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
   "program": "adaptive_ask_evaluator_authority_manifest",
   "fixture_id": "hi-financial-state-integrity",
-  "evaluator_revision": "483d861b376835e52f65138d39d9eb3a113d9bdd",
+  "evaluator_revision": "78fbf8d230663ce16589f0dadd12bc4aed2fa50e",
   "file_inventory": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/input-manifest.json",
@@ -45,12 +45,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/hi-financial-state-integrity/requirement-record.json",
       "bytes": 2790,
-      "raw_sha256": "sha256:dde1a9d681fddcfd8d03277db3b4a8eae9c356aeeba05161d255482da8ac67c2",
-      "semantic_digest": "sha256:25e2532f39ec3150d76b3435b91d75656fd532b8529177026aff64c4484d2c82",
+      "raw_sha256": "sha256:9a2ade684d9958d21816fc2da8d1c04d72e0ea6a1dc35237e326371c4a5bccba",
+      "semantic_digest": "sha256:cfa6b8495a34ba901458c3e9af7eaac38fc639e2aebc81b5f6f7afc7c6f17d4d",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:25e2532f39ec3150d76b3435b91d75656fd532b8529177026aff64c4484d2c82",
+      "requirement_record_digest": "sha256:cfa6b8495a34ba901458c3e9af7eaac38fc639e2aebc81b5f6f7afc7c6f17d4d",
       "requirement_set_digest": "sha256:34c6a8096e199bbc0f3bbfa1d56cced8220c0b49f8e99d26177e530f08ef0a21"
     }
   ],
-  "manifest_digest": "sha256:1ac3feabc0714945dc2d5483f5fbf3e6c778de5cd2e626d2a37aac4728c90be6"
+  "manifest_digest": "sha256:706c0e1b6bf3b26e803cf5c25fe2ef01cb293dff94b691968d8e73f06d42b53f"
 }
