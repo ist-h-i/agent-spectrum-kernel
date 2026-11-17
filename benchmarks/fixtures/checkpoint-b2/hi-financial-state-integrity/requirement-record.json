@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:b9bac33d58da0b8c7c4405f5249d61cccb16604ed6ce4c9a8d18b9d30588ce83",
+  "admission_record_digest": "sha256:b7426522a3aabf66d7657721223737604363bdf5ba8f395ecbc32b70a4814c38",
   "requirements": [
     {
       "requirement_id": "financial-state-correctness",
@@ -64,5 +64,5 @@
     }
   ],
   "requirement_set_digest": "sha256:34c6a8096e199bbc0f3bbfa1d56cced8220c0b49f8e99d26177e530f08ef0a21",
-  "requirement_record_digest": "sha256:25e2532f39ec3150d76b3435b91d75656fd532b8529177026aff64c4484d2c82"
+  "requirement_record_digest": "sha256:bcf9a07b1b0986b212c564e6a1cc1ea762293a6fcbff10de68261f6d46e7847a"
 }
