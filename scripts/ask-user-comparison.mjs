@@ -98,7 +98,7 @@ function validatePrinciplesDefinition(root, plan) {
   assert.equal(comparisonHash(renderer), definition.renderer_source.digest, "principles renderer snapshot changed");
   const id = plan.config.kernel_condition, v2 = id === KERNEL_PRINCIPLES_V2_ID;
   const expected = v2 ? renderKernelPrinciplesV2(source) : renderKernelPrinciples(source), arm = plan.arms[id];
-  let descriptor = null;
+  let descriptor = null, metadataBytes = null;
   if (v2) {
     assert.ok(isPrimaryFixtureRecipe(plan.verification.recipe), "v2 requires primary fixture recipe");
     const paths = kernelPrinciplesV2DescriptorSourcePaths(plan.verification.recipe.fixture_id);
@@ -112,6 +112,7 @@ function validatePrinciplesDefinition(root, plan) {
     assert.equal(definition.task_metadata.path, "control/kernel-principles-task-metadata.json");
     const metadata = readStableFile(join(root, definition.task_metadata.path), "v2 public metadata", LIMIT).bytes;
     assert.equal(comparisonHash(metadata), definition.task_metadata.digest);
+    metadataBytes = metadata;
     const task = readStableFile(join(root, plan.task.path), "v2 public task", LIMIT).bytes;
     descriptor = kernelPrinciplesV2FixtureDescriptor(plan.verification.recipe.fixture_id, task, metadata);
     assert.equal(descriptor.task_class, plan.config.task_class, "v2 task class changed");
@@ -129,7 +130,7 @@ function validatePrinciplesDefinition(root, plan) {
   assert.deepEqual(arm.assets, [{ path: "AGENTS.md", ...arm.baseline_inventory["AGENTS.md"],
     kind: "generated_principles_with_preserved_custom_instructions", origin: "canonical_principles_projection" }]);
   assert.equal(comparisonHash(agents), arm.baseline_inventory["AGENTS.md"].digest, "principles asset digest changed");
-  assert.deepEqual(arm.capability, v2 ? principlesV2Capability(descriptor) : principlesCapability(source, expected.body, definition.generation, plan.config.task_class), "principles qualification changed");
+  assert.deepEqual(arm.capability, v2 ? principlesV2Capability(descriptor, { metadataBytes }) : principlesCapability(source, expected.body, definition.generation, plan.config.task_class), "principles qualification changed");
 }
 
 export function readUserComparisonPlan(output, { ignoreStart = false } = {}) {

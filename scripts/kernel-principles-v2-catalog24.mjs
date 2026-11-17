@@ -3,6 +3,26 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {kernelPrinciplesV2FixtureDescriptor as legacyDescriptor, principlesV2Capability as legacyCapability} from './kernel-principles-v2.mjs';
 const hash = value => createHash('sha256').update(value).digest('hex');
+import { validatePrimaryMetadataTaskBytes, PRIMARY_METADATA_TASK_POLICY } from './ask-primary-metadata-task-contract.mjs';
+const semanticPins = new Map([
+  [
+    "hi-financial-state-integrity",
+    "sha256:afea6283cd67005b7eaef6c630e60f7920830600a89cd05bc70625dbf4af8a67"
+  ],
+  [
+    "mn-frontend-default-fix",
+    "sha256:962fd1449651077a4e51475459edb7afc048b3da65f5704ec72e585cae057be4"
+  ],
+  [
+    "pf-api-pagination-behavior",
+    "sha256:da720fd53c9d80a07d43865c8169aa241297ed040fb992222e67cc26358f5870"
+  ],
+  [
+    "pf-frontend-async-state",
+    "sha256:950599f11b934c82fde72f5fda2b4931323a75d452826c576c9dd260e8ee67ec"
+  ]
+]);
+const semanticPrefix = 'kernel_principles_v2.task_signal@catalog24-2:';
 const prefix = 'kernel_principles_v2.task_signal@catalog24-1:';
 const fixtures = new Map([
   ["hi-authorization-exception", "pr_review", "review", "security_boundary", "d63648ae9c68342c8ab6d06129ddea0126794c5cb1ed0501d171828975d0da04", "214e37d7f3c7f2f10a9acc5f0a9cce32ad6d88eaa0de1cdc8fe831f3d2062a39"],
@@ -21,32 +41,43 @@ const fixtures = new Map([
   ["pf-performance-regression", "investigation_implementation", "implementation", "none", "46bb7cda29d207deb0460791710f53378ad4eedca49b5e675f54b3726f8c1782", "bf14482e073cccbf22f9a2699391c8ecf5365a0bf8b345e0badab30d4c8b5587"],
   ["pf-review-error-contract", "pr_review", "review", "none", "800778683315b66db315c3cc691fa79c8502302dd5217b43085bf7cfb918d622", "c26f291c5c6e9b4bc410bbed20d8106dcc09d9679adad0a795c6e88fad885823"],
 ].map(([id,declared,selected,risk,taskDigest,metadataDigest])=>[id,{declared,selected,risk,taskDigest,metadataDigest}]));
-const refsFor=(id,f)=>[`benchmarks/fixtures/checkpoint-b2/${id}/task.md#sha256:${f.taskDigest}`,
- `benchmarks/fixtures/checkpoint-b2/${id}/metadata.json#sha256:${f.metadataDigest}`,
- `${prefix}${JSON.stringify({fixture_id:id,declared_task_class:f.declared,selected_task_class:f.selected,risk_boundary:f.risk})}`];
+const refsFor=(id,f,rawDigest=f.metadataDigest)=>[`benchmarks/fixtures/checkpoint-b2/${id}/task.md#sha256:${f.taskDigest}`,
+ `benchmarks/fixtures/checkpoint-b2/${id}/metadata.json#sha256:${rawDigest}`,
+ `${semanticPins.has(id)?semanticPrefix:prefix}${JSON.stringify({fixture_id:id,declared_task_class:f.declared,selected_task_class:f.selected,risk_boundary:f.risk})}`,
+ ...(semanticPins.has(id)?[`${PRIMARY_METADATA_TASK_POLICY}:${id}:${semanticPins.get(id)}`]:[])];
 export function kernelPrinciplesV2DescriptorSourcePaths(id){
  const paths=['scripts/kernel-principles-v2.mjs','scripts/kernel-principles-candidate-v2.mjs','scripts/kernel-principles.mjs'];
- return fixtures.has(id)?[...paths,'scripts/kernel-principles-v2-catalog24.mjs']:paths;
+ return fixtures.has(id)?[...paths,'scripts/kernel-principles-v2-catalog24.mjs','scripts/ask-primary-metadata-task-contract.mjs','scripts/content-addressed-store.mjs']:paths;
 }
 export function kernelPrinciplesV2FixtureDescriptor(id,taskBytes,metadataBytes){
  const fixture=fixtures.get(id);if(!fixture)return legacyDescriptor(id,taskBytes,metadataBytes);
  assert.equal(hash(taskBytes),fixture.taskDigest,'public task drift requires descriptor review');
- assert.equal(hash(metadataBytes),fixture.metadataDigest,'public metadata drift requires descriptor review');
- const metadata=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(metadataBytes));
+ if(!semanticPins.has(id))assert.equal(hash(metadataBytes),fixture.metadataDigest,'public metadata drift requires descriptor review');
+ const metadata=semanticPins.has(id)?validatePrimaryMetadataTaskBytes(metadataBytes,semanticPins.get(id)):JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(metadataBytes));
  assert.equal(metadata.fixture_id,id);assert.equal(metadata.fixture_role,'primary');
  assert.equal(metadata.task_class,fixture.declared);assert.equal(metadata.risk_boundary,fixture.risk);
- return {task_class:fixture.selected,requirement_scan:{status:'complete',evidence_refs:refsFor(id,fixture)},required_procedures:[]};
+ return {task_class:fixture.selected,requirement_scan:{status:'complete',evidence_refs:refsFor(id,fixture,hash(metadataBytes))},required_procedures:[]};
 }
-export function principlesV2Capability(descriptor){
+export function principlesV2Capability(descriptor,{metadataBytes}={}){
  const refs=descriptor?.requirement_scan?.evidence_refs;
  assert.ok(Array.isArray(refs),'requirement scan evidence refs required');
- for(const ref of refs.filter(ref=>typeof ref==='string'&&ref.startsWith(prefix))){
-  const record=JSON.parse(ref.slice(prefix.length)),fixture=fixtures.get(record.fixture_id);
+ for(const ref of refs.filter(ref=>typeof ref==='string'&&(ref.startsWith(prefix)||ref.startsWith(semanticPrefix)))){
+  const record=JSON.parse(ref.slice(ref.startsWith(semanticPrefix)?semanticPrefix.length:prefix.length)),fixture=fixtures.get(record.fixture_id);
   assert.ok(fixture,'unknown catalog24 fixture task signal record');assert.equal(ref,refsFor(record.fixture_id,fixture)[2],'fixture task signal record changed');
  }
+ for(const ref of refs.filter(ref=>typeof ref==='string'&&ref.startsWith(`${PRIMARY_METADATA_TASK_POLICY}:`))){
+  const id=ref.slice(PRIMARY_METADATA_TASK_POLICY.length+1).split(':')[0];
+  assert.ok(semanticPins.has(id),'unknown task metadata semantic fixture');
+  assert.equal(ref,`${PRIMARY_METADATA_TASK_POLICY}:${id}:${semanticPins.get(id)}`,'task metadata semantic evidence changed');
+ }
  for(const [id,fixture]of fixtures){
-  const expected=refsFor(id,fixture),root=`benchmarks/fixtures/checkpoint-b2/${id}/`;
-  if(refs.some(ref=>typeof ref==='string'&&(ref.startsWith(root)||ref===expected[2]))){
+  const rawDigest=semanticPins.has(id)&&metadataBytes?hash(metadataBytes):fixture.metadataDigest;
+  const expected=refsFor(id,fixture,rawDigest),root=`benchmarks/fixtures/checkpoint-b2/${id}/`;
+  if(refs.some(ref=>typeof ref==='string'&&(ref.startsWith(root)||ref===expected[2]||(semanticPins.has(id)&&ref===expected[3])))){
+   if(semanticPins.has(id)){
+    assert.ok(metadataBytes instanceof Uint8Array,'catalog task capability requires metadata bytes');
+    validatePrimaryMetadataTaskBytes(metadataBytes,semanticPins.get(id));
+   }
    assert.equal(descriptor.task_class,fixture.selected,'fixture task class changed');
    assert.ok(expected.every(ref=>refs.includes(ref)),'fixture evidence refs incomplete or changed');
   }
