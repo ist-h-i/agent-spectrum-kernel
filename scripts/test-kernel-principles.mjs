@@ -53,12 +53,13 @@ test("condition choice is closed and omission retains historical K", () => {
 
 
 test("reviewed optional capture procedure is excluded without changing historical principles", () => {
-  const text = source.toString("utf8");
+  const historicalSource = readFileSync(new URL("./fixtures/kernel-principles-agents-v3.md", import.meta.url));
+  const text = historicalSource.toString("utf8");
   const capture = /## 7\.6 Opt-in finding capture\n[\s\S]*?(?=## 8\. Skill routing\n)/u;
   assert.match(text, capture);
   // Reconstruct the previously sealed source, not an unsealed alternate input.
   const previous = renderKernelPrinciples(Buffer.from(text.replace(capture, "")));
-  const current = renderKernelPrinciples(source);
+  const current = renderKernelPrinciples(historicalSource);
   assert.equal(previous.generation.source_digest, "sha256:9246ccde37219850da235544c158100efd0b473112ad59c7b692fc930e4538ee");
   assert.equal(previous.generation.renderer_revision, 2);
   assert.equal(current.generation.renderer_revision, 3);
@@ -70,4 +71,32 @@ test("reviewed optional capture procedure is excluded without changing historica
   assert.doesNotMatch(current.body, /finding capture|findings\/|capture receipts/u);
   // Even this excluded procedure remains protected by the full source seal.
   assert.throws(() => renderKernelPrinciples(Buffer.from(text.replace("Without enabled intake", "Even without enabled intake"))), /canonical source changed/u);
+});
+
+import './test-general-outcome-guidance.mjs';
+
+test('outcome guidance has a distinct source revision without changing historical seals',()=>{
+ const current=renderKernelPrinciples(source);
+ assert.equal(current.generation.renderer_revision,5);
+ assert.match(current.body,/consumer-facing boundary/);
+ assert.match(current.body,/Continue independent requested, authorized outcomes/);
+ assert.match(current.body,/do not require a fixed reading tour/);
+ const old=renderKernelPrinciples(readFileSync(new URL('./fixtures/kernel-principles-agents-v3.md',import.meta.url)));
+ assert.equal(old.generation.renderer_revision,3);
+ assert.notEqual(old.generation.source_digest,current.generation.source_digest);
+ assert.notEqual(old.generation.generated_digest,current.generation.generated_digest);
+});
+
+
+test('revision5 retains exact revision4 replay and rejects unreviewed changes',()=>{
+ const old=renderKernelPrinciples(readFileSync(new URL('./fixtures/kernel-principles-agents-v4.md',import.meta.url)));
+ assert.equal(old.generation.renderer_revision,4);
+ assert.equal(old.generation.source_digest,'sha256:b32619ee2ec91361577956476a84588904e021b14ef0d77b081a739535ab1481');
+ const current=renderKernelPrinciples(source);
+ assert.equal(current.generation.renderer_revision,5);
+ assert.match(current.body,/independent observable/);
+ assert.match(current.body,/Reuse evidence within the same task/);
+ assert.match(current.body,/Direct evidence sufficient for a simple change/);
+ assert.notEqual(current.generation.generated_digest,old.generation.generated_digest);
+ assert.throws(()=>renderKernelPrinciples(Buffer.from(source.toString().replace('mandatory gates','optional gates'))),/canonical source changed/);
 });

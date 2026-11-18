@@ -32,10 +32,24 @@ const REQUIRED_TEMPLATE_TOKENS = Object.freeze({
   "skill-investigate.md": ["Findings:", "Cause:", "Changed:", "Evidence:", "fenced JSON `Execution Envelope`"],
   "skill-review.md": ["Baseline review:", "Additional required gates:", "Missing evidence:", "Findings:", "fenced JSON `Execution Envelope`"],
   "skill-verify.md": ["Proof:", "Verification Contract:", "Evidence:", "fenced JSON `Execution Envelope`"],
-  "skill-handoff.md": ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Stop condition:", "fenced JSON `Execution Envelope`"],
+  "skill-handoff.md": ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "fenced JSON `Execution Envelope`", "Execution Envelope.stop_reason.stop_if"],
 });
 
+function validateHandoffEnvelope(entryName, body) {
+  if (entryName !== "skill-handoff.md") return;
+  if (!body.includes("Keep stop conditions only in `Execution Envelope.stop_reason.stop_if`; do not add a separate stop-condition field.")
+      || (body.match(/Emit exactly one fenced JSON `Execution Envelope`/gu) ?? []).length !== 1
+      || (body.match(/fenced JSON `Execution Envelope`/gu) ?? []).length !== 1
+      || (body.match(/Execution Envelope\.stop_reason\.stop_if/gu) ?? []).length !== 1) {
+    throw new Error(`${entryName} must require exactly one canonical handoff Execution Envelope with stop_reason.stop_if`);
+  }
+  if (/^\s*(?:[-*]\s*)?Stop condition\s*:/imu.test(body)) {
+    throw new Error(`${entryName} must not duplicate the stop condition outside the Execution Envelope`);
+  }
+}
+
 function validateClaudeTemplate(entryName, body) {
+  validateHandoffEnvelope(entryName, body);
   for (const token of REQUIRED_TEMPLATE_TOKENS[entryName] ?? []) if (!body.includes(token)) throw new Error(`${entryName} is missing Claude fixed-entry token: ${token}`);
   if (["skill-implement.md", "skill-verify.md"].includes(entryName) && !body.includes("docs/lifecycle-artifact-contract.md")) {
     throw new Error(`${entryName} must preserve the canonical lifecycle artifact contract reference`);
@@ -43,6 +57,7 @@ function validateClaudeTemplate(entryName, body) {
 }
 
 function validateClaudePluginTemplate(entryName, body) {
+  validateHandoffEnvelope(entryName, body);
   for (const token of (REQUIRED_TEMPLATE_TOKENS[entryName] ?? []).filter((candidate) => candidate !== "docs/execution-envelope-contract.md")) {
     if (!body.includes(token)) throw new Error(`${entryName} is missing Claude plugin fixed-entry token: ${token}`);
   }

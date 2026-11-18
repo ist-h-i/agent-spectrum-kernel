@@ -78,7 +78,7 @@ Conditional fields, omit when irrelevant:
 - Bug fix: require reproduction evidence before the fix when feasible.
 - New behavior: tie checks to acceptance criteria.
 - Refactor: require evidence that existing behavior is preserved.
-- Output change: require an output artifact, sample response, rendered text, schema, or contract when relevant.
+- Output change: check the requested result at its consumer-facing boundary. Derive expected behavior from the requested contract, an unaffected consumer, or an independent observable, not the same implementation/helper or an incidental sequence. Use the smallest check that distinguishes a correct result from a plausible wrong one while accepting alternative valid mechanisms. An artifact, sample, schema, or contract alone does not prove runtime behavior. A schema-only requirement may be verified by schema validation, and static documents do not inherently require UI or end-to-end tests.
 - Performance: define measurement method before claiming improvement.
 
 3. Prefer a failing check first when feasible.
@@ -93,13 +93,13 @@ Conditional fields, omit when irrelevant:
 | Manual/runtime check | User-visible or integration behavior lacks automated coverage. |
 | Benchmark/security check | Performance/security claim is being made. |
 
-5. Run verification and record exact evidence against the selected Compact Proof or Formal Verification Contract. Do not rewrite the proof obligation because checks were executed.
+5. Run verification and record exact evidence against the selected Compact Proof or Formal Verification Contract. Reuse matching proof within the same task only when the artifact, relevant inputs/environment, and claim are unchanged; rerun when a material change, contradiction, or mandatory gate requires it. Do not add tests, documents, or independent agents when direct evidence already suffices for a simple change. Do not rewrite the proof obligation because checks were executed.
 
 If a formal trigger appears after compact work begins, upgrade to `formal_verification_contract`, retain every executed evidence ref, and reassess whether that evidence satisfies the new obligations. Formal is absorbing: never downgrade it after failure, resume, or handoff.
 
-6. If verification fails, report failure. Do not bury it under partial success.
+6. Retain failed and unknown evidence. If verification fails, report failure rather than burying it under partial success or changing expectations to fit the implementation.
 
-7. If a required verification path is unavailable, report `insufficient evidence` instead of claiming completion. Provide the exact next verification path.
+7. If a required verification path is unavailable, report `insufficient evidence` instead of claiming completion. Provide the exact next verification path. Limit the unsupported claim or dependent action while continuing independent authorized outcomes; do not bypass a required gate.
    - Express the next action as the work to do next, such as adding a focused test, running checks, or stopping for missing evidence.
 
 ## Output
