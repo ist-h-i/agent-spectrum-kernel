@@ -64,11 +64,11 @@ export function validateFixedEntryControlMap(controlMap = readJson(FIXED_ENTRY_C
   const scope = controlMap.controls.scope;
   exactKeys(scope, ["source_refs", "required_inputs", "missing_input_behavior", "change_boundary", "cleanup_boundary"], "scope control");
   if (!Array.isArray(scope.source_refs) || !Array.isArray(scope.required_inputs) || scope.required_inputs.length === 0) throw new Error("scope control requires source_refs and required_inputs");
-  if (scope.missing_input_behavior !== "stop_or_insufficient_evidence" || scope.change_boundary !== "sufficient_scope_then_maintenance_burden_then_diff" || scope.cleanup_boundary !== "task_required_cleanup_and_retirement_inside_unrelated_separate") throw new Error("scope control weakens canonical evidence, sufficiency, or cleanup semantics");
+  if (scope.missing_input_behavior !== "stop_dependent_action_or_claim_continue_independent_authorized" || scope.change_boundary !== "sufficient_scope_then_maintenance_burden_then_diff" || scope.cleanup_boundary !== "task_required_cleanup_and_retirement_inside_unrelated_separate") throw new Error("scope control weakens canonical evidence, sufficiency, or cleanup semantics");
 
   const verification = controlMap.controls.verification;
-  exactKeys(verification, ["source_refs", "proof_policy_ref", "proof_policy_schema_ref", "proof_path_selected_before_implementation_claim", "focused_check_first", "broader_checks_proportional_to_risk", "exact_results_required", "compact_to_formal_upgrade_required"], "verification control");
-  for (const field of ["proof_path_selected_before_implementation_claim", "focused_check_first", "broader_checks_proportional_to_risk", "exact_results_required", "compact_to_formal_upgrade_required"]) if (verification[field] !== true) throw new Error(`verification control requires ${field}`);
+  exactKeys(verification, ["source_refs", "proof_policy_ref", "proof_policy_schema_ref", "proof_path_selected_before_implementation_claim", "focused_check_first", "consumer_outcome_check_required", "smallest_discriminating_check_required", "proof_boundaries_required", "broader_checks_proportional_to_risk", "exact_results_required", "compact_to_formal_upgrade_required"], "verification control");
+  for (const field of ["proof_path_selected_before_implementation_claim", "focused_check_first", "consumer_outcome_check_required", "smallest_discriminating_check_required", "proof_boundaries_required", "broader_checks_proportional_to_risk", "exact_results_required", "compact_to_formal_upgrade_required"]) if (verification[field] !== true) throw new Error(`verification control requires ${field}`);
   if (verification.proof_policy_ref !== VERIFICATION_PROOF_POLICY_REF || verification.proof_policy_schema_ref !== "schemas/verification-proof-policy.schema.json") throw new Error("verification control must reference the canonical verification proof policy");
 
   const risk = controlMap.controls.risk_approval;
@@ -84,9 +84,9 @@ export function validateFixedEntryControlMap(controlMap = readJson(FIXED_ENTRY_C
   if (evidence.inline_default !== true || evidence.claims_require_evidence !== true || evidence.unsupported_claim_behavior !== "downgrade") throw new Error("evidence control must keep inline discipline, require evidence, and downgrade unsupported claims");
 
   const missing = controlMap.controls.missing_evidence;
-  exactKeys(missing, ["source_refs", "allowed_statuses", "inference", "stop_when_required"], "missing_evidence control");
+  exactKeys(missing, ["source_refs", "allowed_statuses", "inference", "stop_when_required", "stop_scope", "continue_independent_authorized_outcomes"], "missing_evidence control");
   arrayEquals(missing.allowed_statuses, ["unavailable", "insufficient_evidence"], "missing_evidence statuses");
-  if (missing.inference !== "prohibited" || missing.stop_when_required !== true) throw new Error("missing_evidence control must prohibit inference and stop when evidence is required");
+  if (missing.inference !== "prohibited" || missing.stop_when_required !== true || missing.stop_scope !== "dependent_action_or_claim" || missing.continue_independent_authorized_outcomes !== true) throw new Error("missing_evidence control must prohibit inference and stop when evidence is required");
 
   const output = controlMap.controls.output;
   exactKeys(output, ["source_refs", "required_sections_from_prompt_contract", "managed_runner_ordinary", "managed_runner_protected", "managed_runner_diagnostic", "unmanaged_compatibility", "next_action_location"], "output control");
@@ -159,11 +159,11 @@ export function fixedEntryCanonicalPaths(entryName, controlMap = validateFixedEn
 }
 
 function renderControl(controlId, control) {
-  if (controlId === "scope") return "[scope] inspect repo/code/tests/docs/API; derive sufficient scope for the authorized outcome from current requirements/contracts/invariants and evidenced affected owners/providers/consumers; missing=>stop|insufficient; among sufficient options minimize maintenance burden, then diff; include cleanup and retirement required by this change; check consumers before retiring obsolete paths/state/config; retain only with a current compatibility/rollout reason and retirement condition; unrelated cleanup separate.";
-  if (controlId === "verification") return `[verification] ${control.proof_policy_ref}: ${VERIFICATION_PROOF_PATHS.join("|")} before claim; focused->risk-based; exact; trigger=>formal.`;
+  if (controlId === "scope") return "[scope] inspect relevant repo/code/tests/docs/API; derive sufficient scope for the authorized outcome from current requirements/contracts/invariants and evidenced affected owners/providers/consumers; for interacting observed constraints, check the highest-impact incompatible outcome at the first useful boundary; no imagined failures or extra steps for simple direct changes; missing=>stop dependent action/claim|insufficient; continue independent authorized outcomes; read-only entries do not edit; among sufficient options minimize maintenance burden, then diff; include cleanup and retirement required by this change; check consumers before retiring obsolete paths/state/config; retain only with a current compatibility/rollout reason and retirement condition; unrelated cleanup separate.";
+  if (controlId === "verification") return `[verification] ${control.proof_policy_ref}: ${VERIFICATION_PROOF_PATHS.join("|")} before claim; verify the consumer-facing requested outcome with the smallest discriminating check; derive expectations from contract/consumer/independent observable, not the tested implementation or incidental sequence; accept alternative valid mechanisms; reuse same-task proof only for unchanged artifact/inputs/environment/claim, recheck material change/contradiction/required gate; simple direct proof needs no extra tests/docs/agents; shape/sample checks are not behavioral proof; static checks are not runtime proof; unknown limits the supported claim; focused->risk-based; exact; trigger=>formal.`;
   if (controlId === "risk_approval") return "[risk_approval] exact action/risk/impact/reversibility/visibility/alternative/preconditions; unapproved=>stop; approved-only.";
   if (controlId === "evidence") return `[evidence] ${canonicalClaimEvidenceStatuses().join("|")}@${control.contract_ref}; inline; closed formal=>evidence-ledger; unsupported=>downgrade.`;
-  if (controlId === "missing_evidence") return "[missing_evidence] unavailable|insufficient; no inference; required=>stop";
+  if (controlId === "missing_evidence") return "[missing_evidence] unavailable|insufficient; no inference; required=>stop dependent action/claim; never bypass mandatory gates or approval";
   if (controlId === "output") return "[output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.";
   throw new Error(`fixed-entry control has no renderer: ${controlId}`);
 }

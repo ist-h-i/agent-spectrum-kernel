@@ -2,17 +2,17 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-9b8f0fe0714cdb774f971951acb6a23273f4726ed339fe5f8697f411881f8bd3",
-  "evaluator_bundle_digest": "sha256:cc6bb19ab28d61386c6bd7ddc95586b65093e1a0bfcb57075802fa2ea974d5c9",
+  "evaluator_bundle_id": "evaluator-6d3a06f8d069941a5a91f5ba1a490a01123e1fad2f024503bf429ffe2cacc0b1",
+  "evaluator_bundle_digest": "sha256:700d423a2e74d8b522c687df62a8cbf9ee80e9c41e904be8a19a3b06741fbe8c",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-frontend-default-fix",
   "fixture_input_digest": "sha256:ea3d0a27127c32bc23cf94ee1265a10b3f69f7f174e9024ed0760078e46d8655",
   "task_class": "local_bug_fix",
   "suite": "mechanism_negative",
-  "evaluator_revision": "483d861b376835e52f65138d39d9eb3a113d9bdd",
+  "evaluator_revision": "78fbf8d230663ce16589f0dadd12bc4aed2fa50e",
   "evaluator_source_identity": {
-    "base_git_revision": "483d861b376835e52f65138d39d9eb3a113d9bdd",
-    "source_tree_digest": "sha256:fbd0936e6732baae2d3161b0be3b1c65e6709ea26bfb201c0c8f23d89ca7a7fc",
+    "base_git_revision": "78fbf8d230663ce16589f0dadd12bc4aed2fa50e",
+    "source_tree_digest": "sha256:2bf54ba465c1643d597aebadee7fd6f34d58db4be5c1f3b476986d851331cfd6",
     "generator_source_digest": "sha256:50fca9309993030bdcf13b837028ab025706b0614e910b57cf6a3b6eba8e7c3d",
     "source_files": [
       {
@@ -177,13 +177,13 @@
       },
       {
         "path": "scripts/ask-benchmark-execution.mjs",
-        "bytes": 142742,
-        "sha256": "sha256:8ab075d41cd8326bfc1341bfb61155342ddcf4caa965580096f3fb3eeedfad8d"
+        "bytes": 149396,
+        "sha256": "sha256:4e522c9d7d1ad5f963c064ee647a4d86010348f37012cf4474d885b8ffddd576"
       },
       {
         "path": "scripts/ask-benchmark-materialize.mjs",
-        "bytes": 35793,
-        "sha256": "sha256:8ed4cf7944e7dbd5b489d03c4ecc504c132d4c49224bc2da9150e9aa1edb580e"
+        "bytes": 37316,
+        "sha256": "sha256:590bdfba7829e7d28339b3fa1b2b07494b701b77bf5b4342f6fb118aaa65e71e"
       },
       {
         "path": "scripts/ask-benchmark-mn-client-probe-v2.mjs",
@@ -447,8 +447,8 @@
       },
       {
         "path": "scripts/ask-pragmatic-evaluation-report.mjs",
-        "bytes": 8865,
-        "sha256": "sha256:d8dfb5c186e0f5e9473dc3c1b92f33404b8542900c36a903c279bd763b8e3a09"
+        "bytes": 9314,
+        "sha256": "sha256:bc5246b901898ddb5e891f43280549071205078f2ab9c5956be861440a3896ed"
       },
       {
         "path": "scripts/ask-preparation-git-diagnostic.mjs",
@@ -511,6 +511,11 @@
         "sha256": "sha256:2c1826d76cd8db529a5059a9b5d2e171cc9d3e551a90bfdcef0399322f84e9ce"
       },
       {
+        "path": "scripts/ask-primary-metadata-task-contract.mjs",
+        "bytes": 2578,
+        "sha256": "sha256:14d9ec915e2f5f9631179ac5cdaeba690b500dd43dd00a0eb94a8bc6fd926539"
+      },
+      {
         "path": "scripts/ask-primary-native-probe-lifetime.mjs",
         "bytes": 19688,
         "sha256": "sha256:53d63242215b73c2c8f89cc45f63bfa619da1fab1c27e14dd0a5cf081d15366a"
@@ -532,18 +537,18 @@
       },
       {
         "path": "scripts/ask-primary-scoring-version.mjs",
-        "bytes": 22711,
-        "sha256": "sha256:fb49374ca5039650586683591425239fc7e21e051f259f9cd5a6423565550c68"
+        "bytes": 22734,
+        "sha256": "sha256:4a40e0817f6563a5bafc189b4d225c4ecfdab42bb6b6cb1c925484ece278dffc"
       },
       {
         "path": "scripts/ask-primary-unsafe-action-contract.mjs",
         "bytes": 5975,
-        "sha256": "sha256:edf6eeeb2307c80e22c4798c2ea499130eb3b61f5d9fbacd6f8b03b07002852c"
+        "sha256": "sha256:22c42495ea8bdc65554b2e94f60a1471e5681db45b7fb3c212a909ba752271d1"
       },
       {
         "path": "scripts/ask-setup-apply-state.mjs",
-        "bytes": 18001,
-        "sha256": "sha256:6487de71d7f70fc4eb6986db181690192cbc5d521cca3e9cc6657e42bcfe66d3"
+        "bytes": 18117,
+        "sha256": "sha256:d1220ffd3944086d2daeae7ef96856d0ea698f012a1530e9e238975b614569d5"
       },
       {
         "path": "scripts/ask-setup-git.mjs",
@@ -572,8 +577,8 @@
       },
       {
         "path": "scripts/ask-user-comparison-prepare.mjs",
-        "bytes": 63421,
-        "sha256": "sha256:ba592ba9835b339fbd10d576e139944f559c4e722c8bdc88fa64c360b2ff9564"
+        "bytes": 63440,
+        "sha256": "sha256:b547104319e46f796fc1b4892d0f2013bbe9e24dede42b9fea39d7b0f28c737a"
       },
       {
         "path": "scripts/ask-user-comparison-state.mjs",
@@ -582,13 +587,13 @@
       },
       {
         "path": "scripts/ask-user-comparison.mjs",
-        "bytes": 91564,
-        "sha256": "sha256:5834f3571a1e5c9f339eccc130e3539fb5a18a2df33819b4075576df9bc4af55"
+        "bytes": 91635,
+        "sha256": "sha256:975a02668ae358d7ee6509c2d0582f53d29d094d2315e18d9215ddff6ec9ba57"
       },
       {
         "path": "scripts/asset-registry.mjs",
-        "bytes": 48268,
-        "sha256": "sha256:c85bdae4b2fc1886fa99f38005ac89a45effa4e5107ee736ecea0b4220c675b7"
+        "bytes": 49650,
+        "sha256": "sha256:886837a85dfbc26a8f723c54bc1fbf0f507423e284efa1b5730dbd3e5c0c30b4"
       },
       {
         "path": "scripts/claim-evidence-status.mjs",
@@ -599,6 +604,11 @@
         "path": "scripts/claude-fixed-entry-profile.mjs",
         "bytes": 10568,
         "sha256": "sha256:a071f5b2bfff25c2ed5b38ae8e6c8ce6c32c9a1f6a95779b1916111dc15ca082"
+      },
+      {
+        "path": "scripts/claude-native-runtime.mjs",
+        "bytes": 8036,
+        "sha256": "sha256:6d1e4b902b77a546ca4f2697bd214e93045cd2018e024c7a5172230c86f31214"
       },
       {
         "path": "scripts/codex-exec-runner.mjs",
@@ -647,18 +657,38 @@
       },
       {
         "path": "scripts/install-claude-adapter.mjs",
-        "bytes": 61293,
-        "sha256": "sha256:4c4f02c9cfe3fa21bb653a06862937dbe7827173378f0ea29325b9c004bfc920"
+        "bytes": 61940,
+        "sha256": "sha256:be61d37e1d5b5cdbdf9d333ae44bd8baa53db804f6414e98a34aef8e3298c847"
       },
       {
         "path": "scripts/install-codex-adapter.mjs",
-        "bytes": 69560,
-        "sha256": "sha256:2682c17faf0fa53381b33be5e39f75d9cce06bd2eaf3c42d7d7a150c34a197de"
+        "bytes": 69563,
+        "sha256": "sha256:6c7bd11084d44f1edcfced21264aa9408f157d861be22c5d6c734b5e1287346a"
       },
       {
         "path": "scripts/installer-lifecycle.mjs",
-        "bytes": 26724,
-        "sha256": "sha256:2364e0337e5c511d1532cb8da5defffc3de311cd5cbf246634e86ae2dde8f477"
+        "bytes": 27251,
+        "sha256": "sha256:94315c1a8a3b154ea95162a873cb54247100e494ac660a7a31c8a9a46d3504cd"
+      },
+      {
+        "path": "scripts/instruction-environment-compiler.mjs",
+        "bytes": 7779,
+        "sha256": "sha256:3d6015ee0528ce371e721db257983538828c071b0fb99e03fc12132686b0203c"
+      },
+      {
+        "path": "scripts/instruction-environment.mjs",
+        "bytes": 11395,
+        "sha256": "sha256:0e0a6302132415abc6503b21aa5f6773b620029b08c385db8e2b0129810b7d8c"
+      },
+      {
+        "path": "scripts/instruction-projection-paths.mjs",
+        "bytes": 989,
+        "sha256": "sha256:d99516613ac03c9377248e46d891beecf21e03f398d7342457dbb3c6dc2b10c8"
+      },
+      {
+        "path": "scripts/instruction-source-version.mjs",
+        "bytes": 6224,
+        "sha256": "sha256:273681e57605fd104667287d33060e6a93cf8cda714df08f8afa9c7e07a71985"
       },
       {
         "path": "scripts/json-schema-validation.mjs",
@@ -672,18 +702,18 @@
       },
       {
         "path": "scripts/kernel-principles-v2-catalog24.mjs",
-        "bytes": 6294,
-        "sha256": "sha256:9ff3e6cec640a063631c6efe12c4b4a6efb7a2a77b2ee7350222b52659fb0ec1"
+        "bytes": 8253,
+        "sha256": "sha256:fd4bf28d4ca221b7156fb7fee615c13eebe6bbedcc3869af61dfb195ef5aa252"
       },
       {
         "path": "scripts/kernel-principles-v2.mjs",
         "bytes": 9806,
-        "sha256": "sha256:b87bc1925bd2f777fab64e5ef7ac08c45ad9e6bfc84ec2ff7c0a8a52539324e4"
+        "sha256": "sha256:1d29fcf1b460116e15e39f7af3fbad302d7f575afe27824b8c67e9986243288c"
       },
       {
         "path": "scripts/kernel-principles.mjs",
-        "bytes": 5522,
-        "sha256": "sha256:e929162c33dff15b4650c52cfbe30f8f98352aebfb19d14e4f892d6008bee5f5"
+        "bytes": 5840,
+        "sha256": "sha256:0494054bd625b591e91eae5ae08cd38e39480b3fb712c8f805083d74367e9746"
       },
       {
         "path": "scripts/observability-paths.mjs",
@@ -691,14 +721,29 @@
         "sha256": "sha256:fad81f5fd713a18c48c9890955a11d6345c337586344c50d9712858717d9790f"
       },
       {
+        "path": "scripts/portfolio-manager.mjs",
+        "bytes": 87491,
+        "sha256": "sha256:7f2b532320348dd9a66b461c2a6f665eb2a72caa3abae6913d59d6f93e1edb78"
+      },
+      {
         "path": "scripts/prompt-v2-historical-renderer.mjs",
         "bytes": 3723,
         "sha256": "sha256:4446ab25b8782ab0779f8e26332ddbd1157ddf7bf6a12e90d603cdc04c0bc9bd"
       },
       {
+        "path": "scripts/retained-instruction-layout.mjs",
+        "bytes": 6976,
+        "sha256": "sha256:f017728ed3d5ed650106527f2561421e5500fd7747b58109e76ae142521a8e5a"
+      },
+      {
         "path": "scripts/skill-assets.mjs",
         "bytes": 2252,
         "sha256": "sha256:ff4dc939bfbc714ccd83677510c81c8daffb30bf113394600314ec24ec23283e"
+      },
+      {
+        "path": "scripts/verification-evidence.mjs",
+        "bytes": 41729,
+        "sha256": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
       },
       {
         "path": "scripts/verification-proof-policy.mjs",
@@ -973,19 +1018,19 @@
         },
         {
           "path": "scripts/ask-benchmark-execution.mjs",
-          "bytes": 142742,
-          "sha256": "sha256:8ab075d41cd8326bfc1341bfb61155342ddcf4caa965580096f3fb3eeedfad8d",
+          "bytes": 149396,
+          "sha256": "sha256:4e522c9d7d1ad5f963c064ee647a4d86010348f37012cf4474d885b8ffddd576",
           "file_type": "module",
-          "base_git_revision_bytes": 142742,
-          "base_git_revision_sha256": "sha256:8ab075d41cd8326bfc1341bfb61155342ddcf4caa965580096f3fb3eeedfad8d"
+          "base_git_revision_bytes": 149396,
+          "base_git_revision_sha256": "sha256:4e522c9d7d1ad5f963c064ee647a4d86010348f37012cf4474d885b8ffddd576"
         },
         {
           "path": "scripts/ask-benchmark-materialize.mjs",
-          "bytes": 35793,
-          "sha256": "sha256:8ed4cf7944e7dbd5b489d03c4ecc504c132d4c49224bc2da9150e9aa1edb580e",
+          "bytes": 37316,
+          "sha256": "sha256:590bdfba7829e7d28339b3fa1b2b07494b701b77bf5b4342f6fb118aaa65e71e",
           "file_type": "module",
-          "base_git_revision_bytes": 35793,
-          "base_git_revision_sha256": "sha256:8ed4cf7944e7dbd5b489d03c4ecc504c132d4c49224bc2da9150e9aa1edb580e"
+          "base_git_revision_bytes": 37316,
+          "base_git_revision_sha256": "sha256:590bdfba7829e7d28339b3fa1b2b07494b701b77bf5b4342f6fb118aaa65e71e"
         },
         {
           "path": "scripts/ask-benchmark-mn-client-probe-v2.mjs",
@@ -1405,11 +1450,11 @@
         },
         {
           "path": "scripts/ask-pragmatic-evaluation-report.mjs",
-          "bytes": 8865,
-          "sha256": "sha256:d8dfb5c186e0f5e9473dc3c1b92f33404b8542900c36a903c279bd763b8e3a09",
+          "bytes": 9314,
+          "sha256": "sha256:bc5246b901898ddb5e891f43280549071205078f2ab9c5956be861440a3896ed",
           "file_type": "module",
-          "base_git_revision_bytes": 8865,
-          "base_git_revision_sha256": "sha256:d8dfb5c186e0f5e9473dc3c1b92f33404b8542900c36a903c279bd763b8e3a09"
+          "base_git_revision_bytes": 9314,
+          "base_git_revision_sha256": "sha256:bc5246b901898ddb5e891f43280549071205078f2ab9c5956be861440a3896ed"
         },
         {
           "path": "scripts/ask-preparation-git-diagnostic.mjs",
@@ -1508,6 +1553,14 @@
           "base_git_revision_sha256": "sha256:2c1826d76cd8db529a5059a9b5d2e171cc9d3e551a90bfdcef0399322f84e9ce"
         },
         {
+          "path": "scripts/ask-primary-metadata-task-contract.mjs",
+          "bytes": 2578,
+          "sha256": "sha256:14d9ec915e2f5f9631179ac5cdaeba690b500dd43dd00a0eb94a8bc6fd926539",
+          "file_type": "module",
+          "base_git_revision_bytes": 2578,
+          "base_git_revision_sha256": "sha256:14d9ec915e2f5f9631179ac5cdaeba690b500dd43dd00a0eb94a8bc6fd926539"
+        },
+        {
           "path": "scripts/ask-primary-native-probe-lifetime.mjs",
           "bytes": 19688,
           "sha256": "sha256:53d63242215b73c2c8f89cc45f63bfa619da1fab1c27e14dd0a5cf081d15366a",
@@ -1541,27 +1594,27 @@
         },
         {
           "path": "scripts/ask-primary-scoring-version.mjs",
-          "bytes": 22711,
-          "sha256": "sha256:fb49374ca5039650586683591425239fc7e21e051f259f9cd5a6423565550c68",
+          "bytes": 22734,
+          "sha256": "sha256:4a40e0817f6563a5bafc189b4d225c4ecfdab42bb6b6cb1c925484ece278dffc",
           "file_type": "module",
-          "base_git_revision_bytes": 22711,
-          "base_git_revision_sha256": "sha256:fb49374ca5039650586683591425239fc7e21e051f259f9cd5a6423565550c68"
+          "base_git_revision_bytes": 22734,
+          "base_git_revision_sha256": "sha256:4a40e0817f6563a5bafc189b4d225c4ecfdab42bb6b6cb1c925484ece278dffc"
         },
         {
           "path": "scripts/ask-primary-unsafe-action-contract.mjs",
           "bytes": 5975,
-          "sha256": "sha256:edf6eeeb2307c80e22c4798c2ea499130eb3b61f5d9fbacd6f8b03b07002852c",
+          "sha256": "sha256:22c42495ea8bdc65554b2e94f60a1471e5681db45b7fb3c212a909ba752271d1",
           "file_type": "module",
           "base_git_revision_bytes": 5975,
-          "base_git_revision_sha256": "sha256:edf6eeeb2307c80e22c4798c2ea499130eb3b61f5d9fbacd6f8b03b07002852c"
+          "base_git_revision_sha256": "sha256:22c42495ea8bdc65554b2e94f60a1471e5681db45b7fb3c212a909ba752271d1"
         },
         {
           "path": "scripts/ask-setup-apply-state.mjs",
-          "bytes": 18001,
-          "sha256": "sha256:6487de71d7f70fc4eb6986db181690192cbc5d521cca3e9cc6657e42bcfe66d3",
+          "bytes": 18117,
+          "sha256": "sha256:d1220ffd3944086d2daeae7ef96856d0ea698f012a1530e9e238975b614569d5",
           "file_type": "module",
-          "base_git_revision_bytes": 18001,
-          "base_git_revision_sha256": "sha256:6487de71d7f70fc4eb6986db181690192cbc5d521cca3e9cc6657e42bcfe66d3"
+          "base_git_revision_bytes": 18117,
+          "base_git_revision_sha256": "sha256:d1220ffd3944086d2daeae7ef96856d0ea698f012a1530e9e238975b614569d5"
         },
         {
           "path": "scripts/ask-setup-git.mjs",
@@ -1605,11 +1658,11 @@
         },
         {
           "path": "scripts/ask-user-comparison-prepare.mjs",
-          "bytes": 63421,
-          "sha256": "sha256:ba592ba9835b339fbd10d576e139944f559c4e722c8bdc88fa64c360b2ff9564",
+          "bytes": 63440,
+          "sha256": "sha256:b547104319e46f796fc1b4892d0f2013bbe9e24dede42b9fea39d7b0f28c737a",
           "file_type": "module",
-          "base_git_revision_bytes": 63421,
-          "base_git_revision_sha256": "sha256:ba592ba9835b339fbd10d576e139944f559c4e722c8bdc88fa64c360b2ff9564"
+          "base_git_revision_bytes": 63440,
+          "base_git_revision_sha256": "sha256:b547104319e46f796fc1b4892d0f2013bbe9e24dede42b9fea39d7b0f28c737a"
         },
         {
           "path": "scripts/ask-user-comparison-state.mjs",
@@ -1621,19 +1674,19 @@
         },
         {
           "path": "scripts/ask-user-comparison.mjs",
-          "bytes": 91564,
-          "sha256": "sha256:5834f3571a1e5c9f339eccc130e3539fb5a18a2df33819b4075576df9bc4af55",
+          "bytes": 91635,
+          "sha256": "sha256:975a02668ae358d7ee6509c2d0582f53d29d094d2315e18d9215ddff6ec9ba57",
           "file_type": "module",
-          "base_git_revision_bytes": 91564,
-          "base_git_revision_sha256": "sha256:5834f3571a1e5c9f339eccc130e3539fb5a18a2df33819b4075576df9bc4af55"
+          "base_git_revision_bytes": 91635,
+          "base_git_revision_sha256": "sha256:975a02668ae358d7ee6509c2d0582f53d29d094d2315e18d9215ddff6ec9ba57"
         },
         {
           "path": "scripts/asset-registry.mjs",
-          "bytes": 48268,
-          "sha256": "sha256:c85bdae4b2fc1886fa99f38005ac89a45effa4e5107ee736ecea0b4220c675b7",
+          "bytes": 49650,
+          "sha256": "sha256:886837a85dfbc26a8f723c54bc1fbf0f507423e284efa1b5730dbd3e5c0c30b4",
           "file_type": "module",
-          "base_git_revision_bytes": 48268,
-          "base_git_revision_sha256": "sha256:c85bdae4b2fc1886fa99f38005ac89a45effa4e5107ee736ecea0b4220c675b7"
+          "base_git_revision_bytes": 49650,
+          "base_git_revision_sha256": "sha256:886837a85dfbc26a8f723c54bc1fbf0f507423e284efa1b5730dbd3e5c0c30b4"
         },
         {
           "path": "scripts/claim-evidence-status.mjs",
@@ -1650,6 +1703,14 @@
           "file_type": "module",
           "base_git_revision_bytes": 10568,
           "base_git_revision_sha256": "sha256:a071f5b2bfff25c2ed5b38ae8e6c8ce6c32c9a1f6a95779b1916111dc15ca082"
+        },
+        {
+          "path": "scripts/claude-native-runtime.mjs",
+          "bytes": 8036,
+          "sha256": "sha256:6d1e4b902b77a546ca4f2697bd214e93045cd2018e024c7a5172230c86f31214",
+          "file_type": "module",
+          "base_git_revision_bytes": 8036,
+          "base_git_revision_sha256": "sha256:6d1e4b902b77a546ca4f2697bd214e93045cd2018e024c7a5172230c86f31214"
         },
         {
           "path": "scripts/codex-exec-runner.mjs",
@@ -1725,27 +1786,59 @@
         },
         {
           "path": "scripts/install-claude-adapter.mjs",
-          "bytes": 61293,
-          "sha256": "sha256:4c4f02c9cfe3fa21bb653a06862937dbe7827173378f0ea29325b9c004bfc920",
+          "bytes": 61940,
+          "sha256": "sha256:be61d37e1d5b5cdbdf9d333ae44bd8baa53db804f6414e98a34aef8e3298c847",
           "file_type": "module",
-          "base_git_revision_bytes": 61293,
-          "base_git_revision_sha256": "sha256:4c4f02c9cfe3fa21bb653a06862937dbe7827173378f0ea29325b9c004bfc920"
+          "base_git_revision_bytes": 61940,
+          "base_git_revision_sha256": "sha256:be61d37e1d5b5cdbdf9d333ae44bd8baa53db804f6414e98a34aef8e3298c847"
         },
         {
           "path": "scripts/install-codex-adapter.mjs",
-          "bytes": 69560,
-          "sha256": "sha256:2682c17faf0fa53381b33be5e39f75d9cce06bd2eaf3c42d7d7a150c34a197de",
+          "bytes": 69563,
+          "sha256": "sha256:6c7bd11084d44f1edcfced21264aa9408f157d861be22c5d6c734b5e1287346a",
           "file_type": "module",
-          "base_git_revision_bytes": 69560,
-          "base_git_revision_sha256": "sha256:2682c17faf0fa53381b33be5e39f75d9cce06bd2eaf3c42d7d7a150c34a197de"
+          "base_git_revision_bytes": 69563,
+          "base_git_revision_sha256": "sha256:6c7bd11084d44f1edcfced21264aa9408f157d861be22c5d6c734b5e1287346a"
         },
         {
           "path": "scripts/installer-lifecycle.mjs",
-          "bytes": 26724,
-          "sha256": "sha256:2364e0337e5c511d1532cb8da5defffc3de311cd5cbf246634e86ae2dde8f477",
+          "bytes": 27251,
+          "sha256": "sha256:94315c1a8a3b154ea95162a873cb54247100e494ac660a7a31c8a9a46d3504cd",
           "file_type": "module",
-          "base_git_revision_bytes": 26724,
-          "base_git_revision_sha256": "sha256:2364e0337e5c511d1532cb8da5defffc3de311cd5cbf246634e86ae2dde8f477"
+          "base_git_revision_bytes": 27251,
+          "base_git_revision_sha256": "sha256:94315c1a8a3b154ea95162a873cb54247100e494ac660a7a31c8a9a46d3504cd"
+        },
+        {
+          "path": "scripts/instruction-environment-compiler.mjs",
+          "bytes": 7779,
+          "sha256": "sha256:3d6015ee0528ce371e721db257983538828c071b0fb99e03fc12132686b0203c",
+          "file_type": "module",
+          "base_git_revision_bytes": 7779,
+          "base_git_revision_sha256": "sha256:3d6015ee0528ce371e721db257983538828c071b0fb99e03fc12132686b0203c"
+        },
+        {
+          "path": "scripts/instruction-environment.mjs",
+          "bytes": 11395,
+          "sha256": "sha256:0e0a6302132415abc6503b21aa5f6773b620029b08c385db8e2b0129810b7d8c",
+          "file_type": "module",
+          "base_git_revision_bytes": 11395,
+          "base_git_revision_sha256": "sha256:0e0a6302132415abc6503b21aa5f6773b620029b08c385db8e2b0129810b7d8c"
+        },
+        {
+          "path": "scripts/instruction-projection-paths.mjs",
+          "bytes": 989,
+          "sha256": "sha256:d99516613ac03c9377248e46d891beecf21e03f398d7342457dbb3c6dc2b10c8",
+          "file_type": "module",
+          "base_git_revision_bytes": 989,
+          "base_git_revision_sha256": "sha256:d99516613ac03c9377248e46d891beecf21e03f398d7342457dbb3c6dc2b10c8"
+        },
+        {
+          "path": "scripts/instruction-source-version.mjs",
+          "bytes": 6224,
+          "sha256": "sha256:273681e57605fd104667287d33060e6a93cf8cda714df08f8afa9c7e07a71985",
+          "file_type": "module",
+          "base_git_revision_bytes": 6224,
+          "base_git_revision_sha256": "sha256:273681e57605fd104667287d33060e6a93cf8cda714df08f8afa9c7e07a71985"
         },
         {
           "path": "scripts/json-schema-validation.mjs",
@@ -1765,27 +1858,27 @@
         },
         {
           "path": "scripts/kernel-principles-v2-catalog24.mjs",
-          "bytes": 6294,
-          "sha256": "sha256:9ff3e6cec640a063631c6efe12c4b4a6efb7a2a77b2ee7350222b52659fb0ec1",
+          "bytes": 8253,
+          "sha256": "sha256:fd4bf28d4ca221b7156fb7fee615c13eebe6bbedcc3869af61dfb195ef5aa252",
           "file_type": "module",
-          "base_git_revision_bytes": 6294,
-          "base_git_revision_sha256": "sha256:9ff3e6cec640a063631c6efe12c4b4a6efb7a2a77b2ee7350222b52659fb0ec1"
+          "base_git_revision_bytes": 8253,
+          "base_git_revision_sha256": "sha256:fd4bf28d4ca221b7156fb7fee615c13eebe6bbedcc3869af61dfb195ef5aa252"
         },
         {
           "path": "scripts/kernel-principles-v2.mjs",
           "bytes": 9806,
-          "sha256": "sha256:b87bc1925bd2f777fab64e5ef7ac08c45ad9e6bfc84ec2ff7c0a8a52539324e4",
+          "sha256": "sha256:1d29fcf1b460116e15e39f7af3fbad302d7f575afe27824b8c67e9986243288c",
           "file_type": "module",
           "base_git_revision_bytes": 9806,
-          "base_git_revision_sha256": "sha256:b87bc1925bd2f777fab64e5ef7ac08c45ad9e6bfc84ec2ff7c0a8a52539324e4"
+          "base_git_revision_sha256": "sha256:1d29fcf1b460116e15e39f7af3fbad302d7f575afe27824b8c67e9986243288c"
         },
         {
           "path": "scripts/kernel-principles.mjs",
-          "bytes": 5522,
-          "sha256": "sha256:e929162c33dff15b4650c52cfbe30f8f98352aebfb19d14e4f892d6008bee5f5",
+          "bytes": 5840,
+          "sha256": "sha256:0494054bd625b591e91eae5ae08cd38e39480b3fb712c8f805083d74367e9746",
           "file_type": "module",
-          "base_git_revision_bytes": 5522,
-          "base_git_revision_sha256": "sha256:e929162c33dff15b4650c52cfbe30f8f98352aebfb19d14e4f892d6008bee5f5"
+          "base_git_revision_bytes": 5840,
+          "base_git_revision_sha256": "sha256:0494054bd625b591e91eae5ae08cd38e39480b3fb712c8f805083d74367e9746"
         },
         {
           "path": "scripts/observability-paths.mjs",
@@ -1796,6 +1889,14 @@
           "base_git_revision_sha256": "sha256:fad81f5fd713a18c48c9890955a11d6345c337586344c50d9712858717d9790f"
         },
         {
+          "path": "scripts/portfolio-manager.mjs",
+          "bytes": 87491,
+          "sha256": "sha256:7f2b532320348dd9a66b461c2a6f665eb2a72caa3abae6913d59d6f93e1edb78",
+          "file_type": "module",
+          "base_git_revision_bytes": 87491,
+          "base_git_revision_sha256": "sha256:7f2b532320348dd9a66b461c2a6f665eb2a72caa3abae6913d59d6f93e1edb78"
+        },
+        {
           "path": "scripts/prompt-v2-historical-renderer.mjs",
           "bytes": 3723,
           "sha256": "sha256:4446ab25b8782ab0779f8e26332ddbd1157ddf7bf6a12e90d603cdc04c0bc9bd",
@@ -1804,12 +1905,28 @@
           "base_git_revision_sha256": "sha256:4446ab25b8782ab0779f8e26332ddbd1157ddf7bf6a12e90d603cdc04c0bc9bd"
         },
         {
+          "path": "scripts/retained-instruction-layout.mjs",
+          "bytes": 6976,
+          "sha256": "sha256:f017728ed3d5ed650106527f2561421e5500fd7747b58109e76ae142521a8e5a",
+          "file_type": "module",
+          "base_git_revision_bytes": 6976,
+          "base_git_revision_sha256": "sha256:f017728ed3d5ed650106527f2561421e5500fd7747b58109e76ae142521a8e5a"
+        },
+        {
           "path": "scripts/skill-assets.mjs",
           "bytes": 2252,
           "sha256": "sha256:ff4dc939bfbc714ccd83677510c81c8daffb30bf113394600314ec24ec23283e",
           "file_type": "module",
           "base_git_revision_bytes": 2252,
           "base_git_revision_sha256": "sha256:ff4dc939bfbc714ccd83677510c81c8daffb30bf113394600314ec24ec23283e"
+        },
+        {
+          "path": "scripts/verification-evidence.mjs",
+          "bytes": 41729,
+          "sha256": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334",
+          "file_type": "module",
+          "base_git_revision_bytes": 41729,
+          "base_git_revision_sha256": "sha256:a6761cd3b52bcff5acfbc769e36b7cf5f9b19f103c3b503b4f70870c8df01334"
         },
         {
           "path": "scripts/verification-proof-policy.mjs",
@@ -1821,17 +1938,6 @@
         }
       ],
       "edge_inventory": [
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-prompt-successor-native.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-prompt-successor-native.mjs",
-          "source_location": {
-            "line": 30,
-            "column": 49
-          },
-          "edge_digest": "sha256:017faa931dd9528841b6a855a31c018608f51640becf44717a1c29fc129f0c77"
-        },
         {
           "from": "scripts/ask-benchmark-terminal-workspace.mjs",
           "to": "scripts/ask-benchmark-materialize.mjs",
@@ -1940,17 +2046,6 @@
           "edge_digest": "sha256:04d932c28d8c28f4196ec49762cb1e4fa55c341b9a7238903b5e7c127a2f46c4"
         },
         {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-prompt-successor-usage.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-prompt-successor-usage.mjs",
-          "source_location": {
-            "line": 29,
-            "column": 63
-          },
-          "edge_digest": "sha256:04de5b6d490e704ac046d4532cc685d116bc5ec0e427011b35a986017f909c32"
-        },
-        {
           "from": "scripts/ask-pragmatic-evaluation-report.mjs",
           "to": "scripts/ask-benchmark-stable-file.mjs",
           "kind": "static_import",
@@ -1993,6 +2088,17 @@
             "column": 47
           },
           "edge_digest": "sha256:0629863bcca80d3434df8b4faedc6e7964c1e0927f328f353c6696ba164718f7"
+        },
+        {
+          "from": "scripts/instruction-environment.mjs",
+          "to": "scripts/retained-instruction-layout.mjs",
+          "kind": "static_import",
+          "specifier": "./retained-instruction-layout.mjs",
+          "source_location": {
+            "line": 11,
+            "column": 108
+          },
+          "edge_digest": "sha256:0676078afe4a5aec7aee611a18cb880ab67dceb0a1e21eaf0cf87333e52d6428"
         },
         {
           "from": "scripts/ask-benchmark-stable-file.mjs",
@@ -2039,15 +2145,15 @@
           "edge_digest": "sha256:0831f1e6732d05645db9522b09e37a90f6dcf8dfef18f5bae1bb8682bfd46904"
         },
         {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-prompt-successor-delivery.mjs",
+          "from": "scripts/ask-primary-scoring-version.mjs",
+          "to": "scripts/ask-primary-fixture-recipe.mjs",
           "kind": "static_import",
-          "specifier": "./ask-benchmark-prompt-successor-delivery.mjs",
+          "specifier": "./ask-primary-fixture-recipe.mjs",
           "source_location": {
-            "line": 57,
-            "column": 8
+            "line": 14,
+            "column": 37
           },
-          "edge_digest": "sha256:0883ac9e87c0f2da9e33c0eaa8e978a35d0d8c7b2589a924b57c9ccbced6baa6"
+          "edge_digest": "sha256:08370f7d7e7b43e3031281995b379fe0cccdd870190fdea0126a00d6eaca0eb2"
         },
         {
           "from": "scripts/install-claude-adapter.mjs",
@@ -2105,17 +2211,6 @@
           "edge_digest": "sha256:09e7a52e1e350e0415fb7ffb0c4303a3208a3571b7c9b7f4b6a34965039a768f"
         },
         {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-primary-evaluation-scope.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-primary-evaluation-scope.mjs",
-          "source_location": {
-            "line": 4,
-            "column": 43
-          },
-          "edge_digest": "sha256:0acd5aa403128fb4135868b5506aa4679e422ea84938198a344ce0be46ab94f2"
-        },
-        {
           "from": "scripts/ask-primary-evaluation-producer.mjs",
           "to": "scripts/ask-user-comparison-prepare.mjs",
           "kind": "dynamic_import",
@@ -2125,6 +2220,17 @@
             "column": 97
           },
           "edge_digest": "sha256:0b70b0f83bc235e2caf8ed3f4bcfd6145eaa764fef96f42cdf7925d5445097a4"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/install-codex-adapter.mjs",
+          "kind": "static_import",
+          "specifier": "./install-codex-adapter.mjs",
+          "source_location": {
+            "line": 37,
+            "column": 68
+          },
+          "edge_digest": "sha256:0bda7640a31b2c934dd668d1c8edb1868a2a4ff4c8e0bf8188666e6f591088ae"
         },
         {
           "from": "scripts/ask-user-comparison.mjs",
@@ -2215,6 +2321,28 @@
           "edge_digest": "sha256:0dfd016af7918ea57bd8ae3e3bbb5aadda506e3ec8962842731bc1d5b22e91de"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/install-claude-adapter.mjs",
+          "kind": "static_import",
+          "specifier": "./install-claude-adapter.mjs",
+          "source_location": {
+            "line": 38,
+            "column": 70
+          },
+          "edge_digest": "sha256:0e132a10ec0a7bfd4a5b9b83dc00878b5c292766e5bf01b46eb3cd89c6831bef"
+        },
+        {
+          "from": "scripts/retained-instruction-layout.mjs",
+          "to": "scripts/instruction-projection-paths.mjs",
+          "kind": "static_import",
+          "specifier": "./instruction-projection-paths.mjs",
+          "source_location": {
+            "line": 9,
+            "column": 56
+          },
+          "edge_digest": "sha256:0ea4fe5048489f8a7df0b81a894138a325ba3eb324ea02c83ef86970a8f50528"
+        },
+        {
           "from": "scripts/ask-primary-evaluation-producer.mjs",
           "to": "scripts/ask-benchmark-terminal-workspace.mjs",
           "kind": "static_import",
@@ -2257,17 +2385,6 @@
             "column": 36
           },
           "edge_digest": "sha256:1042f1792295a04888b2e7de56796e629bdbb17d0e4eb4018069ff77ab6d6256"
-        },
-        {
-          "from": "scripts/ask-primary-scoring-version.mjs",
-          "to": "scripts/ask-benchmark-stable-file.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-stable-file.mjs",
-          "source_location": {
-            "line": 10,
-            "column": 32
-          },
-          "edge_digest": "sha256:10eb651189499e98d0f5073b1487faa8734074da9d1dce3b3eef0fc22eb5dbc4"
         },
         {
           "from": "scripts/ask-core-task-admission.mjs",
@@ -2399,6 +2516,17 @@
           "edge_digest": "sha256:19e1ecfbd2ea84ce608f887d0a85bf254fa7bb362ff5e06db4c8fd11b96c2a58"
         },
         {
+          "from": "scripts/instruction-environment.mjs",
+          "to": "scripts/portfolio-manager.mjs",
+          "kind": "static_import",
+          "specifier": "./portfolio-manager.mjs",
+          "source_location": {
+            "line": 8,
+            "column": 42
+          },
+          "edge_digest": "sha256:1ab4d409c7f0437ba5f3418294baabe1bf1f64b854d0a185f84b4f8ce4618046"
+        },
+        {
           "from": "scripts/codex-exec-runner.mjs",
           "to": "scripts/codex-risk-workspace.mjs",
           "kind": "static_import",
@@ -2476,6 +2604,17 @@
           "edge_digest": "sha256:21245684c847920be2170b13a093d76ab509d11da977a0e6270920b1bcba3ff4"
         },
         {
+          "from": "scripts/ask-benchmark-materialize.mjs",
+          "to": "scripts/instruction-environment.mjs",
+          "kind": "static_import",
+          "specifier": "./instruction-environment.mjs",
+          "source_location": {
+            "line": 25,
+            "column": 76
+          },
+          "edge_digest": "sha256:2190dfb6e49639d2b8499a682c494d3af4c8918a8bad42b0de19d6a5555d9fc4"
+        },
+        {
           "from": "scripts/ask-benchmark-prompt-successor-delivery.mjs",
           "to": "scripts/ask-benchmark-prompt-successor-repository.mjs",
           "kind": "static_import",
@@ -2531,6 +2670,17 @@
           "edge_digest": "sha256:23712845fe746d92ebe60f74aeb5a06a7bd607aa814321eb5a8325b2c90fcdf6"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-stable-file.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-stable-file.mjs",
+          "source_location": {
+            "line": 36,
+            "column": 58
+          },
+          "edge_digest": "sha256:240c7dcc2d12e8cb287cfdced4158e15c3484ae6d96815aeb080a746eae02430"
+        },
+        {
           "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
           "to": "scripts/ask-benchmark-duplicate-key-json.mjs",
           "kind": "static_import",
@@ -2551,17 +2701,6 @@
             "column": 47
           },
           "edge_digest": "sha256:24cec52a254bdd46d8311ecac07e7fd2a1363712f4419fcb312f8796f6ccf43b"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/install-claude-adapter.mjs",
-          "kind": "static_import",
-          "specifier": "./install-claude-adapter.mjs",
-          "source_location": {
-            "line": 35,
-            "column": 70
-          },
-          "edge_digest": "sha256:24dcfe5bafe38a065b39c2de8658f662276dd06ea3ccb905c0d176a0834972c0"
         },
         {
           "from": "scripts/ask-user-comparison.mjs",
@@ -2639,6 +2778,17 @@
             "column": 81
           },
           "edge_digest": "sha256:275d35a3fc514a8b1fa3727fad3394fb9d57841554301ad3cbcc8effa2a49a25"
+        },
+        {
+          "from": "scripts/instruction-environment-compiler.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 7,
+            "column": 84
+          },
+          "edge_digest": "sha256:27d1998de14440d72206a1d2d4b249fc812de702feffa715e30124c0bcd5bc5c"
         },
         {
           "from": "scripts/ask-primary-evaluation-producer.mjs",
@@ -2770,6 +2920,17 @@
           "edge_digest": "sha256:2c75d8a6db53bfe03bb9f31529989ef411723fc1576f6ed0dd1b25f9c97a8690"
         },
         {
+          "from": "scripts/verification-evidence.mjs",
+          "to": "scripts/execution-envelope.mjs",
+          "kind": "static_import",
+          "specifier": "./execution-envelope.mjs",
+          "source_location": {
+            "line": 21,
+            "column": 36
+          },
+          "edge_digest": "sha256:2cbb1354ae59aeb98d23048baac8bdc2e24c76bcf291db31bfc64eaf7dd66e73"
+        },
+        {
           "from": "scripts/ask-user-comparison.mjs",
           "to": "scripts/ask-primary-execution-input.mjs",
           "kind": "static_import",
@@ -2820,17 +2981,6 @@
           "specifier": "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
           "syntax_identity": "authority_read:scripts/ask-benchmark-evaluator-boundary.mjs:benchmarks/schemas/private-evaluator-independence-statement.schema.json",
           "edge_digest": "sha256:2ececadcbb7237ec362cc729b8f9f395831192d071c27591c2380f4be3b7c108"
-        },
-        {
-          "from": "scripts/install-claude-adapter.mjs",
-          "to": "scripts/claude-fixed-entry-profile.mjs",
-          "kind": "static_import",
-          "specifier": "./claude-fixed-entry-profile.mjs",
-          "source_location": {
-            "line": 8,
-            "column": 80
-          },
-          "edge_digest": "sha256:2f3fa6197f45a29c145f2f59cf39578367691fd73ee3391bda35cdee22658179"
         },
         {
           "from": "scripts/ask-core-codex-native-contract.mjs",
@@ -2976,17 +3126,6 @@
           "edge_digest": "sha256:375699dfa603e58cee99f2c5b908899d71d17ad860faffa79ffb6d456d701459"
         },
         {
-          "from": "scripts/ask-user-comparison.mjs",
-          "to": "scripts/ask-primary-runtime-lineage.mjs",
-          "kind": "dynamic_import",
-          "specifier": "./ask-primary-runtime-lineage.mjs",
-          "source_location": {
-            "line": 219,
-            "column": 64
-          },
-          "edge_digest": "sha256:37629f21ab0aeacf9d7e9c8f156266950ef7d0492c7e056ac0c1785992eb4a4b"
-        },
-        {
           "from": "scripts/ask-benchmark-prompt-v2.mjs",
           "to": "scripts/ask-benchmark-schema.mjs",
           "kind": "static_import",
@@ -3028,6 +3167,17 @@
           "edge_digest": "sha256:39306f23c642e3d6356fce758fb40631034588059dfc41a96089cb006802c098"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-prompt-successor-native.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-prompt-successor-native.mjs",
+          "source_location": {
+            "line": 33,
+            "column": 49
+          },
+          "edge_digest": "sha256:39bfa95ca05ebe5a411a6e18ad3b916d265ae58d72a8d5c04eb2ab8ea4c3edd4"
+        },
+        {
           "from": "scripts/ask-core-native-receiver.mjs",
           "to": "scripts/ask-core-native-connection.mjs",
           "kind": "static_import",
@@ -3061,6 +3211,17 @@
           "edge_digest": "sha256:3a4aa9db70ad1bb433c25e16ca786b3e27408e699c00c3c3e1b97998d202e42c"
         },
         {
+          "from": "scripts/ask-primary-scoring-version.mjs",
+          "to": "scripts/ask-benchmark-stable-file.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-stable-file.mjs",
+          "source_location": {
+            "line": 11,
+            "column": 32
+          },
+          "edge_digest": "sha256:3a8bcb2c7c33ffa77aabf8bb16e7babe08546836c556f81cbc198b78294e5e9a"
+        },
+        {
           "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
           "to": "scripts/ask-benchmark-runtime-observation.mjs",
           "kind": "static_import",
@@ -3070,6 +3231,28 @@
             "column": 146
           },
           "edge_digest": "sha256:3b39c211752d237758be2b95657ba4d5e30c6843289b63b19d6ef9294eac2d9d"
+        },
+        {
+          "from": "scripts/instruction-source-version.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 7,
+            "column": 82
+          },
+          "edge_digest": "sha256:3b6a4111f2c91de14b5f1e16ebffa56db802db45f235e36db8b29a0756e6c60c"
+        },
+        {
+          "from": "scripts/instruction-environment.mjs",
+          "to": "scripts/asset-registry.mjs",
+          "kind": "static_import",
+          "specifier": "./asset-registry.mjs",
+          "source_location": {
+            "line": 7,
+            "column": 37
+          },
+          "edge_digest": "sha256:3ca60e7907087bc55c24801d698cb4b026063548fcdc6a8016ddc070dc6c28d0"
         },
         {
           "from": "scripts/ask-benchmark-terminal-candidate.mjs",
@@ -3201,6 +3384,17 @@
           "edge_digest": "sha256:41aac8586880eddb948e105aa856c216c9b02feb3855993f1037647d8ca448a8"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-prompt-successor-delivery.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-prompt-successor-delivery.mjs",
+          "source_location": {
+            "line": 60,
+            "column": 8
+          },
+          "edge_digest": "sha256:41ae5f3a6661307ff3a5ce9997d25e4f9f7316d182d805de04f9ca36e144fede"
+        },
+        {
           "from": "scripts/ask-primary-evaluation-scope.mjs",
           "to": "scripts/codex-exec-runner.mjs",
           "kind": "dynamic_import",
@@ -3210,6 +3404,17 @@
             "column": 90
           },
           "edge_digest": "sha256:41d127d5b8b71fcaa6505cf2be84d2f65f128a4fcf782490ed56f20c9231bc54"
+        },
+        {
+          "from": "scripts/ask-primary-scoring-version.mjs",
+          "to": "scripts/ask-primary-metadata-task-contract.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-primary-metadata-task-contract.mjs",
+          "source_location": {
+            "line": 1,
+            "column": 54
+          },
+          "edge_digest": "sha256:43f403d9740f6e298203400d677459b897046aaa451f39e154e3dda6c1e0849b"
         },
         {
           "from": "scripts/ask-local-codex.mjs",
@@ -3301,14 +3506,14 @@
         },
         {
           "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-materialize.mjs",
+          "to": "scripts/content-addressed-store.mjs",
           "kind": "static_import",
-          "specifier": "./ask-benchmark-materialize.mjs",
+          "specifier": "./content-addressed-store.mjs",
           "source_location": {
             "line": 31,
-            "column": 121
+            "column": 45
           },
-          "edge_digest": "sha256:4b0f37096e9cd487e3f6d5fa5f83c1fc9126811ff8780a624fa07a4550cc59ce"
+          "edge_digest": "sha256:4a7e16f002654572b8c4f244e98cf19890ea7c426e8c4e38110942c644b88b67"
         },
         {
           "from": "scripts/ask-primary-evaluation-grading.mjs",
@@ -3449,17 +3654,6 @@
             "column": 124
           },
           "edge_digest": "sha256:510bc230edba36ae544d059e83fd826fd20dbb1188190e6d8e7c66ff30cbaec4"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-stable-file.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-stable-file.mjs",
-          "source_location": {
-            "line": 33,
-            "column": 58
-          },
-          "edge_digest": "sha256:51a62f857d4e83364759bccd7ddfef8824246718633bba4d680168043dabacf2"
         },
         {
           "from": "scripts/ask-primary-evaluation-private-grading.mjs",
@@ -3618,6 +3812,17 @@
           "edge_digest": "sha256:58974a964b12d71cd7ba51e3e93a0d538790607a3ec7d1cfc2765458642ecceb"
         },
         {
+          "from": "scripts/install-claude-adapter.mjs",
+          "to": "scripts/fixed-entry-profile.mjs",
+          "kind": "static_import",
+          "specifier": "./fixed-entry-profile.mjs",
+          "source_location": {
+            "line": 10,
+            "column": 87
+          },
+          "edge_digest": "sha256:58bb16156725ed1cd8ca064854d7d151bad499ef2915577da839f1b32ad99cf7"
+        },
+        {
           "from": "scripts/ask-primary-engineering-safety.mjs",
           "to": "scripts/ask-primary-unsafe-action-contract.mjs",
           "kind": "static_import",
@@ -3638,6 +3843,17 @@
             "column": 135
           },
           "edge_digest": "sha256:590313b11203d7057d2733ea3774033a2a2ca8ecaea70e514289cb37f4641cbb"
+        },
+        {
+          "from": "scripts/installer-lifecycle.mjs",
+          "to": "scripts/instruction-source-version.mjs",
+          "kind": "static_import",
+          "specifier": "./instruction-source-version.mjs",
+          "source_location": {
+            "line": 1,
+            "column": 47
+          },
+          "edge_digest": "sha256:5903682bd5b2892c46d1a3cc54def088bfb34738c01add81c2f8bf7496bdd8c4"
         },
         {
           "from": "scripts/ask-benchmark-terminal-candidate.mjs",
@@ -3712,6 +3928,28 @@
             "column": 61
           },
           "edge_digest": "sha256:5ec8e3dec80031be183b4df0220d55c5896eb2ac979b56ba70fc0a2eefa97b37"
+        },
+        {
+          "from": "scripts/instruction-environment.mjs",
+          "to": "scripts/instruction-projection-paths.mjs",
+          "kind": "static_import",
+          "specifier": "./instruction-projection-paths.mjs",
+          "source_location": {
+            "line": 9,
+            "column": 105
+          },
+          "edge_digest": "sha256:5ed76b16ddab2a85e3d2d4d18bd793923ab7ab4c8a0e6c87f3d2b582a5dfe28a"
+        },
+        {
+          "from": "scripts/portfolio-manager.mjs",
+          "to": "scripts/verification-evidence.mjs",
+          "kind": "static_import",
+          "specifier": "./verification-evidence.mjs",
+          "source_location": {
+            "line": 17,
+            "column": 8
+          },
+          "edge_digest": "sha256:5f03e7e5c549b0cbbfd5828d6c0aa8e8655c3b2a41c1f81ae132a004bde3d2d4"
         },
         {
           "from": "scripts/ask-primary-evaluation-producer.mjs",
@@ -4040,6 +4278,17 @@
           "edge_digest": "sha256:6da535859c2a468ed2563013a177908539c4f257af30d40b620e1c73bdfcc0fb"
         },
         {
+          "from": "scripts/install-claude-adapter.mjs",
+          "to": "scripts/ask-personal-prompt-target-lock.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-personal-prompt-target-lock.mjs",
+          "source_location": {
+            "line": 7,
+            "column": 74
+          },
+          "edge_digest": "sha256:6e0b01c20c7614b69d0d03502663ee2b0308d5e0074ab222c69c8f60eac16e82"
+        },
+        {
           "from": "scripts/ask-setup-inputs.mjs",
           "to": "scripts/skill-assets.mjs",
           "kind": "static_import",
@@ -4090,6 +4339,17 @@
             "column": 46
           },
           "edge_digest": "sha256:6edb0f7175faf5dbbc94da4a21d2ba68bf491735bf58acb6e450318014c35d52"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs",
+          "source_location": {
+            "line": 34,
+            "column": 121
+          },
+          "edge_digest": "sha256:6f433d434955b11851d126aa9d51c2015f66a661f715a3058d301c8b76c2e12f"
         },
         {
           "from": "scripts/ask-benchmark-scoring-contract.mjs",
@@ -4144,17 +4404,6 @@
           "edge_digest": "sha256:70dbbfad14b72f269bcbcbad53503b81a2818341defe4b4f700d8d1a6468febd"
         },
         {
-          "from": "scripts/ask-primary-scoring-version.mjs",
-          "to": "scripts/ask-primary-fixture-recipe.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-primary-fixture-recipe.mjs",
-          "source_location": {
-            "line": 12,
-            "column": 40
-          },
-          "edge_digest": "sha256:72147053053b7068735cbbcd7e4cf5c41e662743f408a03ab5e004bcc56a9c32"
-        },
-        {
           "from": "scripts/ai-metrics-record.mjs",
           "to": "scripts/execution-envelope.mjs",
           "kind": "static_import",
@@ -4199,6 +4448,17 @@
           "edge_digest": "sha256:747fdecf749977625cc9e3821d619cecad23615ca069f18eccf434f2ac9576ac"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/claude-native-runtime.mjs",
+          "kind": "static_import",
+          "specifier": "./claude-native-runtime.mjs",
+          "source_location": {
+            "line": 5,
+            "column": 99
+          },
+          "edge_digest": "sha256:75316fd2f321f24df172fa5c4351e557fdbe1c5924eb11edaf7b8fac37fee05f"
+        },
+        {
           "from": "scripts/ask-core-native-connection.mjs",
           "to": "scripts/ask-core-native-files.mjs",
           "kind": "static_import",
@@ -4232,6 +4492,17 @@
           "edge_digest": "sha256:76b7107d6a19fddde7f936d1f3239a6b17c64e9e2c5ba3ce0ae05a8ad93bbe9e"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-command-evidence.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-command-evidence.mjs",
+          "source_location": {
+            "line": 48,
+            "column": 8
+          },
+          "edge_digest": "sha256:77569c945a48d0eb0db48f93669a05959ceab632b518fa289454e07630553456"
+        },
+        {
           "from": "scripts/ask-primary-engineering-safety.mjs",
           "to": "scripts/content-addressed-store.mjs",
           "kind": "static_import",
@@ -4263,17 +4534,6 @@
             "column": 32
           },
           "edge_digest": "sha256:793a73ace174e5310e25c4148dfcb8fc8a6b929341b64f7c913bf3122e3fdb3a"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-selection.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-selection.mjs",
-          "source_location": {
-            "line": 32,
-            "column": 41
-          },
-          "edge_digest": "sha256:793ca8c0393f7dfa29286576bbfd401bc3061002122b414f3b42e22d6e724f5c"
         },
         {
           "from": "scripts/ask-core-native-preparation.mjs",
@@ -4320,6 +4580,17 @@
           "edge_digest": "sha256:7bf0eba09d75aeec969b47ea43acda71338e19a7f665a152340d865e007bffa9"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs",
+          "source_location": {
+            "line": 30,
+            "column": 47
+          },
+          "edge_digest": "sha256:7d7adc8daf01030ebf09ce0b94693077be5c15b41a0e7fa4f82ce21d1d79c3f3"
+        },
+        {
           "from": "scripts/ask-core-native-files.mjs",
           "to": "scripts/ask-core-native-authority.mjs",
           "kind": "static_import",
@@ -4329,6 +4600,17 @@
             "column": 38
           },
           "edge_digest": "sha256:7d8bac1fb948d9016f29256a456ade91535f76090a30528d99d7e64940a80841"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-core-capture-producer.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-core-capture-producer.mjs",
+          "source_location": {
+            "line": 6,
+            "column": 44
+          },
+          "edge_digest": "sha256:7dd33f1027318f106bba24a6ea63ded521b71a07a51af359b891ad44a3d0df9c"
         },
         {
           "from": "scripts/ask-benchmark-portfolio-score.mjs",
@@ -4384,6 +4666,17 @@
             "column": 53
           },
           "edge_digest": "sha256:80e021245e42f1d51343ec8b0d678f2b8a428a8c888d807717acf7ab72de8578"
+        },
+        {
+          "from": "scripts/ask-user-comparison.mjs",
+          "to": "scripts/ask-primary-runtime-lineage.mjs",
+          "kind": "dynamic_import",
+          "specifier": "./ask-primary-runtime-lineage.mjs",
+          "source_location": {
+            "line": 220,
+            "column": 64
+          },
+          "edge_digest": "sha256:80f12e7447031ebdecc4fa97b75c6b2f3ab0def6f17256bdc72b5275d7113a5c"
         },
         {
           "from": "scripts/ask-local-eval.mjs",
@@ -4452,17 +4745,6 @@
           "edge_digest": "sha256:845eacecfd3243ca4a701aae75dbfc56e4d14b2791b225649b8f652efd7a39aa"
         },
         {
-          "from": "scripts/ask-primary-scoring-version.mjs",
-          "to": "scripts/ask-benchmark-scoring-contract.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-scoring-contract.mjs",
-          "source_location": {
-            "line": 11,
-            "column": 89
-          },
-          "edge_digest": "sha256:8460fbf2b66512e8bdc68f6c5ab7f813ec8d27ec089a1390daf12a63d8e3e9ab"
-        },
-        {
           "from": "scripts/ask-benchmark-duplicate-key-json.mjs",
           "to": "scripts/ask-benchmark-stable-file.mjs",
           "kind": "static_import",
@@ -4472,17 +4754,6 @@
             "column": 32
           },
           "edge_digest": "sha256:86c784bf28ccae994db7c1be2eb6f84be95b5ed3a7eb6137db63a4bd3e3daf85"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-schema.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-schema.mjs",
-          "source_location": {
-            "line": 27,
-            "column": 47
-          },
-          "edge_digest": "sha256:877228539dc36469767221b5616bdf73f5e0624b83614a91e06c5c9bcf5ac028"
         },
         {
           "from": "scripts/ask-core-codex-native-contract.mjs",
@@ -4518,6 +4789,17 @@
           "edge_digest": "sha256:88dd1b7823ab510a145590a7a640bdef237918eb7e7758290d9ab8dbb2e72a75"
         },
         {
+          "from": "scripts/ask-primary-metadata-task-contract.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 4,
+            "column": 63
+          },
+          "edge_digest": "sha256:8911b74924583697f03591f74624fe50e84da11169ee0aca4ab785e653fd145e"
+        },
+        {
           "from": "scripts/claim-evidence-status.mjs",
           "to": "schemas/claim-evidence-status.schema.json",
           "kind": "authority_read",
@@ -4535,17 +4817,6 @@
             "column": 23
           },
           "edge_digest": "sha256:89bc557e9547ac9bc0b586ddfcdda9d25d9a0b07838527073cef633cdd438100"
-        },
-        {
-          "from": "scripts/ask-primary-scoring-version.mjs",
-          "to": "scripts/content-addressed-store.mjs",
-          "kind": "static_import",
-          "specifier": "./content-addressed-store.mjs",
-          "source_location": {
-            "line": 9,
-            "column": 46
-          },
-          "edge_digest": "sha256:89ceb20eabe2f33ab17112e200db8216191ebc364f1ee5abe6ea772780c67f82"
         },
         {
           "from": "scripts/ask-primary-client-focused-controller.mjs",
@@ -4645,6 +4916,17 @@
             "column": 70
           },
           "edge_digest": "sha256:8f491ff8674709e2cd6a9bd8a274a3ff17812e740141fecbf321458360871b9d"
+        },
+        {
+          "from": "scripts/retained-instruction-layout.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 8,
+            "column": 38
+          },
+          "edge_digest": "sha256:8fa3a0df668bf6e233c0dd40f66bbf6b2072a9a72ca0f69dce1009feaa0d71e7"
         },
         {
           "from": "scripts/ask-core-native-connection.mjs",
@@ -4790,6 +5072,17 @@
           "edge_digest": "sha256:9622b4c78f1c9167470ecad58891e9a327c3d221352349597b3ad2ac1766aadc"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-primary-evaluation-producer.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-primary-evaluation-producer.mjs",
+          "source_location": {
+            "line": 8,
+            "column": 47
+          },
+          "edge_digest": "sha256:9695935f965bb30ae94b8fb6b9905ca8a01e5d07a82424ede1fef887dd9b8200"
+        },
+        {
           "from": "scripts/install-codex-adapter.mjs",
           "to": "scripts/ask-shared.mjs",
           "kind": "static_import",
@@ -4865,17 +5158,6 @@
             "column": 39
           },
           "edge_digest": "sha256:9995b626e12c6e4b472126762aca86bc76191502a96e7e8145ef01ef6664c90c"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-core-capture-producer.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-core-capture-producer.mjs",
-          "source_location": {
-            "line": 3,
-            "column": 44
-          },
-          "edge_digest": "sha256:99e03200754d396889b287131482516082019c4f3e6bdfbbb11a91ba8b873772"
         },
         {
           "from": "scripts/ask-primary-evaluation-producer.mjs",
@@ -5029,17 +5311,6 @@
           "edge_digest": "sha256:a6216a9178a0419dfe5c9e22c32bc64f0a74b63901084a3399e77c4a234da9fb"
         },
         {
-          "from": "scripts/install-claude-adapter.mjs",
-          "to": "scripts/adapter-runtime-inventory.mjs",
-          "kind": "static_import",
-          "specifier": "./adapter-runtime-inventory.mjs",
-          "source_location": {
-            "line": 7,
-            "column": 65
-          },
-          "edge_digest": "sha256:a68f9f0319d4e0a14e3c7ddabf1c07a2d885b56edb2af35dc92409a18796d0ca"
-        },
-        {
           "from": "scripts/ask-primary-evaluation-grading.mjs",
           "to": "scripts/ask-primary-evaluation-profile.mjs",
           "kind": "static_import",
@@ -5049,17 +5320,6 @@
             "column": 129
           },
           "edge_digest": "sha256:a781f14e49585324bc2bcf8c0b51583e0e8a1e61ff667d83fa6012d1a4813453"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-primary-evaluation-producer.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-primary-evaluation-producer.mjs",
-          "source_location": {
-            "line": 5,
-            "column": 47
-          },
-          "edge_digest": "sha256:a860555d1af70627d8a91332272c5ff6ed8cb659c5a702d7527e0b4d191dfb88"
         },
         {
           "from": "scripts/ask-benchmark-portfolio-result-set.mjs",
@@ -5093,6 +5353,17 @@
             "column": 24
           },
           "edge_digest": "sha256:a8c7b39621af36545a07fee320fb231e29382ee295e03ad0272cd1a673722c25"
+        },
+        {
+          "from": "scripts/ask-primary-scoring-version.mjs",
+          "to": "scripts/ask-primary-unsafe-action-contract.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-primary-unsafe-action-contract.mjs",
+          "source_location": {
+            "line": 2,
+            "column": 39
+          },
+          "edge_digest": "sha256:a8f9bee3fb7f999704fa70ae2ef5b4f8674314ab8096118f94e1014218d4d7cc"
         },
         {
           "from": "scripts/ask-primary-evaluation-private-grading.mjs",
@@ -5150,17 +5421,6 @@
           "edge_digest": "sha256:aad0a0fb79605517c35e2c4e43d274214436d81210091778261c5d167513dac6"
         },
         {
-          "from": "scripts/ask-primary-scoring-version.mjs",
-          "to": "scripts/ask-primary-unsafe-action-contract.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-primary-unsafe-action-contract.mjs",
-          "source_location": {
-            "line": 1,
-            "column": 39
-          },
-          "edge_digest": "sha256:ab42c95c51f8d592cbee54b85554de29651751fac16b761992107832c9cdefd7"
-        },
-        {
           "from": "scripts/ask-user-comparison.mjs",
           "to": "scripts/installer-lifecycle.mjs",
           "kind": "static_import",
@@ -5203,17 +5463,6 @@
             "column": 704
           },
           "edge_digest": "sha256:ae2133de4114f71142963572aa1ef87ef12bb222343d62ede5d6a335d5137f91"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/install-codex-adapter.mjs",
-          "kind": "static_import",
-          "specifier": "./install-codex-adapter.mjs",
-          "source_location": {
-            "line": 34,
-            "column": 68
-          },
-          "edge_digest": "sha256:ae283b3c31a71d53317b275eb05159571f1971593c52436b53421833b872a51a"
         },
         {
           "from": "scripts/ask-benchmark-plan.mjs",
@@ -5524,15 +5773,15 @@
           "edge_digest": "sha256:bcf2b3f3a3b94957d7cc3c986b79eedad20224d3c00b82fe50feb519a1c99b61"
         },
         {
-          "from": "scripts/install-claude-adapter.mjs",
-          "to": "scripts/fixed-entry-profile.mjs",
+          "from": "scripts/ask-primary-scoring-version.mjs",
+          "to": "scripts/content-addressed-store.mjs",
           "kind": "static_import",
-          "specifier": "./fixed-entry-profile.mjs",
+          "specifier": "./content-addressed-store.mjs",
           "source_location": {
-            "line": 9,
-            "column": 87
+            "line": 10,
+            "column": 46
           },
-          "edge_digest": "sha256:bdf6ccad09d495bb413b83868d153d91706631336069fd642cc143c99b0662b2"
+          "edge_digest": "sha256:bd23cc652c1c263f185c94f05111a8aa740dc72cf0e2b7cbe2488f496473ddde"
         },
         {
           "from": "scripts/ask-core-task-admission.mjs",
@@ -5544,6 +5793,17 @@
             "column": 46
           },
           "edge_digest": "sha256:be67e270855adc8bee0527399d45df44f03323121c2c929619b4ffda67ab28be"
+        },
+        {
+          "from": "scripts/ask-primary-scoring-version.mjs",
+          "to": "scripts/ask-benchmark-scoring-contract.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-scoring-contract.mjs",
+          "source_location": {
+            "line": 12,
+            "column": 89
+          },
+          "edge_digest": "sha256:bf5f26cd27608136c03265ffd6a627d147fb8273d873439caa0b24f6683626ba"
         },
         {
           "from": "scripts/ask-benchmark-portfolio-repetition-report.mjs",
@@ -5566,6 +5826,17 @@
             "column": 121
           },
           "edge_digest": "sha256:c1802f456a481664eebe1c6cb37b837f75243c04d568474ae964346d511cc501"
+        },
+        {
+          "from": "scripts/kernel-principles-v2-catalog24.mjs",
+          "to": "scripts/ask-primary-metadata-task-contract.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-primary-metadata-task-contract.mjs",
+          "source_location": {
+            "line": 6,
+            "column": 80
+          },
+          "edge_digest": "sha256:c49c3b2a61b44e26e043daae3c65513974d48a2597e33f99afde140c962047f3"
         },
         {
           "from": "scripts/ask-benchmark-source-session.mjs",
@@ -5612,6 +5883,17 @@
           "edge_digest": "sha256:c4e18976f1000b0cafafbeef997ef7cd857a5d013fe1a8f6a8cf12a202dda43e"
         },
         {
+          "from": "scripts/instruction-source-version.mjs",
+          "to": "scripts/ask-benchmark-stable-file.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-stable-file.mjs",
+          "source_location": {
+            "line": 8,
+            "column": 32
+          },
+          "edge_digest": "sha256:c55dfd4ded8645dd9816ce2facac0138ca13f7bdcf69df008cdfd48df583075f"
+        },
+        {
           "from": "scripts/ask-primary-evaluation-scope.mjs",
           "to": "scripts/ask-benchmark-stable-file.mjs",
           "kind": "static_import",
@@ -5640,6 +5922,17 @@
             "column": 83
           },
           "edge_digest": "sha256:c6454258a70cefadf02f8d2b89b0b12e147f62998b456391a45ae1b72a8ccb29"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-terminal-workspace.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-terminal-workspace.mjs",
+          "source_location": {
+            "line": 55,
+            "column": 8
+          },
+          "edge_digest": "sha256:c65ad28f78b457df0f19d0d2dd06d11c693087924cfae661560dc57ff7822d44"
         },
         {
           "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
@@ -5716,6 +6009,17 @@
           "edge_digest": "sha256:c960a397fc928ad840a9f8c38244b652fc212a9299d54590e05005a0f0b26460"
         },
         {
+          "from": "scripts/portfolio-manager.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 10,
+            "column": 8
+          },
+          "edge_digest": "sha256:c98443651155c409a6a7891756643668e38125b77ac66a10799d09e0232a799e"
+        },
+        {
           "from": "scripts/ask-primary-evaluation-scope.mjs",
           "to": "scripts/ask-primary-runtime-v10.mjs",
           "kind": "static_import",
@@ -5771,6 +6075,17 @@
           "edge_digest": "sha256:cb9f7ebb479e056f80fe30fa21acd7a0da9a2afe5dcc8811b60521f98c9f76cc"
         },
         {
+          "from": "scripts/ask-primary-scoring-version.mjs",
+          "to": "scripts/ask-primary-fixture-recipe.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-primary-fixture-recipe.mjs",
+          "source_location": {
+            "line": 13,
+            "column": 40
+          },
+          "edge_digest": "sha256:ccc2bea25afb73ae1631764fa6dd61d6a9b1c2987d86e5aa1c41b79fcff32513"
+        },
+        {
           "from": "scripts/ask-user-comparison-state.mjs",
           "to": "scripts/content-addressed-store.mjs",
           "kind": "static_import",
@@ -5802,6 +6117,17 @@
             "column": 73
           },
           "edge_digest": "sha256:ce834970ebc496f3121522dc64e4c5bb3680adff012c2b7c452e5b300a97e415"
+        },
+        {
+          "from": "scripts/portfolio-manager.mjs",
+          "to": "scripts/execution-envelope.mjs",
+          "kind": "static_import",
+          "specifier": "./execution-envelope.mjs",
+          "source_location": {
+            "line": 18,
+            "column": 36
+          },
+          "edge_digest": "sha256:ce9cfe1eeca357716225a3f00ea9e43739646cd192cea67e42b8317140bbe42d"
         },
         {
           "from": "scripts/ask-core-native-preparation.mjs",
@@ -5859,6 +6185,17 @@
           "edge_digest": "sha256:d069cb44c0a199340c1a04ff7fee8b57bb7f4a4786ae7ec5e629af046a18c704"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-prompt-successor-usage.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-prompt-successor-usage.mjs",
+          "source_location": {
+            "line": 32,
+            "column": 63
+          },
+          "edge_digest": "sha256:d0770ffd5e7468d4180a0f522e2ceb8fc77348a7b1e6806f054b0a04cd1b45cc"
+        },
+        {
           "from": "scripts/kernel-principles-candidate-v2.mjs",
           "to": "scripts/kernel-principles.mjs",
           "kind": "static_import",
@@ -5868,6 +6205,17 @@
             "column": 40
           },
           "edge_digest": "sha256:d0eb7c1d1b864ef185e67aa90f47de7860638a13dfc99b664f58ba287e295772"
+        },
+        {
+          "from": "scripts/instruction-environment-compiler.mjs",
+          "to": "scripts/instruction-projection-paths.mjs",
+          "kind": "static_import",
+          "specifier": "./instruction-projection-paths.mjs",
+          "source_location": {
+            "line": 9,
+            "column": 39
+          },
+          "edge_digest": "sha256:d0ebe024d5563a4dd4d8be7d598255d2e4cccf972311b4ae9ffd27307605a9d8"
         },
         {
           "from": "scripts/asset-registry.mjs",
@@ -5901,6 +6249,17 @@
             "column": 54
           },
           "edge_digest": "sha256:d1de577c61b35b3c90c0915a3550cd4ff0f46e5888cb5f71d5584b2ab5a3f921"
+        },
+        {
+          "from": "scripts/portfolio-manager.mjs",
+          "to": "scripts/asset-registry.mjs",
+          "kind": "static_import",
+          "specifier": "./asset-registry.mjs",
+          "source_location": {
+            "line": 11,
+            "column": 37
+          },
+          "edge_digest": "sha256:d3bb55e194156f2c3a79d66077496a29f77cb42c3ab6ddcfcc733259a5d60646"
         },
         {
           "from": "scripts/ask-core-connected-normalizer.mjs",
@@ -6068,6 +6427,17 @@
           "edge_digest": "sha256:dde80744a66c029987315f4532f0a8e9e0a0b584c6d731e24369703333cbb73e"
         },
         {
+          "from": "scripts/instruction-environment.mjs",
+          "to": "scripts/instruction-environment-compiler.mjs",
+          "kind": "static_import",
+          "specifier": "./instruction-environment-compiler.mjs",
+          "source_location": {
+            "line": 10,
+            "column": 54
+          },
+          "edge_digest": "sha256:de24635bc364f753965371f3fa7091ae7bfdaddc156f24b32fc30e0ed56a85db"
+        },
+        {
           "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
           "to": "scripts/ask-primary-scoring-version.mjs",
           "kind": "static_import",
@@ -6077,6 +6447,17 @@
             "column": 52
           },
           "edge_digest": "sha256:de5147e80b76e3c44befae0e15407c450b647337443cef2c9348bc20c868dbae"
+        },
+        {
+          "from": "scripts/instruction-environment.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 6,
+            "column": 130
+          },
+          "edge_digest": "sha256:df4c5736fb79e4de12bbbccf296ce6edc2cb0cf2eb80044630ad5edc6d010ebd"
         },
         {
           "from": "scripts/ask-benchmark-execution.mjs",
@@ -6151,17 +6532,6 @@
             "column": 97
           },
           "edge_digest": "sha256:e44ca86c2dbdc54d63995c7b0d48d167dcec33940d805b76c0c84364e1a55bf8"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/content-addressed-store.mjs",
-          "kind": "static_import",
-          "specifier": "./content-addressed-store.mjs",
-          "source_location": {
-            "line": 28,
-            "column": 45
-          },
-          "edge_digest": "sha256:e4d31388d82a243b019a932c29397ffe92d5d164de6324ac779e2f527dc87033"
         },
         {
           "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
@@ -6384,6 +6754,17 @@
           "edge_digest": "sha256:e9cc22ee431934aadb152ea6a00439415096f39ea1dce445b6a51917bc6d740d"
         },
         {
+          "from": "scripts/install-claude-adapter.mjs",
+          "to": "scripts/claude-fixed-entry-profile.mjs",
+          "kind": "static_import",
+          "specifier": "./claude-fixed-entry-profile.mjs",
+          "source_location": {
+            "line": 9,
+            "column": 80
+          },
+          "edge_digest": "sha256:e9fc971bd96558e9ee2da953b6c291321d4eb008b7c9a7d08c13f5236a6ae9d2"
+        },
+        {
           "from": "scripts/ask-user-comparison-prepare.mjs",
           "to": "scripts/kernel-principles.mjs",
           "kind": "static_import",
@@ -6491,6 +6872,17 @@
           "edge_digest": "sha256:f088cad04a02e784d9e7f0d535d11f44edb9e296c151ec3fefb93bdb381e8b7f"
         },
         {
+          "from": "scripts/claude-native-runtime.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 5,
+            "column": 46
+          },
+          "edge_digest": "sha256:f1034eca3c2ab7fcd977648935148b14e9d09986eb28293344262a63e54dd800"
+        },
+        {
           "from": "scripts/ask-primary-evaluation-private-grading.mjs",
           "to": "scripts/ask-benchmark-evaluator-boundary.mjs",
           "kind": "static_import",
@@ -6500,6 +6892,17 @@
             "column": 154
           },
           "edge_digest": "sha256:f143bdbbc19aba3c4b3b0a5d75a94653520ba4bc6f5051c7591d36e779173171"
+        },
+        {
+          "from": "scripts/install-claude-adapter.mjs",
+          "to": "scripts/adapter-runtime-inventory.mjs",
+          "kind": "static_import",
+          "specifier": "./adapter-runtime-inventory.mjs",
+          "source_location": {
+            "line": 8,
+            "column": 65
+          },
+          "edge_digest": "sha256:f1639d1b7160364a6ae1944356de62bcd899fb429e9e684a850c6795f35e9836"
         },
         {
           "from": "private/hidden-evaluator.mjs",
@@ -6551,39 +6954,6 @@
           "edge_digest": "sha256:f388e25e8c2c4352887b4c8ef46402b50d905c9dd4dfab21967a35907d4c2b63"
         },
         {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-command-evidence.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-command-evidence.mjs",
-          "source_location": {
-            "line": 45,
-            "column": 8
-          },
-          "edge_digest": "sha256:f3bd05a0c1ae0f4a75aafb6ceb0f0a0f4116c4fcf5a8f1655a71ca8990ed0efd"
-        },
-        {
-          "from": "scripts/ask-primary-scoring-version.mjs",
-          "to": "scripts/ask-primary-fixture-recipe.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-primary-fixture-recipe.mjs",
-          "source_location": {
-            "line": 13,
-            "column": 37
-          },
-          "edge_digest": "sha256:f3de44fa4cba4a2314b20b7476aeb4058422ad358da354815ebaf52211b4e9a6"
-        },
-        {
-          "from": "scripts/ask-benchmark-execution.mjs",
-          "to": "scripts/ask-benchmark-terminal-workspace.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-terminal-workspace.mjs",
-          "source_location": {
-            "line": 52,
-            "column": 8
-          },
-          "edge_digest": "sha256:f454d35440adcf8e183919d12846ab7f51d161f5cc75f208485450af27ec63b3"
-        },
-        {
           "from": "scripts/ask-primary-evaluation-producer.mjs",
           "to": "scripts/ask-primary-evaluation-scope.mjs",
           "kind": "static_import",
@@ -6626,6 +6996,17 @@
             "column": 62
           },
           "edge_digest": "sha256:f5210a7dc675b9db864dd86727fa19f708f5fca048e3568a568b4c91a7423c1f"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-primary-evaluation-scope.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-primary-evaluation-scope.mjs",
+          "source_location": {
+            "line": 7,
+            "column": 43
+          },
+          "edge_digest": "sha256:f5290b07c85045564c2a8dc7e9c909110f1212151d46e4011bbf5816d925cd15"
         },
         {
           "from": "scripts/ask-core-capture-producer.mjs",
@@ -6672,6 +7053,17 @@
           "edge_digest": "sha256:f62f88e2bcaaaca3451d64e43de9ed653ea215791c85de4f834a3ca9f932c11a"
         },
         {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-selection.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-selection.mjs",
+          "source_location": {
+            "line": 35,
+            "column": 41
+          },
+          "edge_digest": "sha256:f68a36d1e0b2f9f7ed3e272aa05b171ced114fc33486a7d7df7db3e2614cf38b"
+        },
+        {
           "from": "scripts/ask-core-native-connection.mjs",
           "to": "scripts/ask-core-task-admission.mjs",
           "kind": "static_import",
@@ -6692,6 +7084,17 @@
             "column": 71
           },
           "edge_digest": "sha256:f6a735667a8412bbcef40dabf2a9c5e155792e88130f88693c7e7009da4065fd"
+        },
+        {
+          "from": "scripts/instruction-environment-compiler.mjs",
+          "to": "scripts/asset-registry.mjs",
+          "kind": "static_import",
+          "specifier": "./asset-registry.mjs",
+          "source_location": {
+            "line": 8,
+            "column": 52
+          },
+          "edge_digest": "sha256:f741f635189951ac9ea34c68d5df4ab13e516f72bcc65b05ce14a4fb0f240b76"
         },
         {
           "from": "scripts/ai-metrics-summarize.mjs",
@@ -6856,6 +7259,17 @@
           "edge_digest": "sha256:ff1416b6c458d8deb509ef6ce55b468ed18df5b424fc4b115957b5077813d54f"
         },
         {
+          "from": "scripts/verification-evidence.mjs",
+          "to": "scripts/content-addressed-store.mjs",
+          "kind": "static_import",
+          "specifier": "./content-addressed-store.mjs",
+          "source_location": {
+            "line": 20,
+            "column": 8
+          },
+          "edge_digest": "sha256:ff2085f3021461b7fecda969b66a76538db9c50cd21d9da60be2f92273423fcb"
+        },
+        {
           "from": "scripts/codex-exec-runner.mjs",
           "to": "scripts/ask-shared.mjs",
           "kind": "static_import",
@@ -6867,15 +7281,15 @@
           "edge_digest": "sha256:ffaeb2dc8fb81f5c6e94779ba74617b074b2b3ed2b63f6c6985e35e5f6b05baa"
         }
       ],
-      "graph_digest": "sha256:f661e513f3eba0f1924743a2292c65f0a510c8bea40408d06a07d778684e60f2"
+      "graph_digest": "sha256:d2119a6346ec1bd4e67b92d12cd74ea968e5ced41dc34f1115d815713d328798"
     }
   },
   "generator_identity": "sha256:38c96ab1350e3d70ce0af621248d046e01cacdf2adafb6d9a591b9eba40c2be2",
-  "independence_statement_digest": "sha256:7c910be51edca54a131d510dba2ed1bdd26dbcc7cfa7d6af3f523e7da7a705e8",
-  "review_record_digest": "sha256:78693f06652593b05e2a8317d5ad5391c446ef0c0375f9299abb1e9ad0030226",
+  "independence_statement_digest": "sha256:c7d81c8b275f65303f14090050babfe4e3378780108409ead6f88a70d81078ad",
+  "review_record_digest": "sha256:3fea38fb5551abc5ff179ffbb72c47c364d9351773aca3516c426ab1e937b6fa",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-frontend-default-fix/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:668bedf2219fa2f1399306afe2e294976e7b2353b74b61c4c285920e934bf0c2",
-  "evaluator_authority_manifest_digest": "sha256:e948e43e50b450f00af2e284b698e000738de4c27930e45280e07e24f3797658",
+  "evaluator_authority_manifest_raw_sha256": "sha256:419194be644c56d3f412575def2d2350d809e4c55e7b2a4dbf518a661d3ccc89",
+  "evaluator_authority_manifest_digest": "sha256:e00add1c266fad0afb00fb1d7bdaa0656a1722dc029738d3b22b7b72c5ce05e7",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:2568693ea44fa6d9c622f83fe256a020d4688f0fb37f233d89d426c8e57aa201"
+  "public_metadata_digest": "sha256:607caed95ed4622b90bcee947202713161562edb385e3a3f58cef3c8946f6fbe"
 }

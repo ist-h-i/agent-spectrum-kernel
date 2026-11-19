@@ -84,10 +84,12 @@ For #231, `scripts/test-verification-proof-policy.mjs` verifies the closed two-p
 selection policy, Compact Proof result binding, protected-claim rejection,
 monotonic compact-to-formal upgrade, exact legacy-formal fixture bytes, and the
 bounded 97-byte versus 287-byte artifact-shape proxy. The separate generated
-Codex verification prompt now measures 2461 bytes against its immutable
-2291-byte pre-compact fixture, 170 bytes above that historical baseline after
-the scope controls were expanded. Its bytes and digest remain checked against
-the current projection; the whole-prompt comparison is descriptive and does not measure
+Codex verification prompt historically measured 2461 bytes against its immutable
+2291-byte pre-compact fixture (a 170-byte increase at that revision). For the
+current prompt size and delta, use the generated `docs/validation-report.md`
+and `docs/fixtures/verification-proof-policy-cases.json` rather than treating
+that historical measurement as current. Its bytes and digest remain checked
+against the current projection; the whole-prompt comparison is descriptive and does not measure
 Compact Proof's individual contribution. Adapter conformance verifies the same
 selected path across current Claude and Codex projections. These static and
 local checks do not establish that an external runtime loaded the projection,

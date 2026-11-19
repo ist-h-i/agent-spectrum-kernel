@@ -9,6 +9,7 @@ const rollover = readFileSync(new URL('../.github/workflows/context-rollover.yml
 const completion = readFileSync(new URL('../.github/workflows/verification-completion.yml', import.meta.url), 'utf8');
 const baseline = JSON.parse(readFileSync(new URL('../docs/fixtures/ci-full-run-inventory.json', import.meta.url)));
 const lifetimeCommand = 'node --test scripts/test-ask-primary-performance-execution.mjs scripts/test-ask-primary-performance-lifetime.mjs';
+const metadataContractFile = 'scripts/test-kernel-principles-v2-metadata-contract.mjs';
 const publicSandboxFile = 'scripts/test-ask-user-comparison-public-sandbox.mjs';
 const manualComparisonCommand = 'node --test scripts/test-ask-primary-evaluation-start.mjs scripts/test-ask-primary-nine-condition-report.mjs';
 const challengeLifecycleCommand = 'node --experimental-test-module-mocks --test scripts/test-practical-challenge-worker.mjs scripts/test-challenge-evaluation.mjs scripts/test-instruction-loop-measured-adoption.mjs scripts/test-instruction-loop-version-recovery.mjs';
@@ -67,13 +68,13 @@ test('original coverage remains except two audited Mac-only fake logic files, wi
   }).sort();
   const moved = ['scripts/test-ask-primary-build-successor-v2.mjs', 'scripts/test-ask-personal-evolution-unattended-policy.mjs'];
   assert.equal(commands(local).filter(command => command === lifetimeCommand).length, 1);
-  assert.deepEqual(expand(commands(local).filter(command => command !== lifetimeCommand)).filter(command => !command.endsWith(publicSandboxFile)), expand(baseline.local_commands).filter(command => !moved.some(file => command.endsWith(file))));
+  assert.deepEqual(expand(commands(local).filter(command => command !== lifetimeCommand)).filter(command => ![publicSandboxFile, metadataContractFile].some(file => command.endsWith(file))), expand(baseline.local_commands).filter(command => !moved.some(file => command.endsWith(file))));
   for (const file of moved) assert.ok(commands(validate).some(command => command.split(' ').includes(file)), file);
   assert.match(local, /if: matrix.os == 'ubuntu-24.04'\n        run: node --test scripts\/test-kernel-principles.mjs/);
   assert.equal(local.match(/^\s+if:/gm).length, 6, 'only the explicit additional Mac lifetime owner is conditional');
   const macCommands = local.split(/\n      - /).filter(step => !step.includes("if: matrix.os == 'ubuntu-24.04'")).flatMap(commands);
   const macOmissions = [...moved, 'scripts/test-kernel-principles.mjs'];
-  assert.deepEqual(expand(macCommands.filter(command => command !== lifetimeCommand)).filter(command => !command.endsWith(publicSandboxFile)), expand(baseline.local_commands).filter(command => !macOmissions.some(file => command.endsWith(file))), 'all other Mac file/flag coverage retained');
+  assert.deepEqual(expand(macCommands.filter(command => command !== lifetimeCommand)).filter(command => ![publicSandboxFile, metadataContractFile].some(file => command.endsWith(file))), expand(baseline.local_commands).filter(command => !macOmissions.some(file => command.endsWith(file))), 'all other Mac file/flag coverage retained');
   const conditional = [...local.matchAll(/        if: matrix.os == 'macos-15'\n        run: (.+)/g)].map(m => m[1]);
   assert.equal(conditional.length, 5);
   assert.ok(conditional.includes(lifetimeCommand));
@@ -173,4 +174,11 @@ test('challenge lifecycle suites remain separately registered exactly once with 
   for (const file of files) assert.throws(() => check(validate.replace(challengeLifecycleCommand, challengeLifecycleCommand.replace(' ' + file, ''))));
   assert.throws(() => check(validate.replace(challengeLifecycleCommand, challengeLifecycleCommand.replace('--experimental-test-module-mocks ', ''))));
   assert.throws(() => check(validate + '\n' + challengeLifecycleCommand));
+});
+
+
+test('task metadata negative contract has one pure Ubuntu owner without altering historical coverage', () => {
+  assert.equal(commands(local).filter(command => command.split(' ').includes(metadataContractFile)).length, 1);
+  assert.match(local, /if: matrix.os == 'ubuntu-24.04'\n        run: node --test scripts\/test-kernel-principles.mjs scripts\/test-kernel-principles-v2-metadata-contract.mjs\n/);
+  for (const workflow of [validate, rollover, completion]) assert.ok(!workflow.includes(metadataContractFile));
 });

@@ -1,3 +1,4 @@
+import { PRIMARY_METADATA_REGENERATED_HEADERS } from './ask-primary-metadata-task-contract.mjs';
 import * as unsafeActionContract from './ask-primary-unsafe-action-contract.mjs';
 // Explicit evaluation-only successor selection. This verifies static identity and
 // preserved task/scoring semantics; it grants no start, worker or admission authority.
@@ -196,7 +197,7 @@ export function verifyPrimaryScoringSemantics(fixtureId, selectedRoot, { root = 
   const allow = {
     'requirement-record': ['admission_record_digest', 'requirement_record_digest'],
     'output-contract': ['evaluator_public_reference_digest', 'evaluator_authority_manifest_raw_sha256', 'evaluator_authority_manifest_digest', 'output_contract_digest', ...(v7 ? ['result_profile'] : [])],
-    metadata: ['evaluator_bundle_id', 'evaluator_bundle_digest', 'evaluator_byte_count', 'review_status', 'metadata_digest'],
+    metadata: PRIMARY_METADATA_REGENERATED_HEADERS,
   };
   for (const [name, fields] of Object.entries(allow)) {
     keys(fresh(name), Object.keys(old(name)));

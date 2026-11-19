@@ -125,7 +125,7 @@
       "mutation_id": "codex_remove_verification_obligation",
       "scenario_id": "new_behavior_with_verification",
       "adapter_id": "codex",
-      "remove": ["- [verification] ask.verification-proof-policy@1.0.0: compact_proof|formal_verification_contract before claim; focused->risk-based; exact; trigger=>formal."],
+      "remove": ["- [verification] ask.verification-proof-policy@1.0.0: compact_proof|formal_verification_contract before claim; verify the consumer-facing requested outcome with the smallest discriminating check; derive expectations from contract/consumer/independent observable, not the tested implementation or incidental sequence; accept alternative valid mechanisms; reuse same-task proof only for unchanged artifact/inputs/environment/claim, recheck material change/contradiction/required gate; simple direct proof needs no extra tests/docs/agents; shape/sample checks are not behavioral proof; static checks are not runtime proof; unknown limits the supported claim; focused->risk-based; exact; trigger=>formal."],
       "expected_status": "fail"
     },
     {

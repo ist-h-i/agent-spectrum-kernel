@@ -51,13 +51,7 @@ Rules:
 
 Before changing code, inspect the repository context relevant to the task.
 
-Minimum inspection for non-trivial work:
-- README or equivalent project entry point.
-- Package/build/dependency files.
-- Test, lint, typecheck, and CI configuration.
-- Existing implementations near the target area.
-- Existing tests near the target area.
-- Docs, ADRs, architecture notes, schemas, API docs, or context files when relevant.
+Start with the request and the nearest relevant behavior, consumers, and evidence. Expand inspection when an unresolved requirement, risk, dependency, or required gate could change the decision. Use repository entry points, build/test configuration, implementations, tests, and contracts as relevant; do not require a fixed reading tour for every non-trivial task. When observed constraints interact and plausible implementations differ, check the most consequential incompatible outcome against an observable contract at the first useful boundary; do not invent failure modes or extra work for a direct, simple change. Stop expanding when the authorized outcome and necessary verification are sufficiently understood.
 
 Prefer repository conventions over generic best practices. Existing code is evidence. Assumed architecture is not.
 
@@ -73,7 +67,7 @@ Do not:
 - change architecture, style, dependencies, or build systems as a side effect,
 - mix cleanup with behavior change unless required for the requested outcome.
 
-Necessary structural cleanup belongs to the requested outcome; unrelated improvements do not. Re-plan when evidence changes the necessary scope, without requesting approval again for work already authorized. Report unrelated broader issues separately; pause affected work when the revised scope crosses an explicit forbidden boundary or requires an unresolved decision or authorization.
+Necessary structural cleanup belongs to the requested outcome; unrelated improvements do not. Re-plan when evidence changes the necessary scope, without requesting approval again for work already authorized. Report unrelated broader issues separately. Continue independent requested, authorized outcomes when a blocker affects only part of the work. Pause only the dependent action or claim when an explicit boundary, missing decision, authorization, or required evidence prevents progress; required gates remain mandatory. Before finishing, check requested outcomes against the actual result and report any unmet outcome and its concrete reason in the existing completion or handoff fields.
 
 ## 4. Safety and external effects
 
@@ -126,7 +120,7 @@ Do not ask broad question dumps. Ask the next decision that materially changes t
 
 ## 7. Verification first
 
-Completion means verified behavior, not edited files.
+Completion means verified behavior, not edited files. Check the requested outcome at its consumer-facing boundary with the smallest check that distinguishes a correct result from a plausible wrong one. A shape or sample alone does not prove behavior, and static evidence does not prove runtime behavior. A schema-only change may need schema validation; static documents do not inherently need UI or end-to-end tests. Derive expected behavior from the requested contract, an unaffected consumer, or an independent observable, not the implementation under test or an incidental sequence; accept alternative valid mechanisms. Reuse evidence within the same task when the artifact, relevant inputs, environment, and claim are unchanged; recheck material changes, contradictory evidence, and mandatory gates. Direct evidence sufficient for a simple change needs no added test, document, or independent agent. Missing evidence limits the dependent claim; preserve failures and satisfy required gates.
 
 When verification applies, use `ask.verification-proof-policy@1.0.0` from
 `docs/verification-proof-policy-contract.md` before implementation claims.
