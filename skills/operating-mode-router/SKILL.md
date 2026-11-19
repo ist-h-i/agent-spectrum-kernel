@@ -71,6 +71,7 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 User-facing route text should explain the work path in these terms. Skill names belong in `Internal route` for review and debugging.
 
 4. Distinguish close signals.
+   - A test strategy meant to decide a project’s promises, responsibilities, work order or release scope is concrete `delivery_quality` design work: use `skill-router`, not adoption reporting or model-effectiveness evaluation.
    - Executable-spec method setup for a concrete project (test writing conventions, specification index, AI context retrieval, or verification selection): classify as `delivery_quality`, then route through `skill-router` to `spec-driven-development`, including for a new project. A method setup request alone does not request rollout of the ASK skill set or an adoption pack. If ASK rollout is also requested, keep that rollout in `adoption_bootstrap` and delegate only the requested method setup after checking its capability.
    - One completed task effectiveness question: route to `skill-effectiveness-evaluation`.
    - An explicit practical ASK/Skill/instruction-environment comparison or its failure recovery: route to `skill-effectiveness-evaluation` practical mode. Ordinary application tests still belong to delivery verification; this signal does not route every test run into observability.

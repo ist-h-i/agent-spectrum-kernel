@@ -41,6 +41,8 @@ Use available repository context for commands, existing coverage, and test patte
 
 When the project explicitly adopts the executable-spec method, read its `docs/ai/executable-spec-profile.md` (or recorded equivalent) and `spec-driven-development`'s `references/verification-selection.md`. Select checks from specification items, source dependencies, shared rules, and runtime boundaries; stale or incomplete indexes must widen investigation, not silently shrink verification. This supplement never replaces the proof policy above or required CI/merge/release checks. Do not force method setup on unadopted projects.
 
+When verification informed a project decision, use the same discriminating situation and the independent expected result recorded upstream. Check the boundary where the competing choices diverge; a local unit or matching outputs from two consumers may not prove the shared promise. If the evidence cannot support the selected delivery or release scope, return that part to planning or its decision owner rather than passing a narrower substitute.
+
 When scenario visualization is explicitly requested or adopted and `spec-driven-development` is selected, use its `references/scenario-visual-review.md`. Bind the preview to the same acceptance revision, then compare reached assertions and observed execution. An observed matching value without its required assertion remains a verification gap. Playback and human specification review do not discharge automated or integration obligations. If that optional capability is absent, preserve ordinary verification and report only the visualization gap.
 
 When `docs/ai/verification-pattern-ledger.md` exists, consult it only for matching change types, risk classes, regressions, or historically flaky areas:

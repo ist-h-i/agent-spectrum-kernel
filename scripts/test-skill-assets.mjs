@@ -106,6 +106,9 @@ test("executable-spec setup has selected capability and references in delivery a
   const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
   const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
   const route = manifest.routing.default_routes.find(({ id }) => id === "executable_spec_setup");
+  const strategy = manifest.routing.default_routes.find(({ id }) => id === "decision_led_test_strategy");
+  assert.equal(strategy?.primary, "spec-driven-development");
+  assert.equal(strategy.task_class, "design");
   assert.equal(route?.primary, "spec-driven-development");
   const { buildCodexProjectionPlan } = await import("./install-codex-adapter.mjs");
   const { buildClaudeProjectionPlan } = await import("./install-claude-adapter.mjs");
@@ -118,15 +121,21 @@ test("executable-spec setup has selected capability and references in delivery a
     const fixture = plan.routingFixtures.find(({ id }) => id === "executable_spec_setup");
     assert.equal(fixture?.outcome, "available", `${surface} ${profileName}: setup route`);
     assert.equal(fixture.selected_route ?? fixture.selectedRoute, route.primary);
+    const decision = plan.routingFixtures.find(({ id }) => id === strategy.id);
+    assert.equal(decision?.outcome, "available", `${surface} ${profileName}: decision-led strategy`);
+    assert.equal(decision.selected_route ?? decision.selectedRoute, strategy.primary);
     const selected = plan.skills ?? plan.selectedSkills;
     for (const skill of ["operating-mode-router", "skill-router", route.primary, "work-package-compiler", "test-first-verification"]) {
       assert.ok(selected.includes(skill), `${surface} ${profileName}: ${skill}`);
     }
-    for (const reference of ["spec-writing-conventions", "spec-index", "context-retrieval", "verification-selection", "scenario-visual-review"]) {
+    for (const reference of ["spec-writing-conventions", "spec-index", "context-retrieval", "verification-selection", "scenario-visual-review", "decision-led-test-strategy", "quote-reissue-decision"]) {
       assert.ok(plan.projectedManagedAssets.some(({ path }) => path === `${surface}/skills/${route.primary}/references/${reference}.md`));
     }
     for (const file of ["reservation.cases.mjs", "scenario-observer.mjs", "scenario-review.mjs", "scenario-player.html"]) {
       assert.ok(plan.projectedManagedAssets.some(({ path }) => path === `${surface}/skills/${route.primary}/references/examples/javascript/${file}`));
+    }
+    for (const file of ["quote-reissue.mjs", "quote-reissue.test.mjs"]) {
+      assert.ok(plan.projectedManagedAssets.some(({ path }) => path === `${surface}/skills/${strategy.primary}/references/examples/quote-reissue/${file}`));
     }
     if (profileName === "daily") {
       assert.equal(plan.routingFixtures.find(({ id }) => id === "daily_adoption_capability_missing")?.outcome, "capability_missing");
@@ -135,4 +144,35 @@ test("executable-spec setup has selected capability and references in delivery a
   }
   const minimal = buildCodexProjectionPlan({ profileName: "minimal" });
   assert.ok(!minimal.skills.includes(route.primary), "method setup must not expand unrelated minimal profiles");
+});
+
+test("installed Codex decision strategy resolves its walkthrough and executes the documented comparison", (t) => {
+  const source = resolve(fileURLToPath(new URL("..", import.meta.url)));
+  const target = mkdtempSync(resolve(tmpdir(), "ask-decision-strategy-"));
+  t.after(() => rmSync(target, { recursive: true, force: true }));
+  const run = (cwd, args) => {
+    const result = spawnSync(process.execPath, args, { cwd, encoding: "utf8" });
+    assert.equal(result.status, 0, `${result.error ?? ""}\n${result.stdout}\n${result.stderr}`);
+    return result;
+  };
+  run(source, ["scripts/install-kernel.mjs", "--target", target]);
+  run(source, ["scripts/install-codex-adapter.mjs", "--target", target, "--profile", "daily"]);
+  const skill = resolve(target, ".agents/skills/spec-driven-development");
+  function follow(from, suffix) {
+    const refs = [...readFileSync(from, "utf8").matchAll(/\]\(([^)#\s]+)(?:#[^)]*)?\)/gu)];
+    const link = refs.find(([, destination]) => destination.endsWith(suffix));
+    assert.ok(link, `Missing ${suffix} from ${from}`);
+    return resolve(dirname(from), link[1]);
+  }
+  const strategy = follow(resolve(skill, "SKILL.md"), "decision-led-test-strategy.md");
+  const walkthrough = follow(strategy, "quote-reissue-decision.md");
+  const testFile = follow(walkthrough, "quote-reissue.test.mjs");
+  const sample = follow(walkthrough, "quote-reissue.mjs");
+  assert.ok(readFileSync(sample).length > 0);
+  const command = readFileSync(walkthrough, "utf8").match(/^node --test (\S+\.mjs)$/mu);
+  assert.ok(command, "Walkthrough must give an executable skill-relative command");
+  assert.equal(resolve(skill, command[1]), testFile);
+  const output = run(skill, ["--test", command[1]]).stdout;
+  assert.match(output, /(?:^|\s)pass [1-9]\d*\s/u); // An empty discovery is not a worked example.
+  run(source, ["scripts/install-codex-adapter.mjs", "--target", target, "--profile", "daily", "--check"]);
 });

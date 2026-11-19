@@ -43,6 +43,8 @@ This is a transformation skill. It does not make business decisions and must rou
    - Preserve lifecycle `Dependencies` as external or free-form prerequisites. Record plan-local ordering only in `depends_on_package_ids`, and keep the deterministic lifecycle Work Package projection valid.
    - A plan may only mirror human-approval status and immutable evidence from the trusted current context; never infer or self-assert approval from a recognizable authority identity.
 
+For a decision-led test strategy, carry the approved promise and chosen design by reference. Order the distinguishing check before costly dependent work. Name what proceeds on success, what must change on failure, and which portion remains blocked if evidence or authorization is unavailable; do not release, silently narrow a promise, or stop unrelated approved work. Reuse existing task/dependency and stop-condition fields.
+
 3. Keep evidence status visible.
    - Mark target files/modules as `Verified`, `Supported`, `Hypothesis`, or `Unknown`.
    - Do not invent target files when repo evidence is missing.

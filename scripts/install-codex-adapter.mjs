@@ -243,6 +243,7 @@ const CODEX_PROFILES = {
 
 const PROFILE_ROUTING_FIXTURES = {
   daily: [
+    { id: "decision_led_test_strategy", signal: "Use test strategy to decide ownership, work order and release scope", router: "skill-router", selected_route: "spec-driven-development", outcome: "available", requiredSkills: ["spec-driven-development", "work-package-compiler", "test-first-verification"] },
     { id: "executable_spec_setup", signal: "Set up executable specifications for this new project", router: "skill-router", selected_route: "spec-driven-development", outcome: "available", requiredSkills: ["spec-driven-development", "work-package-compiler", "test-first-verification"] },
     { id: "daily_implementation_available", signal: "Ordinary implementation", router: "skill-router", selected_route: "controlled-implementation", outcome: "available", requiredSkills: ["controlled-implementation"] },
     { id: "daily_review_available", signal: "Ordinary review", router: "skill-router", selected_route: "review-router", outcome: "available", requiredSkills: ["review-router"] },
@@ -292,6 +293,7 @@ const PROFILE_ROUTING_FIXTURES = {
     },
   ],
   adoption: [
+    { id: "decision_led_test_strategy", signal: "Use test strategy to decide ownership, work order and release scope", router: "skill-router", selected_route: "spec-driven-development", outcome: "available", requiredSkills: ["spec-driven-development", "work-package-compiler", "test-first-verification"] },
     { id: "executable_spec_setup", signal: "Set up executable specifications for this new project", router: "skill-router", selected_route: "spec-driven-development", outcome: "available", requiredSkills: ["spec-driven-development", "work-package-compiler", "test-first-verification"] },
     {
       id: "unfamiliar_repository",
