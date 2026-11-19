@@ -24,6 +24,7 @@ const DEFAULT_SKILLS = [
   "angular-implementation-architecture",
   "application-boundary-architecture",
   "architecture-decision-memory",
+  "code-visualization",
   "controlled-implementation",
   "documentation-knowledge-compiler",
   "domain-rule-ledger",
@@ -171,6 +172,7 @@ const CLAUDE_PROFILES = {
   },
   implementation: {
     skills: [
+      "code-visualization",
       "ui-ux-design",
       "operating-mode-router",
       "skill-router",
@@ -201,6 +203,7 @@ const CLAUDE_PROFILES = {
   },
   review: {
     skills: [
+      "code-visualization",
       "ui-ux-design",
       "review-router",
       "review-automated-gate",

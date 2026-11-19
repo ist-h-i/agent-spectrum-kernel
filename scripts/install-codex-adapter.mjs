@@ -150,6 +150,7 @@ const CODEX_PROFILES = {
   implementation: {
     description: "Default scoped implementation profile.",
     skills: [
+      "code-visualization",
       "ui-ux-design",
       "test-first-verification",
       "controlled-implementation",
@@ -177,6 +178,7 @@ const CODEX_PROFILES = {
   review: {
     description: "PR, diff, generated-output, and readiness review profile.",
     skills: [
+      "code-visualization",
       "ui-ux-design",
       "review-router",
       "review-automated-gate",

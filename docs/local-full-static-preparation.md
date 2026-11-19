@@ -38,7 +38,7 @@ Verification Contract `FVC-318-FULL-1`, revision 1:
 
 | Obligation | Change / required evidence |
 | --- | --- |
-| O1 / C1 | Source-candidate digests, 47 Skills / 5 prompts / 1 command and complete generated inventory bind preparation. |
+| O1 / C1 | Source-candidate digests, 47 frozen Skill entries / 5 prompts / 1 command and complete generated inventory bind preparation. |
 | O2 / C1 | Real installer materialization into a new root; no replacing or deleting existing roots. |
 | O3 / C2 | Identical public input hashes in P/K/F; no ASK in P, exact canonical Kernel in K, actual package in F. |
 | O4 / C2 | Required asset and literal relative ESM import closure; escaped/missing/unsupported dependencies block. |
