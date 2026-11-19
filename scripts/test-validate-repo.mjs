@@ -77,6 +77,7 @@ if (compactProfileResult.status !== 0) {
 }
 
 for (const [label, script] of [
+  ["Doctor evidence-boundary overlay", resolve(repoRoot, "scripts/test-doctor-overlay-evidence.mjs")],
   ["Shared fixed-entry profiles", fixedEntryProfileTestScript],
   ["Normalized adapter runtime event", adapterRuntimeEventTestScript],
   ["Cross-adapter conformance", crossAdapterConformanceTestScript],

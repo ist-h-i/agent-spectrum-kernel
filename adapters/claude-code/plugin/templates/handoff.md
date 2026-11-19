@@ -20,10 +20,11 @@ Forbidden scope:
 Expected output:
 Verification:
 Unverified evidence:
-Stop condition:
 
 Read `${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md` and `${CLAUDE_PLUGIN_ROOT}/schemas/claim-evidence-status.schema.json`. Keep claim status inline unless a closed formal trigger selects `/ai-skills:evidence-ledger`.
 
 Emit exactly one fenced JSON `Execution Envelope` using `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`.
+
+Keep stop conditions only in `Execution Envelope.stop_reason.stop_if`; do not add a separate stop-condition field.
 
 $ARGUMENTS

@@ -2,7 +2,7 @@
 name: review-pr
 description: Review a target through the fixed-entry Agent Spectrum Kernel profile.
 ---
-<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"696f1f341f460f1e89b8522480078a4a995158b306e9fe145ce3b3c5709a7da5","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"84ac8e62527a0aa682606856b04f7d217723aef09417ae5840ffc8c37bec1f3c","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Review PR
 
@@ -10,11 +10,11 @@ Entry mode is fixed to review. Primary contract: `review-router`. Apply the revi
 
 Produce exactly one `review-ai-quality` baseline result. Select additional gates only for exact observed signal IDs. Run `review-final-merge-gate` last only when `$ARGUMENTS` explicitly requests a final merge decision.
 
-- [scope] inspect repo/code/tests/docs/API; derive sufficient scope for the authorized outcome from current requirements/contracts/invariants and evidenced affected owners/providers/consumers; missing=>stop|insufficient; among sufficient options minimize maintenance burden, then diff; include cleanup and retirement required by this change; check consumers before retiring obsolete paths/state/config; retain only with a current compatibility/rollout reason and retirement condition; unrelated cleanup separate.
-- [verification] ask.verification-proof-policy@1.0.0: compact_proof|formal_verification_contract before claim; focused->risk-based; exact; trigger=>formal.
+- [scope] inspect relevant repo/code/tests/docs/API; derive sufficient scope for the authorized outcome from current requirements/contracts/invariants and evidenced affected owners/providers/consumers; for interacting observed constraints, check the highest-impact incompatible outcome at the first useful boundary; no imagined failures or extra steps for simple direct changes; missing=>stop dependent action/claim|insufficient; continue independent authorized outcomes; read-only entries do not edit; among sufficient options minimize maintenance burden, then diff; include cleanup and retirement required by this change; check consumers before retiring obsolete paths/state/config; retain only with a current compatibility/rollout reason and retirement condition; unrelated cleanup separate.
+- [verification] ask.verification-proof-policy@1.0.0: compact_proof|formal_verification_contract before claim; verify the consumer-facing requested outcome with the smallest discriminating check; derive expectations from contract/consumer/independent observable, not the tested implementation or incidental sequence; accept alternative valid mechanisms; reuse same-task proof only for unchanged artifact/inputs/environment/claim, recheck material change/contradiction/required gate; simple direct proof needs no extra tests/docs/agents; shape/sample checks are not behavioral proof; static checks are not runtime proof; unknown limits the supported claim; focused->risk-based; exact; trigger=>formal.
 - [risk_approval] exact action/risk/impact/reversibility/visibility/alternative/preconditions; unapproved=>stop; approved-only.
 - [evidence] Verified|Supported|Hypothesis|Unknown|Falsified@ask.claim-evidence-status@1.0.0; inline; closed formal=>evidence-ledger; unsupported=>downgrade.
-- [missing_evidence] unavailable|insufficient; no inference; required=>stop
+- [missing_evidence] unavailable|insufficient; no inference; required=>stop dependent action/claim; never bypass mandatory gates or approval
 - [output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.
 
 Conditional (each missing=>`capability_missing`): `formal_claim_audit_required`=>`evidence-ledger`.

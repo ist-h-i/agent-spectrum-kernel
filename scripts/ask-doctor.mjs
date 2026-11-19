@@ -935,6 +935,9 @@ function checkProjectOverlayContradictions(target, probe) {
 }
 
 function hasProjectOverlayContradiction(unit) {
+  // Here evidence is the prerequisite, not the object being waived. Match only
+  // this complete bounded statement; appended bypass instructions still warn.
+  if (/^Do not require extra tests, documents, or agents when direct evidence suffices\.?$/iu.test(unit)) return false;
   return /\b(?:skip|skipping|bypass|bypassing|disable|disabling|ignore|ignoring|not require|no need for)\b.{0,80}\b(?:risk-gate|verification|evidence-ledger|evidence)\b/i.test(unit);
 }
 
