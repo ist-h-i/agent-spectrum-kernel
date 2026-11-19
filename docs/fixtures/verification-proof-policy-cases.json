@@ -68,7 +68,7 @@
       "candidate_profile_id": "codex-verification-compact-v1",
       "candidate_prompt_name": "skill-verify.md",
       "candidate_expected_bytes": 3353,
-      "candidate_sha256": "ce34f3a52bb40c367c41d964bce941a526a8cb34ae58c3289fa0c0a0781181f1"
+      "candidate_sha256": "2d49841614dc214e2f431349b954b86528ef388f81702161534eb20adc2c97a1"
     }
   },
   "closed_sets": {

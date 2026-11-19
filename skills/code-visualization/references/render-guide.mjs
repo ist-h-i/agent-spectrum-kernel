@@ -10,11 +10,13 @@ const i18n = {
   en: { pr: 'PR change map', catch: 'Code catch-up', scope: 'Scope', base: 'Before', target: 'After', path: 'Current flow', revision: 'Revision',
     code: 'From code', executed: 'Run observed', unknown: 'Not verified', overview: 'Flow overview',
     back: 'Back to overview', gaps: 'What remains unknown', branches: 'Branches', evidence: 'Evidence', excerpt: 'Source excerpt',
-    noBefore: 'No equivalent behavior before this change.', noAfter: 'This behavior was removed.' },
+    noBefore: 'No equivalent behavior before this change.', noAfter: 'This behavior was removed.',
+    changed: 'Changed', unchanged: 'Unchanged', compare: 'Compare and inspect', inspect: 'Inspect this flow', metadata: 'Scope and commits' },
   ja: { pr: 'PRの変更マップ', catch: 'コードのキャッチアップ', scope: '対象範囲', base: '変更前', target: '変更後', path: '現在の流れ', revision: '対象コミット',
     code: 'コードから確認', executed: '実行を確認', unknown: '未確認', overview: '処理の全体像',
     back: '全体像へ戻る', gaps: '未確認の事項', branches: '分岐', evidence: '根拠', excerpt: 'ソース抜粋',
-    noBefore: '変更前に対応する挙動はありません。', noAfter: 'この挙動は削除されました。' },
+    noBefore: '変更前に対応する挙動はありません。', noAfter: 'この挙動は削除されました。',
+    changed: '変更あり', unchanged: '変更なし', compare: '前後を比較し、根拠を見る', inspect: '処理の詳細と根拠を見る', metadata: '対象範囲とコミット' },
 };
 
 function requireValue(condition, field) {
@@ -107,6 +109,14 @@ function flowLane(steps, context, side, title, absentText) {
   return `<div class="lane ${side}"><h3>${title}</h3><ol>${list(steps, 'flow steps')
     .map(step => `<li>${detail(step, context, side)}</li>`).join('')}</ol></div>`;
 }
+function preview(steps, strings, heading, absent, showDelta) {
+  if (steps === undefined) return `<div class="preview"><h4>${heading}</h4><p>${absent}</p></div>`;
+  return `<div class="preview"><h4>${heading}</h4><ol>${steps.map(step => `<li>
+    <strong>${escape(step.label)}</strong>${showDelta ? `<span class="delta ${step.delta ?? 'changed'}">${strings[step.delta ?? 'changed']}</span>` : ''}
+    ${(step.branches ?? []).map(branch => `<span class="turn">↳ ${escape(branch.label)}</span>`).join('')}
+  </li>`).join('')}</ol></div>`;
+}
+
 export function renderGuide(guide, { repositoryRoot = process.cwd() } = {}) {
   requireValue(guide && ['catch-up', 'pr'].includes(guide.mode), 'mode');
   const pr = guide.mode === 'pr';
@@ -126,30 +136,44 @@ export function renderGuide(guide, { repositoryRoot = process.cwd() } = {}) {
   const flows = list(guide.flows, 'flows');
   const unknowns = list(guide.unknowns ?? [], 'unknowns', true);
   requireValue(unknowns.every(nonEmpty), 'unknown text');
+  const overview = [];
   const map = flows.map((flow, i) => {
     requireValue(flow && nonEmpty(flow.title) && nonEmpty(flow.summary), 'flow title/summary');
     if (pr) {
       requireValue(['modified', 'added', 'removed'].includes(flow.change), 'PR flow change (modified, added or removed)');
       if (flow.change === 'added') requireValue(flow.beforeSteps === undefined && Array.isArray(flow.steps), 'added flow needs target steps only');
       if (flow.change === 'removed') requireValue(Array.isArray(flow.beforeSteps) && flow.steps === undefined, 'removed flow needs base steps only');
-      if (flow.change === 'modified') requireValue(Array.isArray(flow.beforeSteps) && Array.isArray(flow.steps), 'modified flow needs both sides');
+      if (flow.change === 'modified') {
+        requireValue(Array.isArray(flow.beforeSteps) && Array.isArray(flow.steps), 'modified flow needs both sides');
+        const steps = [...flow.beforeSteps, ...flow.steps];
+        requireValue(steps.every(step => step && ['changed', 'unchanged'].includes(step.delta)), 'modified flow steps need changed/unchanged delta');
+        requireValue(steps.some(step => step.delta === 'changed'), 'modified flow needs a changed step');
+      } else {
+        const steps = flow.steps ?? flow.beforeSteps;
+        requireValue(steps.every(step => step && step.delta === undefined), 'added or removed flow steps are all changed');
+      }
     } else requireValue(flow.beforeSteps === undefined && flow.change === undefined && Array.isArray(flow.steps), 'PR flow fields in catch-up');
-    return `<section class="flow" id="flow-${i + 1}"><h2>${escape(flow.title)}</h2>
+    const detailMarkup = `<section class="flow" id="flow-${i + 1}"><h2>${escape(flow.title)}</h2>
       <p>${escape(flow.summary)}</p><div class="lanes">
       ${pr ? flowLane(flow.beforeSteps, context, 'base', strings.base, strings.noBefore) : ''}
       ${flowLane(flow.steps, context, 'target', pr ? strings.target : strings.path, strings.noAfter)}</div>
       <a class="back" href="#overview">↑ ${strings.back}</a></section>`;
+    overview.push(`<li><h3>${escape(flow.title)}</h3><p>${escape(flow.summary)}</p>
+      <div class="previews${pr ? ' comparison' : ''}">${pr ? preview(flow.beforeSteps, strings, strings.base, strings.noBefore, true) : ''}
+      ${preview(flow.steps, strings, pr ? strings.target : strings.path, strings.noAfter, pr)}</div>
+      <a href="#flow-${i + 1}">${pr ? strings.compare : strings.inspect} →</a></li>`);
+    return detailMarkup;
   }).join('');
   return `<!doctype html><html lang="${language}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <title>${escape(guide.title)}</title><style>${STYLE}</style></head><body><main>
 <header><div class="eyebrow">${pr ? strings.pr : strings.catch}</div><h1>${escape(guide.title)}</h1>
-<p>${escape(guide.purpose)}</p><dl><dt>${strings.scope}</dt><dd>${escape(guide.scope)}</dd>
+<p>${escape(guide.purpose)}</p><details class="metadata"><summary>${strings.metadata}</summary><dl><dt>${strings.scope}</dt><dd>${escape(guide.scope)}</dd>
 ${pr ? `<dt>${strings.base}</dt><dd><code>${guide.baseRevision}</code></dd>` : ''}
-<dt>${pr ? strings.target : strings.revision}</dt><dd><code>${guide.revision}</code></dd></dl></header>
+<dt>${pr ? strings.target : strings.revision}</dt><dd><code>${guide.revision}</code></dd></dl></details></header>
 <nav id="overview" aria-labelledby="overview-heading"><h2 id="overview-heading">${strings.overview}</h2>
-<ol>${flows.map((flow, i) => `<li><a href="#flow-${i + 1}"><strong>${escape(flow.title)}</strong><span>${escape(flow.summary)}</span></a></li>`).join('')}</ol></nav>
+<ol class="flow-index">${overview.join('')}</ol></nav>
 ${map}${unknowns.length ? `<aside><h2>${strings.gaps}</h2><ul>${unknowns.map(note => `<li>${escape(note)}</li>`).join('')}</ul></aside>` : ''}
 </main></body></html>\n`;
 }
@@ -164,7 +188,9 @@ h1,h2,h3,p,dl,dd,ol { margin:0 }
 h1 { font-size:clamp(1.65rem,5vw,2.75rem); line-height:1.15; margin:.35rem 0 .6rem }
 h2 { font-size:1.35rem; margin-bottom:.38rem }
 h3 { font-size:1rem; margin-bottom:.55rem }
-p+dl { margin-top:.85rem }
+.metadata { margin-top:.65rem; background:transparent; border:0 }
+.metadata summary { padding:0; width:max-content; color:var(--accent); text-decoration:underline }
+.metadata dl { margin:.35rem 0 }
 dl { display:grid; grid-template-columns:max-content 1fr; gap:.15rem .65rem; font-size:.9rem }
 dt { color:var(--muted) }
 code { font-family:ui-monospace,monospace; font-size:.86em }
@@ -172,10 +198,27 @@ a { color:var(--accent) }
 :focus-visible { outline:3px solid #1a60c0; outline-offset:3px }
 .eyebrow { font-size:.82rem; font-weight:750; color:var(--accent) }
 nav,.flow,aside { margin-top:1.6rem }
-nav ol { padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr)); gap:.6rem; list-style:none }
-nav a { display:block; height:100%; background:white; border:1px solid var(--line); border-radius:.55rem; padding:.7rem .85rem; text-decoration:none }
-nav a strong { text-decoration:underline }
-nav a span { display:block; color:var(--ink) }
+nav .flow-index { padding:0; display:grid; gap:.65rem; list-style:none }
+.flow-index>li { background:white; border:1px solid var(--line); border-radius:.6rem; padding:.75rem .85rem }
+.flow-index h3 { margin-bottom:.25rem; color:var(--accent) }
+.flow-index a { display:inline-block; margin-top:.65rem; font-weight:700 }
+.previews { display:grid; gap:.45rem; margin-top:.55rem }
+.preview { border-inline-start:.2rem solid var(--line); padding-inline-start:.5rem }
+.preview h4 { font-size:.86rem; margin:0 0 .25rem }
+.preview ol { display:flex; align-items:stretch; gap:1.35rem; flex-wrap:wrap; list-style:none; padding:0 }
+.preview li { min-width:0; flex:1 1 9rem; position:relative; padding:.45rem .5rem; background:#f2f7f8; border:1px solid var(--line); border-radius:.35rem }
+.preview li:not(:last-child)::after { content:"→"; position:absolute; inset-inline-end:-1.15rem; inset-block-start:.4rem; color:var(--muted) }
+.delta,.turn { display:table; margin-top:.22rem; font-size:.78rem }
+.delta { color:var(--muted); border-radius:.25rem; padding:0 .28rem }
+.delta.changed { background:#d9f0ee; color:#064d46; font-weight:750 }
+.delta.unchanged { background:#e8edf0 }
+.turn { color:#704311; padding-inline-start:.3rem; border-inline-start:.12rem solid #ad8a60 }
+@media (max-width:34rem) {
+  .previews.comparison { grid-template-columns:repeat(2,minmax(0,1fr)) }
+  .preview ol { display:grid; gap:.85rem }
+  .preview li:not(:last-child)::after { content:"↓"; inset-inline-start:.65rem; inset-inline-end:auto; inset-block-start:auto; inset-block-end:-1rem }
+}
+
 .flow,aside { padding:clamp(.75rem,3vw,1.35rem); background:white; border:1px solid var(--line); border-radius:.7rem }
 aside { border-inline-start:.25rem solid #87501f }
 .lanes { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr)); gap:.75rem; margin-top:1rem }

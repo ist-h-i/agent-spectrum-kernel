@@ -56,14 +56,17 @@ test('PR has separate pinned commits and local branching controls', () => {
   guide.mode = 'pr';
   guide.baseRevision = baseRevision;
   guide.flows[0].change = 'modified';
-  guide.flows[0].beforeSteps = [step];
-  guide.flows[0].steps = [{ ...step, branches: [{ label: 'When invalid', detail: 'The rejection run was observed.', status: 'executed',
+  guide.flows[0].beforeSteps = [{ ...step, delta:'unchanged' }];
+  guide.flows[0].steps = [{ ...step, delta:'changed', branches: [{ label: 'When invalid', detail: 'The rejection run was observed.', status: 'executed',
     evidence: [{ label: 'Run log', run: 'node --test / local log run 3' }] }] }];
   const html = render(guide);
   assert.match(html, new RegExp(`/blob/${baseRevision}/`));
   assert.match(html, new RegExp(`/blob/${revision}/`));
   assert.match(html, /<details class="branch">/);
   assert.match(html, /Run observed/);
+  assert.match(html, /delta unchanged.*Unchanged/);
+  assert.match(html, /delta changed.*Changed/);
+  assert.match(html, /turn.*When invalid/);
   assert.match(html, /node --test \/ local log run 3/u);
   assert.match(html, /What remains unknown/);
 });
@@ -102,11 +105,14 @@ test('PR changed, added and removed behaviors cannot silently omit a side', () =
   assert.throws(() => render(guide), /PR flow change/);
   flow.change='modified';
   assert.throws(() => render(guide), /needs both sides/);
-  flow.beforeSteps=[{...step,evidence:[{...file,at:'target'}]}];
+  flow.beforeSteps=[{...step,delta:'unchanged',evidence:[{...file,at:'target'}]}];
+  assert.throws(() => render(guide), /changed\/unchanged delta/);
+  flow.steps=[{...step,delta:'changed'}];
   assert.throws(() => render(guide), /evidence requires a file on its own side/);
   flow.change='added';
   assert.throws(() => render(guide), /target steps only/);
   delete flow.beforeSteps;
+  flow.steps=[step];
   assert.match(render(guide),/No equivalent behavior before this change/);
   flow.change='removed';
   flow.beforeSteps=[step];
