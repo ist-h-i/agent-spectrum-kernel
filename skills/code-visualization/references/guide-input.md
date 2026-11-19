@@ -29,6 +29,8 @@ Each flow's `visual` has:
 | `cases` | Alternatives with `label` and an ordered array of object IDs for each existing version (`base`, `target`). Compare the same input object on both sides. Include each diagrammed object in at least one case. |
 | `overrides` | Optional in a case: use an object ID as the key and a short `label`, `caption`, a `state` (`empty` or `blocked`), or `items` (a list of this object's existing identity IDs to show in that case). An `empty` object cannot appear on that case's path. Use a returned result on the path, a label and `items: []` for a valid zero outcome instead. |
 
+Show when material enters the flow: a search card contains the search term, while matched records arrive at a later gateway response. Do not put returned identities on the input just to make the same object appear twice. A confirmed code path that rejects missing configuration is still `code`; mark only actual deployment availability or other unobserved behavior as `unknown`.
+
 Use a few meaningful cases. The renderer limits one scene to 16 objects over 8 stages, 8 cases, and up to 6 identity marks per object so graphs stay readable. Split distinct questions into separate flows instead of packing every call into one diagram. Keep names brief and inspect the static view before adding replay; participants should distinguish the outcome by shape, route, and identity, not by reading a paragraph or relying on color.
 
 For example, for a single committed path with two evidence steps:

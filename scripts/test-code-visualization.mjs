@@ -177,28 +177,35 @@ test('another domain can model one unchanged identity, an excluded item, a zero 
   const guide=fixture(), flow=guide.flows[0];
   flow.title='Plan a library hold';
   flow.steps=[
-    {...step,label:'Reader card'},
+    {...step,label:'Search card'},
+    {...step,label:'Gateway response'},
     {...step,label:'Build hold count'},
-    {label:'Library service unavailable',detail:'The remote availability check was not observed.',status:'unknown'},
+    {...step,label:'Gateway not configured'},
+    {label:'Live availability',detail:'The deployment or remote result was not observed.',status:'unknown'},
   ];
   const ID={id:'hold',label:'H-544'};
   flow.visual={nodes:[
-    object('card',0,[reference()],'shelf',{items:[ID,{id:'other',label:'H-555',excluded:true}]}),
-    object('count',1,[reference('target',1)],'result',{items:[ID]}),
-    object('unavailable',1,[reference('target',2)],'stop',{track:1}),
+    object('card',0,[reference()],'request'),
+    object('gateway',1,[reference('target',1)],'service',{items:[ID,{id:'other',label:'H-555',excluded:true}]}),
+    object('count',2,[reference('target',2)],'result',{items:[ID]}),
+    object('not-configured',1,[reference('target',3)],'stop',{track:-1}),
+    object('unverified',2,[reference('target',4)],'stop',{track:1}),
   ],cases:[
-    {label:'Available',target:['card','count']},
-    {label:'Zero matches',target:['card','count'],overrides:{count:{caption:'0 matches',items:[]}}},
-    {label:'Unavailable',target:['card','unavailable'],overrides:{count:{state:'empty',caption:'No result returned'}}},
+    {label:'Available',target:['card','gateway','count']},
+    {label:'Zero matches',target:['card','gateway','count'],overrides:{count:{caption:'0 matches',items:[]}}},
+    {label:'Not configured',target:['card','not-configured'],overrides:{count:{state:'empty',caption:'No result returned'}}},
+    {label:'Actual deployment unknown',target:['card','gateway','unverified'],overrides:{gateway:{items:[]},count:{state:'empty',caption:'No observed result'}}},
   ]};
   const c=payload(render(guide)).scenes[0];
-  assert.equal(c.nodes[0].items[0].id,c.nodes[1].items[0].id);
-  assert.equal(c.nodes[0].items[1].excluded,true);
+  assert.equal(c.nodes[0].items.length,0);
+  assert.equal(c.nodes[1].items[0].id,c.nodes[2].items[0].id);
+  assert.equal(c.nodes[1].items[1].excluded,true);
   assert.equal(c.cases[1].overrides[0].caption,'0 matches');
   assert.deepEqual(c.cases[1].overrides[0].items,[]);
   assert.equal(c.cases[2].overrides[0].state,'empty');
-  assert.equal(c.nodes[2].refs[0].status,'unknown');
-  flow.visual.nodes[1].items[0]={id:'hold',label:'H-777'};
+  assert.equal(c.nodes[3].refs[0].status,'code');
+  assert.equal(c.nodes[4].refs[0].status,'unknown');
+  flow.visual.nodes[2].items[0]={id:'hold',label:'H-777'};
   assert.throws(()=>render(guide),/changes its label/);
 });
 test('CLI validates before writing and never overwrites an existing output', (t) => {

@@ -203,12 +203,13 @@ ${pr?`<dt>${strings.base}</dt><dd><code>${guide.baseRevision}</code></dd>`:''}
 <div class="workspace">
 <section class="board" aria-label="${strings.overview}"><header><div class="case-wrap"><span class="eyebrow">${strings.case}</span>
 <div class="cases" id="visual-cases" role="group" aria-label="${strings.case}"></div></div></header>
-<div id="visual-stage"><svg id="visual-map" role="group" aria-labelledby="visual-title" xmlns="http://www.w3.org/2000/svg"></svg></div>
-<div class="legend">${legend(strings,pr)}</div><p class="absent" id="visual-absent" hidden></p>
-<footer><div class="transport" role="group" aria-label="${strings.position}">
+<div class="control-row"><div class="transport" role="group" aria-label="${strings.position}">
 <button type="button" id="visual-play" aria-pressed="false">${strings.play}</button>
 <button type="button" id="visual-step">${strings.step}</button><button type="button" id="visual-reset">${strings.reset}</button></div>
-<div class="progress" id="visual-progress" aria-label="${strings.position}"></div></footer></section>
+<div class="progress" id="visual-progress" aria-label="${strings.position}"></div></div>
+<div id="visual-stage"><svg id="visual-map" role="group" aria-labelledby="visual-title" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div class="legend">${legend(strings,pr)}</div><p class="absent" id="visual-absent" hidden></p>
+</section>
 <aside class="detail" id="visual-detail" aria-labelledby="detail-title"><header><h2 id="detail-title" tabindex="-1">${strings.evidence}</h2>
 <button id="detail-close" type="button" hidden>${strings.close}</button></header>
 <div class="detail-content"><p id="detail-default">${strings.hint}</p><div id="visual-evidence"></div></div></aside></div>
