@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v4-continuity",
   "id": "ch02-reservation-delivery-recovery",
-  "input_digest": "sha256:ccf07b766dca7e7916964d9ba1caaa15c07d572446c07e91dfc5c09fe9ecb0b6",
+  "input_digest": "sha256:c6c1c42d10889d32e01f681e230129f231182e4dea69932337eb8cc7e3fa7670",
   "files": [
     {
       "path": "harness/clients.mjs",
@@ -70,8 +70,8 @@
     },
     {
       "path": "spec/scenario-tests.md",
-      "sha256": "59035a5ec0ef0835265ffa0f0e5511934165bb33c83f7f36cd5e577f178dff1e",
-      "bytes": 2973
+      "sha256": "89b2aa4fb1a9bde9a53160241311fe6efc44fdbf5929f706ce8fde7e250589bd",
+      "bytes": 3760
     },
     {
       "path": "src/cancellation.mjs",
@@ -105,8 +105,8 @@
     },
     {
       "path": "task.md",
-      "sha256": "41f57c690b428f843c3596dcb918cb73665b18d3e1435096b08fbb7c88997015",
-      "bytes": 1309
+      "sha256": "41249bb2688b7d39d945f33aa86ab1446a70af191761cc94f2588b7be844c53c",
+      "bytes": 1405
     },
     {
       "path": "test/scenario-public.test.mjs",
