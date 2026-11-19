@@ -33,13 +33,15 @@ function gitEvidence(repositoryRoot) {
   const type = commit => readGit(['cat-file', '-t', commit]).toString('utf8').trim();
   const env = { ...process.env, GIT_NO_REPLACE_OBJECTS: '1', GIT_NO_LAZY_FETCH: '1' };
   const cache = new Map();
+  let root = repositoryRoot;
   function readGit(args) {
-    const result = spawnSync('git', ['--no-pager', '-C', repositoryRoot, ...args], {
+    const result = spawnSync('git', ['--no-pager', '-C', root, ...args], {
       env, maxBuffer: 1024 * 1024, timeout: 5000,
     });
     requireValue(result.status === 0 && !result.error, 'Git evidence unavailable or larger than 1 MiB');
     return result.stdout;
   }
+  root = readGit(['rev-parse', '--show-toplevel']).toString('utf8').replace(/\r?\n$/u, '');
   return {
     commit(commit) { requireValue(type(commit) === 'commit', 'revision does not denote a Git commit'); },
     blob(commit, path) {

@@ -51,6 +51,10 @@ test('catch-up works without a PR and points to exact evidence', () => {
   assert.match(offline, /src\/b &amp; c.ts:L3-L5/);
   assert.match(offline, /3  &lt;example&gt; &#39;quoted&#39; &amp; text/);
 });
+test('a source directory inside the checkout uses repository-relative locators', () => {
+  const fromSubdirectory = renderGuide(fixture(), { repositoryRoot:join(repositoryRoot,'src') });
+  assert.equal(fromSubdirectory,render(fixture()));
+});
 test('PR has separate pinned commits and local branching controls', () => {
   const guide = fixture();
   guide.mode = 'pr';
