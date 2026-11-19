@@ -15,7 +15,7 @@
     "scope": {
       "source_refs": ["AGENTS.md", "skills/scope-control/SKILL.md"],
       "required_inputs": ["workspace", "nearby_implementation", "tests", "docs", "public_contract"],
-      "missing_input_behavior": "stop_or_insufficient_evidence",
+      "missing_input_behavior": "stop_dependent_action_or_claim_continue_independent_authorized",
       "change_boundary": "sufficient_scope_then_maintenance_burden_then_diff",
       "cleanup_boundary": "task_required_cleanup_and_retirement_inside_unrelated_separate"
     },
@@ -25,6 +25,9 @@
       "proof_policy_schema_ref": "schemas/verification-proof-policy.schema.json",
       "proof_path_selected_before_implementation_claim": true,
       "focused_check_first": true,
+      "consumer_outcome_check_required": true,
+      "smallest_discriminating_check_required": true,
+      "proof_boundaries_required": true,
       "broader_checks_proportional_to_risk": true,
       "exact_results_required": true,
       "compact_to_formal_upgrade_required": true
@@ -55,7 +58,9 @@
       "source_refs": ["docs/execution-envelope-contract.md", "skills/evidence-ledger/SKILL.md"],
       "allowed_statuses": ["unavailable", "insufficient_evidence"],
       "inference": "prohibited",
-      "stop_when_required": true
+      "stop_when_required": true,
+      "stop_scope": "dependent_action_or_claim",
+      "continue_independent_authorized_outcomes": true
     },
     "output": {
       "source_refs": ["docs/execution-envelope-contract.md"],

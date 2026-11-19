@@ -45,11 +45,11 @@ for (const id of CANONICAL_PRIMARY_FIXTURE_IDS) test(`${id}: original public com
   const recipe = buildPrimaryFixtureRecipe(id), tree = source(id);
   const metadata=readFileSync(join(root,"benchmarks/fixtures/checkpoint-b2",id,"metadata.json"));
   const descriptor=kernelPrinciplesV2FixtureDescriptor(id,tree.get("task.md").bytes,metadata);
-  assert.equal(descriptor.task_class,recipe.runner_task_class);assert.equal(principlesV2Capability(descriptor).status,"available");
+  assert.equal(descriptor.task_class,recipe.runner_task_class);assert.equal(principlesV2Capability(descriptor,{metadataBytes:metadata}).status,"available");
   assert.throws(()=>kernelPrinciplesV2FixtureDescriptor(id,Buffer.from("drift"),metadata));
   assert.throws(()=>kernelPrinciplesV2FixtureDescriptor(id,tree.get("task.md").bytes,Buffer.from("{}")));
-  const changedDescriptor=structuredClone(descriptor);changedDescriptor.task_class="risk-gated";assert.throws(()=>principlesV2Capability(changedDescriptor));
-  const closure=kernelPrinciplesV2DescriptorSourcePaths(id);assert.equal(closure[0],"scripts/kernel-principles-v2.mjs");assert.ok([3,4].includes(closure.length));
+  const changedDescriptor=structuredClone(descriptor);changedDescriptor.task_class="risk-gated";assert.throws(()=>principlesV2Capability(changedDescriptor,{metadataBytes:metadata}));
+  const closure=kernelPrinciplesV2DescriptorSourcePaths(id);assert.equal(closure[0],"scripts/kernel-principles-v2.mjs");assert.ok([3,4,6].includes(closure.length));
   const closed = validatePrimaryFixtureRecipe(recipe, tree, { taskBytes: tree.get("task.md").bytes,
     mutablePaths: recipe.mutable_paths, taskClass: recipe.runner_task_class });
   assert.equal(closed.fixture_id, id);

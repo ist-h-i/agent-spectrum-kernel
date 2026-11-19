@@ -85,7 +85,7 @@ Before editing, inspect:
 
 3. Choose and implement the smallest sufficient change.
 
-Before minimizing the diff, identify the current invariants, owners, and affected providers/consumers that must be covered together. Inspect runtime or configuration connections when relevant. Use `scope-control` when the sufficient boundary is unclear and `application-boundary-architecture` when boundary mechanics need a decision; reuse decisions already made upstream.
+Before minimizing the diff, identify current invariants, owners, and affected providers/consumers that must be covered together. Inspect runtime or configuration connections when relevant. If observed constraints interact and plausible implementations would differ, identify the highest-impact incompatible outcome and the observable contract that rules it out. Test that distinction at the first useful boundary, before broad implementation when feasible. Do not expand scope to imagined failures or add analysis to a simple change with sufficient direct evidence. Use `scope-control` for an unclear boundary or `application-boundary-architecture` for an unresolved boundary decision; reuse decisions already made upstream.
 
 For requests with multiple deliverables or constraints, identify each required outcome and its affected components before editing. During final diff inspection, check each outcome against the actual change and its evidence; finish authorized independent work even if another outcome is blocked. Record any unmet outcome and its specific blocker in the existing contract or envelope, without creating a separate report.
 

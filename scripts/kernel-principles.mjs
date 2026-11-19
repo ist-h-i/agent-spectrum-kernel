@@ -3,14 +3,19 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 
 export const KERNEL_PRINCIPLES_ID = "kernel_principles_v1";
-export const KERNEL_PRINCIPLES_SOURCE_DIGEST = "sha256:8d67bf4adc14a3887f0b2a6707c0467fc099e8d71e738398a8e1367827517c51";
+export const KERNEL_PRINCIPLES_SOURCE_DIGEST = "sha256:6e28a7f89a1fb1f2454014f3ef38b89c076de9a68e9ec63b340655bebf7ed9f3";
 // Retain the reviewed 5f36081 source for replay; new sources never inherit a seal.
 const reviewedSourceRevisions = new Map([
   ["sha256:173b0ae1cbb3a92cb434b60c5d233dbd0e2b68b75be9732818d8b53cbb3b5d6c", 1],
   ["sha256:9246ccde37219850da235544c158100efd0b473112ad59c7b692fc930e4538ee", 2],
   // Reviewed addition: section 7.6 is opt-in persistence procedure, not a
   // dependency-free engineering principle. Keep its commands out of this condition.
-  [KERNEL_PRINCIPLES_SOURCE_DIGEST, 3],
+  ["sha256:8d67bf4adc14a3887f0b2a6707c0467fc099e8d71e738398a8e1367827517c51", 3],
+  // New source revision: selective investigation, scoped blockers and outcome checks.
+  // Extraction boundaries are unchanged; historical sources retain their own identities.
+  ["sha256:b32619ee2ec91361577956476a84588904e021b14ef0d77b081a739535ab1481", 4],
+  // Reviewed independent expectations, bounded evidence reuse and simple-task proportionality.
+  [KERNEL_PRINCIPLES_SOURCE_DIGEST, 5],
 ]);
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 

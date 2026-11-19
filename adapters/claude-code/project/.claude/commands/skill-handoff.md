@@ -19,8 +19,9 @@ Forbidden scope:
 Expected output:
 Verification:
 Unverified evidence:
-Stop condition:
 
-Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`; for non-trivial continuation include bounded `docs/agent-session-state-contract.md` fields.
+Emit exactly one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`; for non-trivial continuation include bounded `docs/agent-session-state-contract.md` fields.
+
+Keep stop conditions only in `Execution Envelope.stop_reason.stop_if`; do not add a separate stop-condition field.
 
 $ARGUMENTS

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import "./test-fixed-entry-outcome-controls.mjs";
+import "./test-claude-handoff-envelope.mjs";
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,7 +34,9 @@ function assertSufficientScope(content, label) {
     ["consumer checks before retiring paths, state or configuration", /check consumers before retiring obsolete paths\/state\/config/u],
     ["justified temporary retention with a retirement condition", /retain only with a current compatibility\/rollout reason and retirement condition/u],
     ["unrelated cleanup stays separate", /unrelated cleanup separate/u],
-    ["missing-input stop is retained", /missing=>stop\|insufficient/u],
+    ["read-only boundary", /read-only entries do not edit/u],
+    ["independent authorized work continues", /continue independent authorized outcomes/u],
+    ["missing-input stop is retained", /missing=>stop dependent action\/claim\|insufficient/u],
   ]) assert.match(scope, clause, `${label} lost ${meaning}`);
   assert.doesNotMatch(scope, /minimal diff; cleanup separate/u, `${label} must not restore diff-first scope`);
 }
@@ -63,7 +67,7 @@ for (const [adapter, plan] of [["Claude", claude], ["Codex", codex]]) {
       ["include cleanup and retirement required by this change", "defer all cleanup and retain old paths"],
       ["check consumers before retiring obsolete paths/state/config", "retire old paths/state/config without checking consumers"],
       ["retain only with a current compatibility/rollout reason and retirement condition", "retain for possible future use without a retirement condition"],
-      ["missing=>stop|insufficient", "missing=>guess"],
+      ["missing=>stop dependent action/claim|insufficient", "missing=>guess"],
     ]) {
       const weakened = artifact.content.replace(before, after);
       assert.notEqual(weakened, artifact.content, `${label} semantic mutation must change the prompt`);
