@@ -61,7 +61,13 @@ function inspectClosed({root,profilePath,configPath,preEvaluation=false,reselect
  const answers=messages.filter(e=>{
   assert.equal(typeof e.item.text,'string');
   try{parseJsonRejectDuplicateKeys(e.item.text,'retained authoring answer candidate');return true;}
-  catch(error){assert.ok(!/^[\s]*[\[{]/u.test(e.item.text),'ambiguous structured authoring message');return false;}
+  catch{
+   // An entire JSON fence is ambiguous too. A code example inside otherwise
+   // ordinary progress prose is not a competing structured message.
+   const fence=/^\x60{3}(json)?[ \t]*\r?\n([\s\S]*?)\r?\n\x60{3}[ \t]*$/iu.exec(e.item.text.trim());
+   assert.ok(!/^\s*[\[{]/u.test(e.item.text)&&!fence?.[1]&&!(fence&&/^\s*[\[{]/u.test(fence[2])),'ambiguous structured authoring message');
+   return false;
+  }
  });
  assert.equal(answers.length,1,'one unambiguous retained authoring answer required');
  assert.equal(answers[0],messages.at(-1),'retained answer must be the final agent message');

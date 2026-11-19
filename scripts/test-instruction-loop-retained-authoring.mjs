@@ -395,7 +395,7 @@ function transcriptMessages(f,texts){
  const text=events.map(JSON.stringify).join('\n')+'\n';f.execution.stdout={text,total_bytes:Buffer.byteLength(text),truncated:false};writeFileSync(f.executionPath,JSON.stringify(f.execution));
 }
 test('progress commentary before one terminal structured answer does not force authoring replay',t=>{
- const f=fixture(t,{bound:true});transcriptMessages(f,['I will inspect the constraints.','The scope is now clear.',JSON.stringify(f.response)]);
+ const f=fixture(t,{bound:true});transcriptMessages(f,['I will inspect the constraints.','The scope is now clear. Example only:\n```json\n{"example":true}\n```',JSON.stringify(f.response)]);
  const original=readFileSync(f.executionPath),before=readRunJournal(f.root).previous;
  const got=inspectClosedFullAuthoring(f);assert.deepEqual(got.response,f.response);
  const prepared=prepareRetainedFullAuthoringConfiguration(f);assert.equal(prepared.models_started,false);assert.equal(prepared.approval_carried_forward,false);
@@ -406,5 +406,8 @@ for(const [name,texts]of [
  ['duplicate structured answers',r=>[JSON.stringify(r),JSON.stringify(r)]],
  ['commentary after structured answer',r=>[JSON.stringify(r),'And another thought.']],
  ['malformed earlier structured answer',r=>['{"changes":',JSON.stringify(r)]],
+ ['earlier JSON-fenced answer',r=>['```json\n'+JSON.stringify({changes:[]})+'\n```',JSON.stringify(r)]],
+ ['earlier unlabeled fenced answer',r=>['```\n'+JSON.stringify({changes:[]})+'\n```',JSON.stringify(r)]],
+ ['earlier malformed JSON-fenced answer',r=>['```JSON\r\n{"changes":\r\n```',JSON.stringify(r)]],
  ['answer with duplicate keys',r=>['{"changes":[],"changes":[]}',JSON.stringify(r)]]
 ])test('retained authoring rejects '+name,t=>{const f=fixture(t);transcriptMessages(f,texts(f.response));assert.throws(()=>inspectClosedFullAuthoring(f));assert.equal(existsSync(f.outputRoot),false);});
