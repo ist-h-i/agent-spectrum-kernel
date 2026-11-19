@@ -39,7 +39,7 @@ supplement. It classifies conditional context templates, example fixtures,
 instruction contracts, contract schemas and runtime dependencies. All are copied
 as exact source bytes, including the recursive dependencies; none is excluded
 from closure. Empty/template knowledge does not become initialized evidence.
-The installer-generated core/default and 47 Skills / 5 prompts / 1 command are
+The installer-generated core/default and 47 frozen Skill entries / 5 prompts / 1 command are
 preserved. This is a declared evaluation distribution with supplemental assets,
 not a change to the global installer or a claim that the old candidate closed.
 
@@ -105,7 +105,7 @@ security proof.
 
 The original inventory stays at 111 source paths / 159 installed ASK files. The
 supplement adds 40 exact source assets, giving 199 ASK files plus 13 common inputs
-(212 in Full), while retaining 47 Skills / 5 prompts / 1 command. Original
+(212 in Full), while retaining 47 frozen Skill entries / 5 prompts / 1 command. Original
 `prepare` still returns blocked; only explicit `prepare-complete` closes the
 bounded literal check. Computed I/O and semantic completeness remain unknown.
 

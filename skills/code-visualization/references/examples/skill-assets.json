@@ -1,0 +1,257 @@
+{
+  "language": "ja",
+  "githubRepository": "ist-h-i/agent-spectrum-kernel",
+  "flows": [
+    {
+      "title": "スキルのファイルを集める",
+      "summary": "元ファイルの場所は変わらず、対象の名前とパスを目録にします。",
+      "steps": [
+        {
+          "label": "スキルの棚",
+          "detail": "SKILL.mdとreferences/配下だけを選びます。直下のprivate-notes.mdは棚に残ります。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "対象ファイルの選び方",
+              "path": "scripts/skill-assets.mjs",
+              "startLine": 38,
+              "endLine": 45
+            },
+            {
+              "label": "通常ケースの仕様を確認するテスト",
+              "path": "scripts/test-skill-assets.mjs",
+              "startLine": 21,
+              "endLine": 31
+            }
+          ]
+        },
+        {
+          "label": "対象を選ぶ",
+          "detail": "名前を重複排除し、対象フォルダとファイルの種類を調べます。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "再帰探索と重複排除",
+              "path": "scripts/skill-assets.mjs",
+              "startLine": 16,
+              "endLine": 29
+            }
+          ]
+        },
+        {
+          "label": "文字を検査",
+          "detail": "ファイルを厳密なUTF-8として読みます。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "UTF-8として読み、項目を加える",
+              "path": "scripts/skill-assets.mjs",
+              "startLine": 30,
+              "endLine": 36
+            }
+          ]
+        },
+        {
+          "label": "名前の目録",
+          "detail": "3ファイルの名前とパスが目録に入ります。原本の移動もインストールも行いません。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "目録を返す",
+              "path": "scripts/skill-assets.mjs",
+              "startLine": 30,
+              "endLine": 47
+            },
+            {
+              "label": "3件の出力を確認するテスト",
+              "path": "scripts/test-skill-assets.mjs",
+              "startLine": 21,
+              "endLine": 31
+            }
+          ]
+        },
+        {
+          "label": "ここで中断",
+          "detail": "候補にリンクや不正文字があれば探索を中断し、途中まで集めた目録は返しません。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "リンクと不正な文字を拒否",
+              "path": "scripts/skill-assets.mjs",
+              "startLine": 20,
+              "endLine": 36
+            },
+            {
+              "label": "拒否のテスト",
+              "path": "scripts/test-skill-assets.mjs",
+              "startLine": 62,
+              "endLine": 78
+            }
+          ]
+        }
+      ],
+      "visual": {
+        "nodes": [
+          {
+            "id": "shelf",
+            "label": "スキルの棚",
+            "caption": "4ファイル",
+            "shape": "shelf",
+            "stage": 0,
+            "track": 0,
+            "refs": [
+              {
+                "side": "target",
+                "step": 0
+              }
+            ],
+            "items": [
+              {
+                "id": "skill",
+                "label": "SKILL.md"
+              },
+              {
+                "id": "nested",
+                "label": "nested/a.md"
+              },
+              {
+                "id": "z-file",
+                "label": "z.md"
+              },
+              {
+                "id": "notes",
+                "label": "private-notes.md",
+                "excluded": true
+              }
+            ]
+          },
+          {
+            "id": "select",
+            "label": "対象を選ぶ",
+            "caption": "SKILL.md・references/",
+            "shape": "route",
+            "stage": 1,
+            "track": 0,
+            "refs": [
+              {
+                "side": "target",
+                "step": 1
+              }
+            ]
+          },
+          {
+            "id": "decode",
+            "label": "文字の検査",
+            "caption": "UTF-8",
+            "shape": "gate",
+            "stage": 2,
+            "track": 0,
+            "refs": [
+              {
+                "side": "target",
+                "step": 2
+              }
+            ]
+          },
+          {
+            "id": "catalog",
+            "label": "名前の目録",
+            "caption": "3項目",
+            "shape": "list",
+            "stage": 3,
+            "track": 0,
+            "refs": [
+              {
+                "side": "target",
+                "step": 3
+              }
+            ],
+            "items": [
+              {
+                "id": "skill",
+                "label": "SKILL.md"
+              },
+              {
+                "id": "nested",
+                "label": "nested/a.md"
+              },
+              {
+                "id": "z-file",
+                "label": "z.md"
+              }
+            ]
+          },
+          {
+            "id": "stop",
+            "label": "中断",
+            "caption": "返らない",
+            "shape": "stop",
+            "stage": 2,
+            "track": 1,
+            "refs": [
+              {
+                "side": "target",
+                "step": 4
+              }
+            ]
+          }
+        ],
+        "cases": [
+          {
+            "label": "通常の棚",
+            "target": [
+              "shelf",
+              "select",
+              "decode",
+              "catalog"
+            ]
+          },
+          {
+            "label": "リンクが混在",
+            "target": [
+              "shelf",
+              "select",
+              "stop"
+            ],
+            "overrides": {
+              "catalog": {
+                "state": "empty",
+                "label": "目録なし",
+                "caption": "返らない"
+              }
+            }
+          },
+          {
+            "label": "不正UTF-8",
+            "target": [
+              "shelf",
+              "select",
+              "decode",
+              "stop"
+            ],
+            "overrides": {
+              "catalog": {
+                "state": "empty",
+                "label": "目録なし",
+                "caption": "返らない"
+              },
+              "decode": {
+                "state": "blocked",
+                "label": "文字の検査",
+                "caption": "不正なUTF-8"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "mode": "catch-up",
+  "revision": "210267ad3ddecba787b3e9abb886ed67c8abbcfb",
+  "title": "ファイルが、一覧になるまで",
+  "purpose": "スキルの資産収集｜差分なし",
+  "scope": "既存実装と内容の例。配布・インストール処理は対象外。",
+  "unknowns": [
+    "参照したテストは検証項目を示します。この図のためには実行していません。"
+  ]
+}

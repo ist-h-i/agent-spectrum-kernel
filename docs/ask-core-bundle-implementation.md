@@ -31,7 +31,7 @@ three-arm effectiveness. Completion receipts will bind the submitted head.
 CUSTOM_INSTRUCTIONS.md. Core capabilities are a closed separate inventory,
 not pretend selected Skills. Core installs 34 assets and its new state file,
 with no Skill directory. Full installs 203 assets and its new state file,
-retaining all 47 Skills, 5 prompts and 1 command from the actual existing Node
+retaining all 47 frozen Skill entries, 5 prompts and 1 command from the actual existing Node
 installers plus all 40 previously bounded Full supplement assets.
 
 The generated manifest pins raw source bytes, projected bytes, version, complete
