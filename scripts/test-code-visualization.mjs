@@ -192,7 +192,7 @@ test('another domain can model one unchanged identity, an excluded item, a zero 
     object('unverified',2,[reference('target',4)],'stop',{track:1}),
   ],cases:[
     {label:'Available',target:['card','gateway','count']},
-    {label:'Zero matches',target:['card','gateway','count'],overrides:{count:{caption:'0 matches',items:[]}}},
+    {label:'Zero matches',target:['card','gateway','count'],overrides:{gateway:{items:['other']},count:{caption:'0 matches',items:[]}}},
     {label:'Not configured',target:['card','not-configured'],overrides:{count:{state:'empty',caption:'No result returned'}}},
     {label:'Actual deployment unknown',target:['card','gateway','unverified'],overrides:{gateway:{items:[]},count:{state:'empty',caption:'No observed result'}}},
   ]};
@@ -200,8 +200,10 @@ test('another domain can model one unchanged identity, an excluded item, a zero 
   assert.equal(c.nodes[0].items.length,0);
   assert.equal(c.nodes[1].items[0].id,c.nodes[2].items[0].id);
   assert.equal(c.nodes[1].items[1].excluded,true);
-  assert.equal(c.cases[1].overrides[0].caption,'0 matches');
-  assert.deepEqual(c.cases[1].overrides[0].items,[]);
+  assert.deepEqual(c.cases[1].overrides.find(item=>item.id==='gateway').items,[{id:'other',label:'H-555',excluded:true}]);
+  const zero=c.cases[1].overrides.find(item=>item.id==='count');
+  assert.equal(zero.caption,'0 matches');
+  assert.deepEqual(zero.items,[]);
   assert.equal(c.cases[2].overrides[0].state,'empty');
   assert.equal(c.nodes[3].refs[0].status,'code');
   assert.equal(c.nodes[4].refs[0].status,'unknown');
