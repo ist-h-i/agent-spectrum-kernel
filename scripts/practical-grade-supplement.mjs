@@ -1,6 +1,6 @@
 // Opt-in, retained-source verification. Original execution records stay immutable.
 import assert from 'node:assert/strict';
-import {existsSync,mkdirSync,readdirSync,realpathSync} from 'node:fs';
+import {existsSync,lstatSync,mkdirSync,readdirSync,realpathSync} from 'node:fs';
 import {basename,dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {canonicalDigest,readJsonFileStrict,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
@@ -37,6 +37,39 @@ function coordinatorRoots(root,c){
  assert.equal(s?.outputs?.select?.practical_root,root,'foreign parent selection');assert.ok(same(s.outputs.select.practical_runtime,c.original_runtime));
  const parents=[operation,cycle].sort();if(c.coordinator_roots!==undefined)assert.ok(same([...c.coordinator_roots].sort(),parents),'parent roots must exactly match bound operation');return parents;
 }
+// Remote-provider closure is inapplicable only to a positively bound model-free grader.
+// Unknown definitions, changed pins, incomplete local processes, and model graders stay closed.
+function modelFreeGradeClosed(root,parents,state,job,phase){
+ try{
+  assert.equal(phase?.ready_for_next_root,true);assert.equal(phase.process_group_closed,true);
+  assert.equal(phase.provider_terminal_confirmed,null);
+  assert.equal(phase.exit_code,0);assert.equal(phase.signal,null);assert.equal(phase.timed_out,false);
+  const cycle=parents.map(p=>readRunJournal(p).state).find(s=>s.outputs?.select?.practical_root===root);
+  const runtime=cycle?.outputs?.select?.practical_runtime;assert.equal(canonicalDigest(runtime),state.plan.runtime_digest);
+  const command=runtime.commands.trial;assert.equal(basename(command.argv[1]),'practical-evaluation-worker.mjs');
+  assert.ok(command.pins.some(p=>p.path===command.argv[1]),'worker executable pin required');
+  for(const p of command.pins)verifyRef({path:p.path,digest:p.digest});
+  const workerRef={path:command.argv[2],digest:command.argv[3]};assert.ok(command.pins.some(p=>same(p,workerRef)));
+  const worker=checkedRef(workerRef),grader=worker.cases[job.input.row.case_id]?.grader;
+  assert.equal(grader?.model_calls,false);for(const p of grader.pins)verifyRef({path:p.path,digest:p.digest});
+  const directory=join(root,'jobs',canonicalDigest(job).slice(7));
+  assert.equal(json(join(directory,'grade-started.json')).command_digest,canonicalDigest(grader));
+  assert.ok(same(json(join(directory,'grade-completion.json')),phase));return true;
+ }catch{return false;}
+}
+function assertOriginalGradeClosed(root,parents,state,job,output){
+ const issue='original grade closure unresolved';
+ assert.ok(output&&Object.hasOwn(output,'grade'),issue);
+ if(output.grade!==null){
+  assert.ok(typeof output.grade==='object'&&!Array.isArray(output.grade),issue);
+  assert.ok(closed(output.grade)||modelFreeGradeClosed(root,parents,state,job,output.grade),issue);
+  return;
+ }
+ const directory=join(root,'jobs',canonicalDigest(job).slice(7));
+ assertNoSymlinkPathSegments(directory,'original grade evidence');
+ for(const receipt of ['grade-started.json','grade-completion.json'])
+  assert.equal(lstatSync(join(directory,receipt),{throwIfNoEntry:false}),undefined,'original grade closure unresolved: null phase contradicts grading receipt');
+}
 function quiescent(root,parents,{held=false,allowOwnedCoordinatorLocks=false}={}){
  const h=readRunJournal(root),s=h.state;assert.ok(s&&s.status==='completed'&&s.active===null&&!s.recovery,'original evaluation is not completed/quiescent');
  assert.ok(!s.suspended&&!s.report?.execution_suspended,'completed evaluation contains suspended execution');
@@ -46,7 +79,7 @@ function quiescent(root,parents,{held=false,allowOwnedCoordinatorLocks=false}={}
  const isolated=(s.isolated_grade_continuations??[]).map(reference=>validateIsolatedGradeContinuation(reference,{root,state:s,checkProcesses:true}));
  const exceptedGrade=d=>isolated.some(v=>canonicalDigest(v.attempt.job)===d);
  const exceptedTrial=d=>exceptions.some(c=>c.original_job_digest===d),exceptedAssessor=d=>exceptions.some(c=>c.original_assessor_job_digest===d);
- for(const a of s.attempts){if(exceptedTrial(canonicalDigest(a.job)))continue;assert.ok(closed(a.result.output?.task),'original Task closure unresolved');if(!exceptedGrade(canonicalDigest(a.job))){assert.equal(a.result.output?.ready_for_next_root,true,'original trial completion unresolved');if(a.result.output?.grade)assert.ok(closed(a.result.output.grade),'original grade closure unresolved');}}
+ for(const a of s.attempts){if(exceptedTrial(canonicalDigest(a.job)))continue;assert.ok(closed(a.result.output?.task),'original Task closure unresolved');if(!exceptedGrade(canonicalDigest(a.job))){assert.equal(a.result.output?.ready_for_next_root,true,'original trial completion unresolved');assertOriginalGradeClosed(root,parents,s,a.job,a.result.output);}}
  const jobs=join(root,'jobs');assert.ok(existsSync(jobs),'original command receipts required');
  for(const name of readdirSync(jobs)){
   assert.match(name,/^[a-f0-9]{64}$/u);const d=join(jobs,name),q=json(join(d,'request.json'));
@@ -55,7 +88,7 @@ function quiescent(root,parents,{held=false,allowOwnedCoordinatorLocks=false}={}
   assert.equal(canonicalDigest(q),'sha256:'+name);assert.equal(r.request_digest,canonicalDigest(q));assert.equal(t.request_digest,r.request_digest);
   assert.ok(['completed','failed','interrupted'].includes(r.status),'original command completion unresolved');assert.equal(t.exit_code,0,'original transport requires inspection');assert.equal(t.signal,null);
   if(q.kind==='assess')assert.equal(r.status,'completed','original assessment provider closure unresolved');
-  if(q.kind==='trial'&&!exceptedTrial(canonicalDigest(q))){assert.ok(closed(r.output.task));if(!exceptedGrade(canonicalDigest(q))){assert.equal(r.output?.ready_for_next_root,true);if(r.output.grade)assert.ok(closed(r.output.grade));}}
+  if(q.kind==='trial'&&!exceptedTrial(canonicalDigest(q))){assert.ok(closed(r.output.task));if(!exceptedGrade(canonicalDigest(q))){assert.equal(r.output?.ready_for_next_root,true);assertOriginalGradeClosed(root,parents,s,q,r.output);}}
  }
  for(const p of [root,...parents]){rootPath(p);if(!held&&existsSync(join(p,'.advance-lock'))){assert.ok(allowOwnedCoordinatorLocks&&p!==root,'original coordinator is running or unresolved');const owner=join(p,'.advance-lock/pid');assertNoSymlinkPathSegments(owner,'owned coordinator lock');assert.equal(readStableFile(owner,'owned coordinator lock',64).bytes.toString('utf8'),String(process.pid),'coordinator lock is owned by another process');}}
  return h;

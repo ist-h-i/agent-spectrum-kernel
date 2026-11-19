@@ -55,3 +55,50 @@ test('paired partial evidence survives retained selection even when its artifact
  assert.equal(readRunJournal(f.root).previous,before);assert.deepEqual(published.readout.report.resources_all_attempts,f.state.report.resources_all_attempts);
  const {summarizeInstructionLoopEvaluation}=await import('./instruction-loop-feedback.mjs');assert.equal(JSON.stringify(summarizeInstructionLoopEvaluation(published.readout.report)).includes('PRIVATE-C06'),false);
 });
+
+
+function ungradedFixture(t,mode='absent'){
+ const f=retainedFixture(t);
+ f.legacy.mutate(s=>{for(const a of s.attempts){
+  const output=a.result.output, dir=output.evidence_root;
+  output.grade=null;output.quality_observation=null;
+  if(mode==='missing')delete output.grade;
+  if(mode==='false')output.grade=false;
+  if(mode==='array')output.grade=[];
+  if(mode==='started'||mode==='completed')write(join(dir,mode==='started'?'grade-started.json':'grade-completion.json'),{synthetic:true});
+  write(join(dir,'result.json'),a.result);const r=s.report.all_attempts.find(v=>v.id===a.id);r.original_result=structuredClone(a.result);r.result_digest=canonicalDigest(a.result);r.quality_observation=null;
+ }});
+ const parent=readRunJournal(f.parent).state;parent.outputs.report={...structuredClone(f.state.report),measured_context:'Synthetic scope.'};appendRunJournal(f.parent,'ungraded-original-fixture',parent);
+ return f;
+}
+test('retained grading accepts an original ungraded null phase without inventing completion or altering task evidence',async t=>{
+ const f=ungradedFixture(t);
+ const before=readRunJournal(f.root).previous,raw=f.state.attempts.map(a=>readFileSync(join(a.result.output.evidence_root,'result.json')));
+ const r=await inspectPracticalRetainedGrades(f);assert.equal(r.receipt.closed,true);const selections=selectAll(r,f),published=publishPracticalRetainedGradeReport({reference:r.reference,selections});
+ for(const [i,a]of published.readout.report.all_attempts.entries()){assert.equal(a.original_result.output.grade,null);assert.equal(a.quality_observation.fixed_reference.exact_lower,'3');assert.equal(a.quality_observation.scope,'source_reference');assert.equal(a.quality_observation.fixed_reference.runtime_acceptance_verified,null);assert.equal(a.included_in_comparison,true);assert.deepEqual(readFileSync(join(a.original_result.output.evidence_root,'result.json')),raw[i]);}
+ assert.equal(readRunJournal(f.root).previous,before);assert.deepEqual(published.readout.report.resources_all_attempts,f.state.report.resources_all_attempts);
+});
+
+for(const mode of ['missing','false','array','started','completed'])
+ test('retained import rejects absent, malformed or contradictory original grade: '+mode,async t=>{
+  const f=ungradedFixture(t,mode);
+  await assert.rejects(inspectPracticalRetainedGrades(f),/original grade closure unresolved/);
+  assert.equal(existsSync(f.counter),false);
+ });
+function localGradeFixture(t,mode='local'){
+ const f=retainedFixture(t),parent=readRunJournal(f.parent).state,runtime=parent.outputs.select.practical_runtime,command=runtime.commands.trial;
+ writeFileSync(command.argv[1],'// synthetic model-free worker identity');command.pins.push(pin(command.argv[1]));
+ const wp=command.argv[2],worker=JSON.parse(readFileSync(wp)),grader=worker.cases.case.grader;
+ if(mode==='model')grader.model_calls=true;if(mode==='unknown')delete grader.model_calls;
+ write(wp,worker);command.argv[3]=pin(wp).digest;command.pins=command.pins.map(p=>p.path===wp?pin(wp):p);
+ f.legacy.mutate(s=>{s.plan.runtime_digest=canonicalDigest(runtime);for(const a of s.attempts){const phase={...a.result.output.grade,provider_terminal_confirmed:null,signal:null,timed_out:false};if(mode==='local-open')phase.process_group_closed=false;if(mode==='provider-unclosed')phase.provider_terminal_confirmed=false;if(mode==='provider-unknown')delete phase.provider_terminal_confirmed;
+ a.result.output.grade=phase;const d=a.result.output.evidence_root;write(join(d,'grade-started.json'),{command_digest:mode==='wrong-command'?canonicalDigest('foreign'):canonicalDigest(grader)});write(join(d,'grade-completion.json'),phase);write(join(d,'result.json'),a.result);const q=s.report.all_attempts.find(v=>v.id===a.id);q.original_result=structuredClone(a.result);q.result_digest=canonicalDigest(a.result);}});
+ parent.outputs.report={...structuredClone(f.state.report),measured_context:'Synthetic scope.'};appendRunJournal(f.parent,'local-grader-fixture',parent);if(mode==='worker-drift')writeFileSync(command.argv[1],'// changed worker');return f;
+}
+test('bound model-free grade needs local closure, not remote-provider telemetry',async t=>{
+ const f=localGradeFixture(t),before=readRunJournal(f.root).previous,raw=f.state.attempts.map(a=>readFileSync(join(a.result.output.evidence_root,'result.json')));
+ const r=await inspectPracticalRetainedGrades(f);assert.equal(r.receipt.closed,true);const p=publishPracticalRetainedGradeReport({reference:r.reference,selections:selectAll(r,f)});
+ assert.equal(readRunJournal(f.root).previous,before);assert.deepEqual(p.readout.report.resources_all_attempts,f.state.report.resources_all_attempts);
+ for(const [i,a]of p.readout.report.all_attempts.entries()){assert.equal(a.original_result.output.grade.provider_terminal_confirmed,null);assert.deepEqual(readFileSync(join(a.original_result.output.evidence_root,'result.json')),raw[i]);}
+});
+for(const mode of ['model','unknown','local-open','wrong-command','worker-drift','provider-unclosed','provider-unknown'])test('retained import rejects unproven grader closure: '+mode,async t=>{const f=localGradeFixture(t,mode);await assert.rejects(inspectPracticalRetainedGrades(f),/original grade closure unresolved/);});
