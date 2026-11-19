@@ -1,6 +1,13 @@
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { compileScene } from './scene-model.mjs';
+
+const surface = readFileSync(new URL('./visual-surface.css', import.meta.url),'utf8');
+const player = readFileSync(new URL('./visual-player.js', import.meta.url),'utf8');
+const playerHash = createHash('sha256').update(player).digest('base64');
+const encode = value => JSON.stringify(value).replace(/[<>&]/gu, char=>'\\u'+char.charCodeAt(0).toString(16).padStart(4,'0'));
 
 const tags = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const escape = value => value.replace(/[&<>"']/gu, char => tags[char]);
@@ -11,11 +18,19 @@ const i18n = {
     code: 'From code', executed: 'Run observed', unknown: 'Not verified', overview: 'Flow overview',
     back: 'Back to overview', gaps: 'What remains unknown', branches: 'Branches', evidence: 'Evidence', excerpt: 'Source excerpt',
     noBefore: 'No equivalent behavior before this change.', noAfter: 'This behavior was removed.',
+    case: 'Choose an input', scene: 'Flow', play: '▶ Play', pause: 'Ⅱ Pause', step: 'Step →', reset: '↶ Reset', position: 'Replay position',
+    close: 'Close', hint: 'Select an object to see its role and the source excerpt.', baseShort: 'B', targetShort: 'A',
+    halt: 'Stopped', inferred: 'Reconstructed from source code', notRun: 'Not a live trace or a speed measurement.', empty: 'No output returned',
+    js: 'Open the file in a browser with JavaScript enabled to use the local view.' ,
     changed: 'Changed', unchanged: 'Unchanged', compare: 'Compare and inspect', inspect: 'Inspect this flow', metadata: 'Scope and commits' },
   ja: { pr: 'PRの変更マップ', catch: 'コードのキャッチアップ', scope: '対象範囲', base: '変更前', target: '変更後', path: '現在の流れ', revision: '対象コミット',
     code: 'コードから確認', executed: '実行を確認', unknown: '未確認', overview: '処理の全体像',
     back: '全体像へ戻る', gaps: '未確認の事項', branches: '分岐', evidence: '根拠', excerpt: 'ソース抜粋',
     noBefore: '変更前に対応する挙動はありません。', noAfter: 'この挙動は削除されました。',
+    case: '入力を選ぶ', scene: '処理を選ぶ', play: '▶ 再生', pause: 'Ⅱ 停止', step: '一歩 →', reset: '↶ 初め', position: '再生位置',
+    close: '閉じる', hint: '図のオブジェクトを選ぶと、役割とソースの抜粋を開けます。', baseShort: '旧', targetShort: '新',
+    halt: '停止', inferred: 'コードから再構成', notRun: '実行ログや処理速度を表すものではありません。', empty: '結果は返りません',
+    js: 'JavaScriptが有効なブラウザーで開くと、ローカルで図を操作できます。',
     changed: '変更あり', unchanged: '変更なし', compare: '前後を比較し、根拠を見る', inspect: '処理の詳細と根拠を見る', metadata: '対象範囲とコミット' },
 };
 
@@ -90,7 +105,7 @@ function evidenceItem(item, context, side) {
   const path = item.path.split('/').map(encodeURIComponent).join('/');
   return `<li><a href="https://github.com/${context.githubRepository}/blob/${commit}/${escape(path)}#${lines}">${label} · ${pointer}</a> <code>${commit}</code>${excerpt}</li>`;
 }
-function detail(item, context, side, branch = false) {
+function detail(item, context, side, branch = false, nested = false) {
   requireValue(item && nonEmpty(item.label) && nonEmpty(item.detail), branch ? 'branch label/detail' : 'step label/detail');
   const { strings } = context;
   requireValue(['code', 'executed', 'unknown'].includes(item.status), 'step status');
@@ -99,163 +114,124 @@ function detail(item, context, side, branch = false) {
   if (item.status === 'executed') requireValue(evidence.some(ref => ref && nonEmpty(ref.run)), 'executed evidence requires a run');
   if (branch) requireValue(item.branches === undefined, 'nested branch');
   const branches = list(item.branches ?? [], 'branches', true);
-  return `<details class="${branch ? 'branch' : 'node'}"><summary><span>${escape(item.label)}</span>
+  return `<details class="${branch ? 'branch' : 'node'}"${nested ? '' : ' open'}><summary><span>${escape(item.label)}</span>
       <span class="badge ${item.status}">${strings[item.status]}</span></summary>
     <div class="detail"><p>${escape(item.detail)}</p>${evidence.length ? `<div class="eyebrow">${strings.evidence}</div>
     <ul class="refs">${evidence.map(ref => evidenceItem(ref, context, side)).join('')}</ul>` : ''}
-    ${branches.length ? `<div class="branches"><div class="eyebrow">${strings.branches}</div>${branches.map(b => detail(b, context, side, true)).join('')}</div>` : ''}
+    ${branches.length ? `<div class="branches"><div class="eyebrow">${strings.branches}</div>${branches.map(b => detail(b, context, side, true, true)).join('')}</div>` : ''}
     </div></details>`;
 }
-function flowLane(steps, context, side, title, absentText) {
-  if (steps === undefined) return `<div class="lane ${side}"><h3>${title}</h3><p>${absentText}</p></div>`;
-  return `<div class="lane ${side}"><h3>${title}</h3><ol>${list(steps, 'flow steps')
-    .map(step => `<li>${detail(step, context, side)}</li>`).join('')}</ol></div>`;
+function flowSides(flow, pr) {
+  if (pr) {
+    requireValue(['modified', 'added', 'removed'].includes(flow.change), 'PR flow change (modified, added or removed)');
+    if (flow.change === 'added') requireValue(flow.beforeSteps === undefined && Array.isArray(flow.steps), 'added flow needs target steps only');
+    if (flow.change === 'removed') requireValue(Array.isArray(flow.beforeSteps) && flow.steps === undefined, 'removed flow needs base steps only');
+    if (flow.change === 'modified') {
+      requireValue(Array.isArray(flow.beforeSteps) && Array.isArray(flow.steps), 'modified flow needs both sides');
+      const steps = [...flow.beforeSteps, ...flow.steps];
+      requireValue(steps.every(step => step && ['changed', 'unchanged'].includes(step.delta)), 'modified flow steps need changed/unchanged delta');
+      requireValue(steps.some(step => step.delta === 'changed'), 'modified flow needs a changed step');
+    } else {
+      requireValue((flow.steps ?? flow.beforeSteps).every(step => step && step.delta === undefined), 'added or removed flow steps are all changed');
+    }
+  } else requireValue(flow.beforeSteps === undefined && flow.change === undefined && Array.isArray(flow.steps), 'PR flow fields in catch-up');
+  return { base:flow.beforeSteps,target:flow.steps };
 }
-function preview(steps, strings, heading, absent, showDelta) {
-  if (steps === undefined) return `<div class="preview"><h4>${heading}</h4><p>${absent}</p></div>`;
-  return `<div class="preview"><h4>${heading}</h4><ol>${steps.map(step => `<li>
-    <strong>${escape(step.label)}</strong>${showDelta ? `<span class="delta ${step.delta ?? 'changed'}">${strings[step.delta ?? 'changed']}</span>` : ''}
-    ${(step.branches ?? []).map(branch => `<span class="turn">↳ ${escape(branch.label)}</span>`).join('')}
-  </li>`).join('')}</ol></div>`;
+
+function compileFlow(flow, index, pr, context) {
+  requireValue(flow && nonEmpty(flow.title) && nonEmpty(flow.summary), 'flow title/summary');
+  const sides=flowSides(flow,pr);
+  const templateId=(side,step,branch)=>`evidence-${index}-${side}-${step}${branch===undefined?'':'-branch-'+branch}`;
+  const templates=[];
+  for(const side of ['base','target']) {
+    if(!sides[side])continue;
+    list(sides[side], 'flow steps').forEach((item,step)=>{
+      templates.push(`<template id="${templateId(side,step)}">${detail(item,context,side)}</template>`);
+      (item.branches??[]).forEach((branch,n)=>{
+        templates.push(`<template id="${templateId(side,step,n)}">${detail(branch,context,side,true)}</template>`);
+      });
+    });
+  }
+  const strings=context.strings;
+  return {
+    scene: { title:flow.title,summary:flow.summary,
+      absent:flow.change==='added'?strings.noBefore:flow.change==='removed'?strings.noAfter:'',
+      ...compileScene(flow.visual,sides,templateId) },
+    templates,
+  };
+}
+
+function legend(strings,pr){
+  const line = (cls, mark, value) => `<span><i class="symbol ${cls}" aria-hidden="true">${mark}</i>${value}</span>`;
+  return (pr?line('','',strings.target)+line('base','',strings.base)+line('delta','●',strings.changed):line('','',strings.path))
+    +line('stop','×',strings.halt)+line('unknown','?',strings.unknown);
 }
 
 export function renderGuide(guide, { repositoryRoot = process.cwd() } = {}) {
   requireValue(guide && ['catch-up', 'pr'].includes(guide.mode), 'mode');
-  const pr = guide.mode === 'pr';
-  const language = guide.language ?? 'en';
-  requireValue(['en', 'ja'].includes(language), 'language');
-  const strings = i18n[language];
-  for (const key of ['title', 'purpose', 'scope']) requireValue(nonEmpty(guide[key]), key);
-  requireValue(nonEmpty(guide.revision) && sha.test(guide.revision), 'revision');
-  requireValue(pr ? nonEmpty(guide.baseRevision) && sha.test(guide.baseRevision) && guide.baseRevision.toLowerCase() !== guide.revision.toLowerCase()
-    : guide.baseRevision === undefined, 'baseRevision');
-  if (guide.githubRepository !== undefined) requireValue(nonEmpty(guide.githubRepository)
-    && repository.test(guide.githubRepository) && guide.githubRepository.split('/').every(p => p !== '.' && p !== '..'), 'githubRepository');
-  const source = gitEvidence(repositoryRoot);
+  const pr=guide.mode==='pr',language=guide.language??'en';
+  requireValue(['en','ja'].includes(language),'language');
+  const strings=i18n[language];
+  for (const key of ['title','purpose','scope']) requireValue(nonEmpty(guide[key]),key);
+  requireValue(nonEmpty(guide.revision) && sha.test(guide.revision),'revision');
+  requireValue(pr ? nonEmpty(guide.baseRevision) && sha.test(guide.baseRevision) && guide.baseRevision.toLowerCase()!==guide.revision.toLowerCase()
+    : guide.baseRevision===undefined,'baseRevision');
+  if(guide.githubRepository!==undefined)requireValue(nonEmpty(guide.githubRepository) && repository.test(guide.githubRepository)
+    && guide.githubRepository.split('/').every(p=>p!=='.' && p!=='..'),'githubRepository');
+  const source=gitEvidence(repositoryRoot);
   source.commit(guide.revision);
-  if (pr) source.commit(guide.baseRevision);
-  const context = { strings, revision: guide.revision, baseRevision: guide.baseRevision, githubRepository: guide.githubRepository, source };
-  const flows = list(guide.flows, 'flows');
-  const unknowns = list(guide.unknowns ?? [], 'unknowns', true);
-  requireValue(unknowns.every(nonEmpty), 'unknown text');
-  const overview = [];
-  const map = flows.map((flow, i) => {
-    requireValue(flow && nonEmpty(flow.title) && nonEmpty(flow.summary), 'flow title/summary');
-    if (pr) {
-      requireValue(['modified', 'added', 'removed'].includes(flow.change), 'PR flow change (modified, added or removed)');
-      if (flow.change === 'added') requireValue(flow.beforeSteps === undefined && Array.isArray(flow.steps), 'added flow needs target steps only');
-      if (flow.change === 'removed') requireValue(Array.isArray(flow.beforeSteps) && flow.steps === undefined, 'removed flow needs base steps only');
-      if (flow.change === 'modified') {
-        requireValue(Array.isArray(flow.beforeSteps) && Array.isArray(flow.steps), 'modified flow needs both sides');
-        const steps = [...flow.beforeSteps, ...flow.steps];
-        requireValue(steps.every(step => step && ['changed', 'unchanged'].includes(step.delta)), 'modified flow steps need changed/unchanged delta');
-        requireValue(steps.some(step => step.delta === 'changed'), 'modified flow needs a changed step');
-      } else {
-        const steps = flow.steps ?? flow.beforeSteps;
-        requireValue(steps.every(step => step && step.delta === undefined), 'added or removed flow steps are all changed');
-      }
-    } else requireValue(flow.beforeSteps === undefined && flow.change === undefined && Array.isArray(flow.steps), 'PR flow fields in catch-up');
-    const detailMarkup = `<section class="flow" id="flow-${i + 1}"><h2>${escape(flow.title)}</h2>
-      <p>${escape(flow.summary)}</p><div class="lanes">
-      ${pr ? flowLane(flow.beforeSteps, context, 'base', strings.base, strings.noBefore) : ''}
-      ${flowLane(flow.steps, context, 'target', pr ? strings.target : strings.path, strings.noAfter)}</div>
-      <a class="back" href="#overview">↑ ${strings.back}</a></section>`;
-    overview.push(`<li><h3>${escape(flow.title)}</h3><p>${escape(flow.summary)}</p>
-      <div class="previews${pr ? ' comparison' : ''}">${pr ? preview(flow.beforeSteps, strings, strings.base, strings.noBefore, true) : ''}
-      ${preview(flow.steps, strings, pr ? strings.target : strings.path, strings.noAfter, pr)}</div>
-      <a href="#flow-${i + 1}">${pr ? strings.compare : strings.inspect} →</a></li>`);
-    return detailMarkup;
-  }).join('');
+  if(pr)source.commit(guide.baseRevision);
+  const context={strings,revision:guide.revision,baseRevision:guide.baseRevision,githubRepository:guide.githubRepository,source};
+  const flows=list(guide.flows,'flows');
+  const unknowns=list(guide.unknowns??[],'unknowns',true);
+  requireValue(unknowns.every(nonEmpty),'unknown text');
+  const compiled=flows.map((flow,index)=>compileFlow(flow,index,pr,context));
+  const scenes=compiled.map(item=>item.scene);
+  const data=encode({scenes,labels:strings,pr});
+  const choices=scenes.length>1
+    ? `<label class="scene-pick">${strings.scene}<select id="visual-scene">${scenes.map((scene,i)=>`<option value="${i}">${escape(scene.title)}</option>`).join('')}</select></label>` : '';
   return `<!doctype html><html lang="${language}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<title>${escape(guide.title)}</title><style>${STYLE}</style></head><body><main>
-<header><div class="eyebrow">${pr ? strings.pr : strings.catch}</div><h1>${escape(guide.title)}</h1>
-<p>${escape(guide.purpose)}</p><details class="metadata"><summary>${strings.metadata}</summary><dl><dt>${strings.scope}</dt><dd>${escape(guide.scope)}</dd>
-${pr ? `<dt>${strings.base}</dt><dd><code>${guide.baseRevision}</code></dd>` : ''}
-<dt>${pr ? strings.target : strings.revision}</dt><dd><code>${guide.revision}</code></dd></dl></details></header>
-<nav id="overview" aria-labelledby="overview-heading"><h2 id="overview-heading">${strings.overview}</h2>
-<ol class="flow-index">${overview.join('')}</ol></nav>
-${map}${unknowns.length ? `<aside><h2>${strings.gaps}</h2><ul>${unknowns.map(note => `<li>${escape(note)}</li>`).join('')}</ul></aside>` : ''}
-</main></body></html>\n`;
+<meta name="color-scheme" content="dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${playerHash}'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>${escape(guide.title)}</title><style>${surface}</style></head><body><main class="shell">
+<header class="top"><div><div class="signature">ASK · ${pr?strings.pr:strings.catch}</div>
+<h1>${escape(guide.title)}</h1><p>${escape(guide.purpose)}</p>
+<details class="metadata"><summary>${strings.metadata}</summary><dl><dt>${strings.scope}</dt><dd>${escape(guide.scope)}</dd>
+${pr?`<dt>${strings.base}</dt><dd><code>${guide.baseRevision}</code></dd>`:''}
+<dt>${pr?strings.target:strings.revision}</dt><dd><code>${guide.revision}</code></dd></dl></details></div>${choices}</header>
+<div class="workspace">
+<section class="board" aria-label="${strings.overview}"><header><div class="case-wrap"><span class="eyebrow">${strings.case}</span>
+<div class="cases" id="visual-cases" role="group" aria-label="${strings.case}"></div></div></header>
+<div id="visual-stage"><svg id="visual-map" role="group" aria-labelledby="visual-title" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div class="legend">${legend(strings,pr)}</div><p class="absent" id="visual-absent" hidden></p>
+<footer><div class="transport" role="group" aria-label="${strings.position}">
+<button type="button" id="visual-play" aria-pressed="false">${strings.play}</button>
+<button type="button" id="visual-step">${strings.step}</button><button type="button" id="visual-reset">${strings.reset}</button></div>
+<div class="progress" id="visual-progress" aria-label="${strings.position}"></div></footer></section>
+<aside class="detail" id="visual-detail" aria-labelledby="detail-title"><header><h2 id="detail-title" tabindex="-1">${strings.evidence}</h2>
+<button id="detail-close" type="button" hidden>${strings.close}</button></header>
+<div class="detail-content"><p id="detail-default">${strings.hint}</p><div id="visual-evidence"></div></div></aside></div>
+<div class="statusbar"><strong>${strings.inferred}</strong> · ${strings.notRun}</div>
+<details class="metadata"><summary>${strings.overview}</summary><p id="visual-subtitle">${escape(scenes[0].summary)}</p></details>
+${unknowns.length?`<details class="unknowns"><summary>${strings.gaps}</summary><ul>${unknowns.map(note=>`<li>${escape(note)}</li>`).join('')}</ul></details>`:''}
+<div id="visual-live" class="sr-only" role="status" aria-live="polite"></div>
+<noscript>${strings.js}</noscript>
+${compiled.flatMap(item=>item.templates).join('')}
+<script id="visual-data" type="application/json">${data}</script>
+<script>${player}</script></main></body></html>\n`;
 }
 
-const STYLE = `
-:root { color-scheme:light; --ink:#152631; --muted:#455d6b; --accent:#075f55; --line:#c4d2dc; --paper:#f3f7f8; font:16px/1.55 system-ui,sans-serif }
-* { box-sizing:border-box }
-body { margin:0; color:var(--ink); background:var(--paper); overflow-wrap:anywhere }
-main { max-width:64rem; margin:auto; padding:clamp(1rem,4vw,3rem) }
-header { border-top:.4rem solid var(--accent); padding:1.3rem 0 0 }
-h1,h2,h3,p,dl,dd,ol { margin:0 }
-h1 { font-size:clamp(1.65rem,5vw,2.75rem); line-height:1.15; margin:.35rem 0 .6rem }
-h2 { font-size:1.35rem; margin-bottom:.38rem }
-h3 { font-size:1rem; margin-bottom:.55rem }
-.metadata { margin-top:.65rem; background:transparent; border:0 }
-.metadata summary { padding:0; width:max-content; color:var(--accent); text-decoration:underline }
-.metadata dl { margin:.35rem 0 }
-dl { display:grid; grid-template-columns:max-content 1fr; gap:.15rem .65rem; font-size:.9rem }
-dt { color:var(--muted) }
-code { font-family:ui-monospace,monospace; font-size:.86em }
-a { color:var(--accent) }
-:focus-visible { outline:3px solid #1a60c0; outline-offset:3px }
-.eyebrow { font-size:.82rem; font-weight:750; color:var(--accent) }
-nav,.flow,aside { margin-top:1.6rem }
-nav .flow-index { padding:0; display:grid; gap:.65rem; list-style:none }
-.flow-index>li { background:white; border:1px solid var(--line); border-radius:.6rem; padding:.75rem .85rem }
-.flow-index h3 { margin-bottom:.25rem; color:var(--accent) }
-.flow-index a { display:inline-block; margin-top:.65rem; font-weight:700 }
-.previews { display:grid; gap:.45rem; margin-top:.55rem }
-.preview { border-inline-start:.2rem solid var(--line); padding-inline-start:.5rem }
-.preview h4 { font-size:.86rem; margin:0 0 .25rem }
-.preview ol { display:flex; align-items:stretch; gap:1.35rem; flex-wrap:wrap; list-style:none; padding:0 }
-.preview li { min-width:0; flex:1 1 9rem; position:relative; padding:.45rem .5rem; background:#f2f7f8; border:1px solid var(--line); border-radius:.35rem }
-.preview li:not(:last-child)::after { content:"→"; position:absolute; inset-inline-end:-1.15rem; inset-block-start:.4rem; color:var(--muted) }
-.delta,.turn { display:table; margin-top:.22rem; font-size:.78rem }
-.delta { color:var(--muted); border-radius:.25rem; padding:0 .28rem }
-.delta.changed { background:#d9f0ee; color:#064d46; font-weight:750 }
-.delta.unchanged { background:#e8edf0 }
-.turn { color:#704311; padding-inline-start:.3rem; border-inline-start:.12rem solid #ad8a60 }
-@media (max-width:34rem) {
-  .previews.comparison { grid-template-columns:repeat(2,minmax(0,1fr)) }
-  .preview ol { display:grid; gap:.85rem }
-  .preview li:not(:last-child)::after { content:"↓"; inset-inline-start:.65rem; inset-inline-end:auto; inset-block-start:auto; inset-block-end:-1rem }
-}
-
-.flow,aside { padding:clamp(.75rem,3vw,1.35rem); background:white; border:1px solid var(--line); border-radius:.7rem }
-aside { border-inline-start:.25rem solid #87501f }
-.lanes { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr)); gap:.75rem; margin-top:1rem }
-.lane { border:1px solid var(--line); border-radius:.55rem; background:#f6fbfa; padding:.7rem; min-width:0 }
-.lane.base { background:#f3f5f9 }
-.lane ol { list-style:none; padding:0; counter-reset:step }
-.lane ol>li { counter-increment:step }
-.lane ol>li:not(:last-child)::after { content:"↓"; display:block; color:var(--muted); padding:.05rem 0 .05rem 1.25rem }
-details { background:white; border:1px solid var(--line); border-radius:.45rem }
-summary { cursor:pointer; padding:.55rem .65rem }
-summary:hover { background:#f0f7f6 }
-.node>summary::before { content:counter(step) "."; margin-inline-end:.35rem; font-weight:750; color:var(--accent) }
-.badge { display:inline-block; margin-inline-start:.4rem; border-radius:.3rem; font-size:.78rem; color:#244458; background:#e7eff4; padding:0 .32rem; white-space:nowrap }
-.badge.executed { color:#175544; background:#dff3e8 }
-.badge.unknown { color:#713600; background:#fff0d8 }
-.detail { padding:.25rem .65rem .65rem }
-.refs { padding-inline-start:1.3rem; margin:.28rem 0 .5rem }
-.excerpt { margin:.3rem 0 .5rem }
-.excerpt pre { margin:0; padding:.35rem .6rem; color:var(--ink); background:var(--paper); white-space:pre-wrap; overflow-wrap:anywhere }
-.branches { border-inline-start:.18rem solid #846836; padding-inline-start:.55rem; margin-top:.5rem }
-.branches details { margin-top:.3rem }
-.back { display:inline-block; margin-top:.75rem }
-@media (max-width:29rem) { dl { grid-template-columns:1fr } dd { margin-bottom:.35rem } }
-`;
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && existsSync(process.argv[1]) && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   try {
     const [input, output, flag, repo, ...extra] = process.argv.slice(2);
     if (!input || !output || extra.length || !/\.html$/iu.test(output) || (flag !== undefined && (flag !== '--repo' || !repo))) {
       throw new Error('Usage: node render-guide.mjs guide.json output.html [--repo <checkout>] (new file)');
     }
-    const html = renderGuide(JSON.parse(readFileSync(input, 'utf8')), { repositoryRoot: repo });
-    writeFileSync(output, html, { flag: 'wx', mode: 0o600 });
-  } catch (error) {
+    const html=renderGuide(JSON.parse(readFileSync(input,'utf8')),{repositoryRoot:repo});
+    writeFileSync(output,html,{flag:'wx',mode:0o600});
+  } catch(error) {
     console.error(error.message);
-    process.exitCode = 1;
+    process.exitCode=1;
   }
 }

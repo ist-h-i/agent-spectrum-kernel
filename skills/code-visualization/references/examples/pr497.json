@@ -1,0 +1,328 @@
+{
+  "language": "ja",
+  "githubRepository": "ist-h-i/agent-spectrum-kernel",
+  "flows": [
+    {
+      "title": "配布CLIからのレビュー",
+      "summary": "配布CLIに追加された入口と、許可・レビュー要否による経路の違いです。",
+      "change": "modified",
+      "beforeSteps": [
+        {
+          "label": "同じコマンド入力",
+          "detail": "両方の版に同じ ask verification review を与える。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "サブコマンドの取得",
+              "path": "scripts/ask-package-cli.mjs",
+              "startLine": 29,
+              "endLine": 33
+            }
+          ],
+          "delta": "unchanged"
+        },
+        {
+          "label": "CLIで振り分ける",
+          "detail": "コマンド名を実装に割り当てる。登録に verification はない。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "旧版のコマンド割り当て",
+              "path": "scripts/ask-package-cli.mjs",
+              "startLine": 40,
+              "endLine": 43
+            }
+          ],
+          "delta": "changed"
+        },
+        {
+          "label": "旧版の入口で停止",
+          "detail": "旧配布CLIでは未登録コマンドとして停止する。他の形式での検証機能の有無は扱わない。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "旧版で拒否する条件",
+              "path": "scripts/ask-package-cli.mjs",
+              "startLine": 40,
+              "endLine": 43
+            }
+          ],
+          "delta": "changed"
+        }
+      ],
+      "steps": [
+        {
+          "label": "同じコマンド入力",
+          "detail": "両方の版に同じ ask verification review を与える。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "サブコマンドの取得",
+              "path": "scripts/ask-package-cli.mjs",
+              "startLine": 29,
+              "endLine": 33
+            }
+          ],
+          "delta": "unchanged"
+        },
+        {
+          "label": "CLIで振り分ける",
+          "detail": "新版では verification を検証処理に渡す。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "新版のコマンド割り当て",
+              "path": "scripts/ask-package-cli.mjs",
+              "startLine": 41,
+              "endLine": 44
+            }
+          ],
+          "delta": "changed"
+        },
+        {
+          "label": "実行条件を確認",
+          "detail": "明示許可に加え、信頼できるレビュアーのモジュールとダイジェストが必要。提供元の条件は各例で満たす想定に固定している。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "明示許可と提供元の条件",
+              "path": "scripts/verification-reuse-completion.mjs",
+              "startLine": 301,
+              "endLine": 309
+            }
+          ],
+          "delta": "changed"
+        },
+        {
+          "label": "レビュー担当へ渡す",
+          "detail": "必要な場合にだけ担当へ依頼し、戻った応答と対象を確認する。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "必要な場合の呼び出し",
+              "path": "scripts/verification-review-dispatch.mjs",
+              "startLine": 112,
+              "endLine": 135
+            }
+          ],
+          "delta": "changed"
+        },
+        {
+          "label": "結果を受け取る",
+          "detail": "必要ならレビュー結果、不要なら not_required を返す。レビュー結果は変更承認ではない。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "結果に承認は含まれない",
+              "path": "scripts/verification-review-dispatch.mjs",
+              "startLine": 99,
+              "endLine": 108
+            },
+            {
+              "label": "不要と完了の分岐",
+              "path": "scripts/verification-review-dispatch.mjs",
+              "startLine": 112,
+              "endLine": 135
+            }
+          ],
+          "delta": "changed"
+        },
+        {
+          "label": "許可なしで停止",
+          "detail": "明示許可がなければレビュアーは呼ばない。",
+          "status": "code",
+          "evidence": [
+            {
+              "label": "呼び出しの条件",
+              "path": "scripts/verification-reuse-completion.mjs",
+              "startLine": 301,
+              "endLine": 311
+            }
+          ],
+          "delta": "changed"
+        }
+      ],
+      "visual": {
+        "nodes": [
+          {
+            "id": "request",
+            "label": "レビュー依頼",
+            "caption": "同じ入力",
+            "shape": "request",
+            "stage": 0,
+            "track": 0,
+            "refs": [
+              {
+                "side": "base",
+                "step": 0
+              },
+              {
+                "side": "target",
+                "step": 0
+              }
+            ]
+          },
+          {
+            "id": "dispatch",
+            "label": "振り分け",
+            "caption": "verification",
+            "shape": "route",
+            "stage": 1,
+            "track": 0,
+            "refs": [
+              {
+                "side": "base",
+                "step": 1
+              },
+              {
+                "side": "target",
+                "step": 1
+              }
+            ]
+          },
+          {
+            "id": "old-stop",
+            "label": "未登録",
+            "caption": "旧CLIで停止",
+            "shape": "stop",
+            "stage": 2,
+            "track": -1,
+            "refs": [
+              {
+                "side": "base",
+                "step": 2
+              }
+            ]
+          },
+          {
+            "id": "permit",
+            "label": "許可と提供元",
+            "caption": "実行条件を確認",
+            "shape": "gate",
+            "stage": 2,
+            "track": 0,
+            "refs": [
+              {
+                "side": "target",
+                "step": 2
+              }
+            ]
+          },
+          {
+            "id": "reject",
+            "label": "呼び出さない",
+            "caption": "明示許可なし",
+            "shape": "stop",
+            "stage": 2,
+            "track": 1,
+            "refs": [
+              {
+                "side": "target",
+                "step": 5
+              }
+            ]
+          },
+          {
+            "id": "reviewer",
+            "label": "レビュー担当",
+            "caption": "依頼を受け取る",
+            "shape": "person",
+            "stage": 3,
+            "track": 0,
+            "refs": [
+              {
+                "side": "target",
+                "step": 3
+              }
+            ]
+          },
+          {
+            "id": "receipt",
+            "label": "結果の紙",
+            "caption": "依頼 → 結果",
+            "shape": "result",
+            "stage": 4,
+            "track": 0,
+            "refs": [
+              {
+                "side": "target",
+                "step": 4
+              }
+            ]
+          }
+        ],
+        "cases": [
+          {
+            "label": "必要・許可あり",
+            "base": [
+              "request",
+              "dispatch",
+              "old-stop"
+            ],
+            "target": [
+              "request",
+              "dispatch",
+              "permit",
+              "reviewer",
+              "receipt"
+            ]
+          },
+          {
+            "label": "許可なし",
+            "base": [
+              "request",
+              "dispatch",
+              "old-stop"
+            ],
+            "target": [
+              "request",
+              "dispatch",
+              "permit",
+              "reject"
+            ],
+            "overrides": {
+              "permit": {
+                "state": "blocked",
+                "label": "許可なし"
+              },
+              "receipt": {
+                "state": "empty",
+                "label": "結果なし",
+                "caption": "呼び出さない"
+              }
+            }
+          },
+          {
+            "label": "レビュー不要",
+            "base": [
+              "request",
+              "dispatch",
+              "old-stop"
+            ],
+            "target": [
+              "request",
+              "dispatch",
+              "permit",
+              "receipt"
+            ],
+            "overrides": {
+              "receipt": {
+                "label": "不要票",
+                "caption": "担当に依頼しない"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "mode": "pr",
+  "baseRevision": "445eec92545e694becf04278b96da867134c1758",
+  "revision": "df6b3d513dbc36098f31fd56592df06d8a9f65a2",
+  "title": "同じ入力、違う結果",
+  "purpose": "検証レビューの入口｜PR #497",
+  "scope": "npm配布CLIのレビューコマンド。提供元・対象・証拠などは例で指定した条件に固定。",
+  "unknowns": [
+    "実際のレビュアーは呼んでいません。出力の実測ではありません。"
+  ]
+}

@@ -1,52 +1,46 @@
-# Local guide input
+# Produce a local object map
 
-Run Node using the renderer next to the installed skill, for example:
+Use the renderer next to the installed skill:
 
 ```sh
 node .agents/skills/code-visualization/references/render-guide.mjs guide.json guide.html --repo /path/to/checkout
-# Claude Code projection: .claude/skills/code-visualization/references/render-guide.mjs
+# Claude Code: .claude/skills/code-visualization/references/render-guide.mjs
 ```
 
-Use a fresh output file. `--repo` defaults to the current Git checkout. Generation needs local Git commits and blobs; the renderer will not fetch missing source. No npm packages, server, account, or internet are needed to open and explore the file. Clicking a GitHub evidence link is optional and requires GitHub reachability plus any applicable repository permissions; the exact revision, path, line, and an expandable excerpt from the committed source remain visible offline. Set `githubRepository` only for an observed GitHub repository (same repository for all attached evidence); omit it for local-only or other providers. The file includes real committed source excerpts selected by your locators. Do not select secret-bearing or private material for output that might be shared; do not include entire source files. Saving locally never authorizes any sharing.
+Choose a fresh output file. `--repo` defaults to the current checkout; a directory inside it works. Local commits and blobs are required. The renderer does not fetch missing content. The output is a single HTML file; open it in a JavaScript-enabled browser. Playback is a source-informed explanation, not execution or a timing measurement. The HTML has no packages, server, external assets or background network calls. Optional GitHub evidence links require an explicit click. Use `githubRepository` only for an observed GitHub `owner/repo` matching the evidence. Otherwise read committed excerpts without leaving the file.
 
-## Input shape
+The file includes exact, compact source excerpts. Never include secrets or whole files. A local write does not authorize sharing or publication.
 
-- `mode`: `"catch-up"` or `"pr"`.
-- `title`, `purpose`, `scope`: reader-facing strings; optional `language` is `"en"` (default) or `"ja"`.
-- `revision`: inspected full 40-hex commit; `baseRevision` required in PR mode.
-- Optional `githubRepository`: `owner/repo` for pinned source links.
-- `flows`: one or more representative paths. Each has `title` and `summary`. In catch-up, add ordered `steps`. In PR mode set `change` for each flow: `"modified"` requires both `beforeSteps` and `steps` with a `delta` on each step (`"changed"` or `"unchanged"`); `"added"` requires `steps` only; `"removed"` requires `beforeSteps` only. The renderer labels an absent side. Do not add `delta` to added or removed flows; their steps are already labeled changed. The overview shows step and branch labels before the reader opens details. State the user-visible effect or affected behavior in the summary.
-- Each step has `label`, `detail`, `status` (`code`, `executed`, or `unknown`), and optional `evidence` and `branches`. A branch uses the same label/detail/status/evidence fields and attaches to the step where its condition occurs. `code` must carry a source/test-file ref; `executed` must carry an observed run locator. `unknown` explains what's unavailable or not observed.
-- Evidence item: either `{label, path, startLine, endLine?, at?}` (repo-relative path, positive line numbers; at most 50 lines and 12 KiB per excerpt; `at` is `target` or `base`), or a plain-text `{label, run}` locator for an actual run. The default side follows the row; a locator should identify the command and artifact/run, not imply successful execution.
-- `unknowns`: array of meaningful unverified points, if any.
+## Describe the evidence and objects separately
 
-Example (fictional content; replace all locators with checked ones):
+- Guide: `mode` (`catch-up` or `pr`), `title`, `purpose`, `scope`, `revision` (full commit SHA), and `flows`. Add `baseRevision` in PR mode, optional `language` (`en` or `ja`) and `unknowns` to record material gaps.
+- Flow: `title`, `summary`, source `steps`, and the `visual` object described below. In PR mode set `change`: `modified` requires both `beforeSteps` and `steps`, with `delta` (`changed` or `unchanged`) on each step; `added` requires `steps` only; `removed` requires `beforeSteps` only. Do not label steps in added/removed flows with a delta. The renderer labels an absent side.
+- Step: `label`, `detail`, `status` (`code`, `executed`, or `unknown`), optional `evidence` and `branches`. A branch has the same evidence fields. A `code` step needs a source or test file on its own side; refer to a test as code unless its execution was observed. An `executed` step needs an actual run locator. A structurally valid locator does not establish correctness.
+- Evidence: `{label, path, startLine, endLine?, at?}` for a committed regular file (relative path; up to 50 lines and 12 KiB per excerpt; optional side `at: "base"|"target"` defaults to the bound step side). A run uses plain text `{label, run}` with a command/output locator. Missing commits, paths and ranges fail rendering.
+
+Each flow's `visual` has:
+
+| Field | What to describe |
+| --- | --- |
+| `nodes` | Objects with unique `id`, concise `label`, optional `caption`, `shape`, horizontal `stage` (0-based), optional `track` (-1, 0, 1; default 0), and `refs` to the evidence that explains their role. Narrow screens arrange stages vertically. Place the same comparison object only once. |
+| `shape` | Choose the closest meaning: `request`, `artifact`, `shelf`, `route`, `gate`, `person`, `result`, `list`, `stop`, `service`. A `person` shows who receives the work; do not jump from permission directly to successful completion. |
+| `refs` | One or more `{side, step, branch?}` locators. Use zero-based step/branch indexes; `side` is `base` or `target`. Bind both sides when an object is shared in a PR comparison. |
+| `items` | Optional named marks for identities, each `{id, label, excluded?}`. A stable `id` and label let people recognize an object in separate locations. Use `excluded: true` for an item still present but not carried forward. |
+| `cases` | Alternatives with `label` and an ordered array of object IDs for each existing version (`base`, `target`). Compare the same input object on both sides. Include each diagrammed object in at least one case. |
+| `overrides` | Optional in a case: use an object ID as the key and a short `label`, `caption`, a `state` (`empty` or `blocked`), or `items` (a list of this object's existing identity IDs to show in that case). An `empty` object cannot appear on that case's path. Use a returned result on the path, a label and `items: []` for a valid zero outcome instead. |
+
+Use a few meaningful cases. The renderer limits one scene to 16 objects over 8 stages, 8 cases, and up to 6 identity marks per object so graphs stay readable. Split distinct questions into separate flows instead of packing every call into one diagram. Keep names brief and inspect the static view before adding replay; participants should distinguish the outcome by shape, route, and identity, not by reading a paragraph or relying on color.
+
+For example, for a single committed path with two evidence steps:
 
 ```json
 {
-  "mode": "catch-up",
-  "title": "Saving a record",
-  "purpose": "Find the records feature and see why a write can be rejected.",
-  "scope": "Records module; background jobs not inspected.",
-  "revision": "1111111111111111111111111111111111111111",
-  "flows": [{
-    "title": "Save a record",
-    "summary": "The request enters through the records route.",
-    "steps": [{
-      "label": "Validate input",
-      "detail": "The save route checks the input before passing it to storage.",
-      "status": "code",
-      "evidence": [{"label": "Save route", "path": "src/records.ts", "startLine": 31}],
-      "branches": [{
-        "label": "Invalid input",
-        "detail": "The route returns the validation result without writing.",
-        "status": "code",
-        "evidence": [{"label": "Rejection branch", "path": "src/records.ts", "startLine": 37}]
-      }]
-    }]
-  }],
-  "unknowns": ["Persistence behavior was not exercised."]
+  "nodes": [
+    {"id":"request","label":"Request","shape":"request","stage":0,"refs":[{"side":"target","step":0}]},
+    {"id":"receipt","label":"Receipt","shape":"result","stage":1,"refs":[{"side":"target","step":1}]}
+  ],
+  "cases": [{"label":"Ordinary input","target":["request","receipt"]}]
 }
 ```
 
-The renderer rejects a missing commit, missing or non-regular source file, or an out-of-range location. A structurally valid guide is not proof that its narrative fits the source or that the GitHub URL is accessible. Inspect the referenced lines; preserve the distinction between code reading, execution evidence, and unknowns.
+Full examples with pinned public ASK source: [PR comparison](examples/pr497.json) and [code catch-up](examples/skill-assets.json). Both are source-derived scenarios, not stored live runs. These files are input examples, not assumptions about another project. Use only exact evidence from the project being visualized.
