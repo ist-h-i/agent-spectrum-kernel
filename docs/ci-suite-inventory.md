@@ -48,10 +48,15 @@ and step inventories remain preserved baselines rather than regenerated totals.
 
 The sufficient-scope change adds one unconditional command to the existing
 Validate/common job: `node --test scripts/test-sufficient-change-scope-fixtures.mjs`.
+
 It calibrates local artificial behavior checks for incomplete scope, incorrect
 policy sharing and a follow-up change. It starts no model and adds no workflow
 or job. The historical inventories and measurements below remain unchanged;
 the current workflow and receipt registry include this additional command.
+
+## Decision-led test strategy
+
+Validate/common also runs `node --test scripts/test-quote-reissue-decision-trace.mjs`: the worked quote example uses the existing lifecycle resolver to distinguish the evidence for each scoped decision from an unverified historical or release claim.
 
 ## Cross-workflow duplicate reduction
 

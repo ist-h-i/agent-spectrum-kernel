@@ -84,6 +84,8 @@ export function buildReport(snapshot, records = [], execution = null) {
     extra_cases: [...new Set([...current.cases.map((item) => item.id), ...byId.keys()])].filter((id) => !snapshot.cases.some((item) => item.id === id)),
     scenarios: snapshot.cases.map((scenario) => {
       const candidate = current.cases.find((item) => item.id === scenario.id);
+      const currentItemId = candidate?.item_id ?? null;
+      const itemDrift = Boolean(candidate && currentItemId !== scenario.item_id);
       const record = byId.get(scenario.id);
       const context = record?.before ? { before: record.before, input: record.input } : null;
       const inputDrift = execution ? !context || !isDeepStrictEqual([scenario.before, scenario.input], [context.before, context.input]) : false;
@@ -91,9 +93,11 @@ export function buildReport(snapshot, records = [], execution = null) {
       return {
         ...scenario,
         input_drift: inputDrift,
+        current_item_id: currentItemId,
+        item_drift: itemDrift,
         candidate: context,
         removed: !candidate,
-        needs_attention: Boolean(execution && (inputDrift || !candidate || fields.some((field) => field.expectation !== "match" || field.observation !== "match" || field.assertion !== "passed"))),
+        needs_attention: Boolean(execution && (inputDrift || itemDrift || !candidate || fields.some((field) => field.expectation !== "match" || field.observation !== "match" || field.assertion !== "passed"))),
         fields,
       };
     }),

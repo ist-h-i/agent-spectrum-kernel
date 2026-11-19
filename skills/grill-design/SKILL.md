@@ -54,6 +54,8 @@ Check only branches relevant to the task:
 - state the tradeoff,
 - wait only if the answer materially changes the plan.
 
+When an adopted project has competing state owners, compatibility contracts or deployable slices that users can distinguish, or the user explicitly requests this strategy, compare the proposed owners and their consumers at the same distinguishing scenario. Pick the least costly adequate mechanism, including keeping the current structure; a mock-friendly class or a new service alone is not a reason to split. State which observation would rule out the chosen design and which work should wait for it. Use the selected `spec-driven-development` capability’s `references/decision-led-test-strategy.md` before choosing the boundary, even when the user did not name the method.
+
 4. If the repository can answer the question, inspect the repository instead of asking.
 
 5. Stop when the implementation boundary and acceptance criteria are clear.

@@ -279,6 +279,10 @@ test-first-verification
 Angularのrouted formを実装してください。generic workflowは維持し、Angular固有の制約と検証補助だけ angular-implementation-architecture から出してください。
 ```
 
+### テスト戦略で設計や順序を決める
+
+「今の案と別案で利用者が異なる結果を見る場面を示し、どの機能が責任を持つか、先に何を確かめるか、どこまで公開できるかを決めたい」と依頼します。[判断の進め方](../skills/spec-driven-development/references/decision-led-test-strategy.md)では、既存の要求・設計判断・作業計画をつなぎます。[確定見積の再発行](../skills/spec-driven-development/references/quote-reissue-decision.md)は、過去の金額を再現するために当初の設計と着手順を変える例です。テスト数を増やす手順でも、全プロジェクトに新しい文書・設定を導入する指示でもありません。
+
 ### 設計壁打ち
 
 使うSkill:

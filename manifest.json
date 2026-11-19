@@ -640,6 +640,13 @@
         "secondary": []
       },
       {
+        "id": "decision_led_test_strategy",
+        "signals": ["test strategy to decide architecture and ownership", "compare design options through observable outcomes", "In an adopted project two plausible owners of a stored fact give users different results after a change; which design and prerequisite should we choose?"],
+        "task_class": "design",
+        "primary": "spec-driven-development",
+        "secondary": []
+      },
+      {
         "id": "executable_spec_setup",
         "signals": ["executable-spec method setup", "specification test conventions", "specification index setup", "AI context retrieval setup", "verification selection rules", "specification scenario visualization", "unit-test scenario animation"],
         "task_class": "design",

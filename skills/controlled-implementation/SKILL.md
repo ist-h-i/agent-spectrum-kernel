@@ -68,6 +68,8 @@ Stop before implementation when:
 - generated/manual-edit boundaries are unclear,
 - a human decision is required.
 
+If the Work Package makes a later change depend on a distinguishing check, read the result for that exact promise, revision, and boundary before starting the dependent change. A counterexample reopens the responsible design; a missing result holds that task, not independently approved work. Record the affected task and next check in the existing contract rather than quietly substituting a unit test or a different population.
+
 Do not treat passing tests as permission to expand scope beyond the contract.
 Re-plan necessary work within existing authorization without asking again; an explicit forbidden boundary or unresolved upstream decision still blocks the affected work.
 

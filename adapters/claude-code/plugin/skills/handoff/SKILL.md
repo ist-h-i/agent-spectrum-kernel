@@ -2,7 +2,7 @@
 name: handoff
 description: Produce a precise next-task handoff through the fixed-entry Agent Spectrum Kernel profile.
 ---
-<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"handoff","k":"p","r":"ask-fixed-entry-assets-v1","p":"84ac8e62527a0aa682606856b04f7d217723aef09417ae5840ffc8c37bec1f3c","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"handoff","k":"p","r":"ask-fixed-entry-assets-v1","p":"446b9b9bcef746e527b58c0f39eaecfbf2bf2a8292b2a70291a0702390f8b17c","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Handoff
 

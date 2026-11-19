@@ -1,16 +1,17 @@
 ---
 name: spec-driven-development
-description: Define observable behavior and acceptance criteria, establish an executable-spec test method, or visualize specifications and unit-test behavior as scenarios for human review, preserving source IDs and evidence boundaries.
+description: Use test strategy to choose ownership, delivery order and release scope before design is fixed; define observable acceptance criteria, establish an executable-spec test method, or visualize specifications and unit-test behavior as scenarios for human review, preserving source IDs and evidence boundaries.
 ---
 
 # Spec-Driven Development
 
 ## Goal
 
-Turn a stable Requirement Contract or behavior request into an observable behavior delta before work packaging or implementation.
+Use an observable difference between plausible plans to inform a project decision, or turn an already stable Requirement Contract into an observable behavior delta before work packaging or implementation. Do not let a test decide an unresolved business promise.
 
 ## Use when
 
+- A test strategy must shape an unresolved requirement, architecture boundary, delivery sequence or release scope.
 - The request changes user-visible or caller-visible behavior.
 - The implementation touches multiple files/modules.
 - Acceptance criteria are missing.
@@ -23,7 +24,13 @@ Turn a stable Requirement Contract or behavior request into an observable behavi
 ## Do not use when
 
 - The task is a trivial localized edit.
-- A current Spec already exists and its acceptance criteria remain unchanged, unless establishing or consuming the executable-spec method below.
+- A current Spec already exists and its acceptance criteria remain unchanged, unless a structural decision is still open or the project is establishing or consuming the executable-spec method below.
+
+## When strategy must guide a decision before implementation
+
+For an explicit strategy request, or a material open decision on an adopting project, use [decision-led test strategy](references/decision-led-test-strategy.md). Start before the requirement or architecture is fixed: pick a situation where two plausible plans lead to different outcomes, identify who can decide the promise and what observation distinguishes the plans, then use the answer to keep or change ownership, work order or release scope. If a business choice is open, return it to its owner; use `requirement-grill` only if selected. Do not emit accepted business expectations or compile dependent implementation. Check each downstream capability before invoking it. If unavailable, name the missing handoff and decision in work terms; continue independent work without inventing that skill’s procedure. Use the existing design, Work Package and verification artifacts at their normal points; a strategy discussion alone neither requires project setup nor authorizes implementation or release.
+
+[Confirmed quote reissue](references/quote-reissue-decision.md) is the end-to-end worked example. The [local reservation example](references/examples/domain-context.md) shows a different decision: what one public operation can prove and why a concurrency or persistence claim would require another boundary.
 
 ## Executable-spec method for new projects
 
@@ -88,6 +95,8 @@ Conditional fields, omit when irrelevant:
 
 Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the spec artifact below; it does not repeat the envelope fields.
 
+For strategy work, report the actual decision (or the blocked choice and its owner), the distinguishing evidence, the resulting change or justified non-change in architecture/sequence/scope, and what remains unverified. Use the existing Issue, Requirement, ADR, Work Package or release record that owns each fact. Do not create another mandatory document.
+
 For method setup only, report the conventions/templates created, their verified availability, and any project-specific setup gaps instead of inventing a business Spec. A reusable skill package can be complete while a project's generator, CI, and domain decisions remain unconfigured; state the boundary explicitly.
 
 ```text
@@ -110,7 +119,7 @@ Conditional fields, omit when irrelevant:
 
 ## Exit criteria
 
-For method setup or scenario visualization, the applicable references and their entry points are available, examples are checked, and registration versus project initialization is distinguished. For behavior-definition work:
+For strategy work, the owner can trace an unresolved choice to its evidence, project consequence and revisit condition; creating more tests or recording an already decided plan is not a demonstrated project effect. For method setup or scenario visualization, the applicable references and their entry points are available, examples are checked, and registration versus project initialization is distinguished. For behavior-definition work:
 
 - Acceptance criteria are testable.
 - Observable behavior is separated from business rationale and executable task scope.
