@@ -48,6 +48,8 @@ Classify code as critical/security/boundary code when it touches any of these:
 
 Legacy code may be migration-staged only for pre-existing violations that are outside the requested change surface, are not relied on by the requested change, are not expanded, and satisfy the baseline rules in "Architecture Guard Rollout". New or expanded violations in touched code should be treated as new-code violations unless the change explicitly reduces the baseline.
 
+On an executable-spec project, when competing owners, a compatibility obligation, or a rollout choice would lead to different consumer-visible results, consult the selected `spec-driven-development` decision strategy before choosing the boundary. Test both proposals against the same promise: who establishes the fact, who must read it, and at what later time or through which other path? Carry the resulting owner and the missing or failed proof to the Work Package. A local refactor with a stable owner and unchanged promise does not need this step.
+
 ## Stability Gates
 
 - `MUST`: Violating this leaks external I/O, breaks dependency direction, duplicates mutable state ownership, leaks DTO/raw errors across a boundary, or hides an async lifetime.

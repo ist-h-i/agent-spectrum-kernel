@@ -37,7 +37,7 @@ test("初案は価格改定前には通るが、改定後に確定時の金額�
 });
 
 // @acceptance {"item_id":"AC-CONFIRMED-TOTAL","lifetime":"business"}
-test("確定してから価格を改定しても、新しい読み手の画面とCSVは同じ確定額を返す", (t) => {
+test("[AC-CONFIRMED-TOTAL] 確定してから価格を改定しても、新しい読み手の画面とCSVは同じ確定額を返す", (t) => {
   const file = confirmationFile(t);
   assert.deepEqual(openQuoteDesk(file, () => 1200).confirm("Q-101"), { totalYen: 1200 });
 
@@ -46,19 +46,20 @@ test("確定してから価格を改定しても、新しい読み手の画面�
 });
 
 // @acceptance {"item_id":"AC-LEGACY-UNAVAILABLE","lifetime":"business"}
-test("確定時の金額がない旧見積は画面とCSVの両方で再発行せず、値を補わない", (t) => {
+test("[AC-LEGACY-UNAVAILABLE] 確定時の金額がない旧見積は画面とCSVの両方で再発行せず、値を補わない", (t) => {
   const file = confirmationFile(t);
-  const legacy = JSON.stringify([{ id: "Q-099" }]);
-  writeFileSync(file, legacy);
+  const stored = JSON.stringify([{ id: "Q-099" }, { id: "Q-101", confirmedTotalYen: 1200 }]);
+  writeFileSync(file, stored);
   const reopened = openQuoteDesk(file, () => 1500);
 
   assert.throws(() => reopened.previewReissue("Q-099"), { code: "CONFIRMED_TOTAL_UNAVAILABLE" });
   assert.throws(() => reopened.exportReissueCsv("Q-099"), { code: "CONFIRMED_TOTAL_UNAVAILABLE" });
-  assert.equal(readFileSync(file, "utf8"), legacy);
+  assert.deepEqual(results(reopened, "Q-101"), confirmedAt1200);
+  assert.equal(readFileSync(file, "utf8"), stored);
 });
 
 // @acceptance {"item_id":"AC-DRAFT-LIVE-PRICE","lifetime":"business"}
-test("未確定の見積では価格改定後の価格を表示する", (t) => {
+test("[AC-DRAFT-LIVE-PRICE] 未確定の見積では価格改定後の価格を表示する", (t) => {
   let catalogPriceYen = 1200;
   const desk = openQuoteDesk(confirmationFile(t), () => catalogPriceYen);
   assert.deepEqual(desk.previewDraft(), { totalYen: 1200 });

@@ -636,7 +636,7 @@
       },
       {
         "id": "decision_led_test_strategy",
-        "signals": ["test strategy to decide architecture and ownership", "compare design options through observable outcomes", "choose work order and release scope through test strategy"],
+        "signals": ["test strategy to decide architecture and ownership", "compare design options through observable outcomes", "In an adopted project two plausible owners of a stored fact give users different results after a change; which design and prerequisite should we choose?"],
         "task_class": "design",
         "primary": "spec-driven-development",
         "secondary": []

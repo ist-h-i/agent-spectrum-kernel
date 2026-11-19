@@ -43,6 +43,8 @@ ASKでは`.agent-spectrum-kernel/codex-install-state.json`の`selected_skills`�
 仕様変更・バグ修正・リファクタリングでは、まず
 docs/ai/executable-spec-profile.md を読み、対象の仕様項目から
 テスト本体、業務コンテキスト、現在有効なADRへ進む。
+責務の候補によって利用者が受け取る結果が変わるときは、設計を決める前に
+spec-driven-development の references/decision-led-test-strategy.md を参照する。
 読む範囲と実行する検証範囲は別々に決める。
 記述規約・索引・取得手順・選定ルールは、インストール済み
 spec-driven-development の必要な参照だけを読む。
@@ -50,7 +52,7 @@ spec-driven-development の必要な参照だけを読む。
 
 ## 言語別の通常テスト
 
-[JavaScriptのテスト](examples/javascript/reservation.test.mjs)と[Pythonのテスト](examples/python/test_reservation.py)は、同じ架空の予約処理をそれぞれ独立した小さなプロジェクトとして示す。採用先の業務仕様ではない。[ドメインの説明](examples/domain-context.md)には目的と用語を置き、観測可能な条件はテストに置く。
+[JavaScriptのテスト](examples/javascript/reservation.test.mjs)と[Pythonのテスト](examples/python/test_reservation.py)は、同じ架空の予約処理をそれぞれ独立した小さなプロジェクトとして示す。採用先の業務仕様ではない。[ドメインの説明](examples/domain-context.md)には目的・用語に加え、なぜこの約束は単一の公開操作で十分か、並行予約ならどの保証を持ち越せないかを示す。観測可能な条件はテストに置く。設計・着手順・公開条件まで比較する場合は[見積の通し例](quote-reissue-decision.md)を使う。
 
 - suiteの`@spec`コメントにSpecのID、revision、合意状態、コンテキスト参照を一度置く。
 - ケース近傍の`@acceptance`コメントに項目IDと変更寿命を置く。
@@ -77,7 +79,7 @@ Pythonの`-B`は、配布対象の`references/`へバイトコードを生成し
   "source_scope": {"include": ["<actual source roots>"], "exclude": []},
   "generator": {"command": "<actual command>", "source": "<actual generator path>"},
   "items": [{
-    "spec_ref": {"artifact_id": "SPEC-RESERVATION", "item_id": "AC-EXCEEDS-CAPACITY", "observed_revision": 1},
+    "spec_ref": {"artifact_id": "SPEC-RESERVATION", "item_id": "AC-EXCEEDS-CAPACITY", "observed_revision": 2},
     "source": {"path": "<actual test path>", "anchor": "AC-EXCEEDS-CAPACITY"},
     "status": "accepted",
     "lifetime": "business",

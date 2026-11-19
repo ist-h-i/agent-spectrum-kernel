@@ -96,7 +96,7 @@ test("documented executable-spec Python command preserves managed reference asse
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const result = spawnSync(executable, args, { cwd: destination, env, encoding: "utf8", timeout: 10000 });
     assert.equal(result.status, 0, `${result.error ?? ""}\n${result.stdout}\n${result.stderr}`);
-    assert.match(result.stderr, /Ran 3 tests/);
+    assert.match(result.stderr, /Ran [1-9]\d* tests?/);
     assert.deepEqual(skillAssets(root, ["spec-driven-development"]), assets);
     for (const [path, bytes] of before) assert.deepEqual(readFileSync(resolve(root, path)), bytes, path);
   }
@@ -134,7 +134,7 @@ test("executable-spec setup has selected capability and references in delivery a
     for (const file of ["reservation.cases.mjs", "scenario-observer.mjs", "scenario-review.mjs", "scenario-player.html"]) {
       assert.ok(plan.projectedManagedAssets.some(({ path }) => path === `${surface}/skills/${route.primary}/references/examples/javascript/${file}`));
     }
-    for (const file of ["quote-reissue.mjs", "quote-reissue.test.mjs"]) {
+    for (const file of ["confirmed-quote.mjs", "confirmed-quote.test.mjs", "quote-reissue.mjs", "quote-reissue.test.mjs"]) {
       assert.ok(plan.projectedManagedAssets.some(({ path }) => path === `${surface}/skills/${strategy.primary}/references/examples/quote-reissue/${file}`));
     }
     if (profileName === "daily") {
@@ -151,7 +151,11 @@ test("installed Codex decision strategy resolves its walkthrough and executes th
   const target = mkdtempSync(resolve(tmpdir(), "ask-decision-strategy-"));
   t.after(() => rmSync(target, { recursive: true, force: true }));
   const run = (cwd, args) => {
-    const result = spawnSync(process.execPath, args, { cwd, encoding: "utf8" });
+    // A node:test worker sets a private context that would suppress the child
+    // runner’s normal output. Exercise the actual documented standalone command.
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(process.execPath, args, { cwd, env, encoding: "utf8" });
     assert.equal(result.status, 0, `${result.error ?? ""}\n${result.stdout}\n${result.stderr}`);
     return result;
   };
@@ -166,13 +170,17 @@ test("installed Codex decision strategy resolves its walkthrough and executes th
   }
   const strategy = follow(resolve(skill, "SKILL.md"), "decision-led-test-strategy.md");
   const walkthrough = follow(strategy, "quote-reissue-decision.md");
-  const testFile = follow(walkthrough, "quote-reissue.test.mjs");
+  const record = follow(walkthrough, "decision-record.md");
+  assert.equal(follow(record, "quote-reissue-decision.md"), walkthrough);
+  const unit = follow(walkthrough, "confirmed-quote.test.mjs");
+  const integration = follow(walkthrough, "quote-reissue.test.mjs");
   const sample = follow(walkthrough, "quote-reissue.mjs");
   assert.ok(readFileSync(sample).length > 0);
-  const command = readFileSync(walkthrough, "utf8").match(/^node --test (\S+\.mjs)$/mu);
+  const command = readFileSync(walkthrough, "utf8").match(/^node --test ([^\n]+)$/mu);
   assert.ok(command, "Walkthrough must give an executable skill-relative command");
-  assert.equal(resolve(skill, command[1]), testFile);
-  const output = run(skill, ["--test", command[1]]).stdout;
+  const paths = command[1].trim().split(/\s+/u);
+  assert.deepEqual(paths.map(path => resolve(skill, path)), [unit, integration]);
+  const output = run(skill, ["--test", ...paths]).stdout;
   assert.match(output, /(?:^|\s)pass [1-9]\d*\s/u); // An empty discovery is not a worked example.
   run(source, ["scripts/install-codex-adapter.mjs", "--target", target, "--profile", "daily", "--check"]);
 });

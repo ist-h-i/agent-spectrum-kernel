@@ -50,7 +50,7 @@ This is decision support. It may recommend a decision, but unresolved value, pri
    - Do not ask for facts that the repo or docs can answer.
    - If progress is possible, state the reversible assumption and keep it out of durable contracts.
 
-When a test strategy is being used to choose the requirement, present one situation in which plausible promises yield different results for the affected user. The business owner decides which result is acceptable; a passing prototype is not an approval. Preserve the rejected alternative or unresolved branch in the existing decision context. If the selected `spec-driven-development` capability is available, its `references/decision-led-test-strategy.md` connects that decision to design and delivery.
+When an adopted project has competing promises that would assign a different owner, compatibility promise or rollout scope, or the user explicitly requests a strategy, present one situation in which plausible promises yield different results for the affected user. The business owner decides which result is acceptable; a passing prototype is not an approval. Preserve the rejected alternative or unresolved branch in the existing decision context. If the selected `spec-driven-development` capability is available, its `references/decision-led-test-strategy.md` connects that decision to design and delivery.
 
 5. Produce a Requirement Contract that owns only the business decision.
 

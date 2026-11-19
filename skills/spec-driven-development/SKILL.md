@@ -30,7 +30,7 @@ Use an observable difference between plausible plans to inform a project decisio
 
 For an explicit strategy request, or a material open decision on an adopting project, use [decision-led test strategy](references/decision-led-test-strategy.md). Start before the requirement or architecture is fixed: pick a situation where two plausible plans lead to different outcomes, identify who can decide the promise and what observation distinguishes the plans, then use the answer to keep or change ownership, work order or release scope. If a business choice is open, return it to its owner; use `requirement-grill` only if selected. Do not emit accepted business expectations or compile dependent implementation. Check each downstream capability before invoking it. If unavailable, name the missing handoff and decision in work terms; continue independent work without inventing that skill’s procedure. Use the existing design, Work Package and verification artifacts at their normal points; a strategy discussion alone neither requires project setup nor authorizes implementation or release.
 
-[Confirmed quote reissue](references/quote-reissue-decision.md) is the end-to-end worked example. The separate reservation samples illustrate ordinary test writing; they are not a project decision framework.
+[Confirmed quote reissue](references/quote-reissue-decision.md) is the end-to-end worked example. The [local reservation example](references/examples/domain-context.md) shows a different decision: what one public operation can prove and why a concurrency or persistence claim would require another boundary.
 
 ## Executable-spec method for new projects
 

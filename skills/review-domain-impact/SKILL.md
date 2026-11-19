@@ -49,6 +49,8 @@ Treat missing, template, stale, or contradicted inputs as evidence limitations. 
 
 When a scenario animation is supplied or requested, compare its source acceptance revision, test expectations and observed execution, using `spec-driven-development/references/scenario-visual-review.md` only when that optional capability is selected. Read the underlying tests and mock boundaries. Keep unasserted values, changed inputs and unobserved behavior visible; replay success is not human approval or proof of application-wide behavior. The visual aid does not add or waive review gates.
 
+For a decision-led strategy, follow the agreed Requirement decision to the exact Spec item, chosen owner, Work Package/Verification obligation and executed Evidence used by this change. Compare supported and excluded populations. Green evidence for a draft, a different record, a mock or a previous revision cannot authorize confirmed output for the affected record. If the evidence contradicts the chosen boundary, identify the design or task that must be reopened; if the business promise changed, return that specific decision to its owner. Do not grant release approval here.
+
 2. Apply evidence priority.
 
 ```text

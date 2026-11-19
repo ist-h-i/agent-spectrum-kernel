@@ -87,11 +87,12 @@ function select(index){pause();selected=index;progress=0;const scenario=report.s
   if(report.mode==='preview')warnings.push('仕様のプレビューです。テスト・実装は未実行です。');
   if(report.execution&&(report.execution.exit_code!==0||report.execution.error))warnings.push('テスト実行に失敗があります。ログと未観測の項目を確認してください。');
   if(report.source_drift.length||report.revision_drift)warnings.push('取得時から参照元が変わっています。差分と仕様の版を確認してください。');
+  if(scenario.item_drift)warnings.push('対応する受入条件が変わりました: '+scenario.item_id+' → '+scenario.current_item_id+'。以前の条件を検証したとは判断できません。');
   if(scenario.input_drift)warnings.push('前提または入力が一致しない／取得できません。同じ条件の比較として扱えません。');
   if(scenario.removed)warnings.push('このケースは現在のfixtureから削除されています。');
   if(report.extra_cases.length)warnings.push('スナップショットにない追加ケース: '+report.extra_cases.join(', '));
   $('notice').textContent=warnings.join('\n');$('checks').replaceChildren();
-  for(const field of scenario.fields){const row=el('tr',undefined,$('checks'));el('td',field.field==='result'?'返り値':'確保数の変更',row);for(const key of ['expectation','observation','assertion']){const incomparable=scenario.input_drift&&key!=='assertion';el('td',report.mode==='preview'?'未実行':incomparable?'条件差分あり':labels[field[key]],row,report.mode==='preview'||incomparable?'unknown':statusClass(field[key]));}}
+  for(const field of scenario.fields){const row=el('tr',undefined,$('checks'));el('td',field.field==='result'?'返り値':'確保数の変更',row);for(const key of ['expectation','observation','assertion']){const incomparable=(scenario.input_drift||scenario.item_drift)&&key!=='assertion';el('td',report.mode==='preview'?'未実行':incomparable?'条件差分あり':labels[field[key]],row,report.mode==='preview'||incomparable?'unknown':statusClass(field[key]));}}
   $('evidence').textContent=JSON.stringify({source_spec:report.snapshot.spec,human_review:report.snapshot.human_review,snapshot_digest:report.snapshot_digest,source_drift:report.source_drift,snapshot_sources:report.snapshot.sources,current_sources:report.current_sources,scenario,execution:report.execution},null,2);draw();
 }
 report.scenarios.forEach((scenario,index)=>{const button=el('button',undefined,$('cases'),'case');el('span',String(index+1).padStart(2,'0'),button,'case-num');const text=el('span',scenario.title,button);el('small',inputLabel(scenario.input),text);if(scenario.needs_attention)el('span','要確認',text,'case-marker');button.addEventListener('click',()=>select(index));});

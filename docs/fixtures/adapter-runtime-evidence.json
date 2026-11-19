@@ -22,11 +22,11 @@
         "adapters/claude-code/project/.claude/hooks/hooks.json",
         "scripts/install-claude-adapter.mjs"
       ],
-      "subject_digest": "sha256:5d21df4214bf0ee72065c653f84479c4795b57e1b8b2c8f2686e9561118bc560",
+      "subject_digest": "sha256:74f9e3898dd2a4545ab70040be242fa83cb037d89f29d3ebb591fc474d6730d6",
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:0d7d5487cc71f61bbd20714b7514ea8c4aefbdda3850ae40740e722c66d4f3a1"
+      "profile_fingerprint": "sha256:8b27d1eec5345781f54604745576b30f1604c4ee09370261dee4600fa57204c1"
     },
     {
       "record_id": "codex-projection-manifest",
@@ -50,11 +50,11 @@
         "adapters/codex/commands/codex-exec.md",
         "scripts/install-codex-adapter.mjs"
       ],
-      "subject_digest": "sha256:84825bf2cb91ca176068925dd57bc8ac900c2973cb5e1dbea5c792ac9585ee56",
+      "subject_digest": "sha256:f7e5e405e61edec1908837fb12ca23502c335ab6f5decf1af531cc59a56e42c5",
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:1b18c2d9128beeeea7a2173a0ffb97e391aac70d8cee47efd2184a17a471e83f"
+      "profile_fingerprint": "sha256:912c4ffe5a78a3f7c36af2cf1793a97b937979f65292520e2dc99de979313350"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
