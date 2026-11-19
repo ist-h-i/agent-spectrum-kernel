@@ -89,6 +89,7 @@ The user-facing route should describe work steps and stop points without requiri
 | Adoption maturity, instruction quality, usage metrics, or multi-task adoption impact | `operating-mode-router` | Route to `observability_metrics` -> `skill-adoption-metrics` |
 | Evidence-backed full-layer engineering capability evaluation | `operating-mode-router` | Route to `observability_metrics` -> `engineering-capability-evaluation` |
 | Weekly/monthly reporting, recurring summary, scheduler, or automation cadence | `operating-mode-router` | Route to `operation_automation`; use report templates or external operation, not a delivery skill |
+| Requested interactive visualization of a PR change or existing code | `code-visualization` | Optional guide for a human reader; an actual review decision still uses `review-router`. |
 | Unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed |
 | Vague business intent, success condition, responsibility boundary, or domain rule impact before implementation | `requirement-grill` | `domain-rule-ledger` only to consume existing confirmed/verified rules or record explicitly requested durable rules; then route to `work-package-compiler`, `grill-design`, or `spec-driven-development` |
 | Confirmed Requirement Contract needs observable behavior definition | `spec-driven-development` | Reference the Requirement Contract and emit behavior delta only; `grill-design` first if technical choices remain |
