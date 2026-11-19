@@ -1,7 +1,7 @@
 {
   "version": "ceiling-public-v4-continuity",
   "id": "ch01-ledger-format-migration",
-  "input_digest": "sha256:02e96f8c9c11dc080d584319bc664173e1c9c049fb43ca2890922e1c7da69258",
+  "input_digest": "sha256:dacd574415dcbddb632358755812c0e15fa29a30789a913bcee9995236f97570",
   "files": [
     {
       "path": "harness/consumers.mjs",
@@ -70,8 +70,8 @@
     },
     {
       "path": "spec/requirements.md",
-      "sha256": "35a604bf1aa24d3376adac8a475376f8fef205834dd1f8ac9d143bcb2714fc0f",
-      "bytes": 2709
+      "sha256": "7c9e4c20bc71bcc4c82ba867867826b511e61c5b44bb2595e1e4923ff4ed279a",
+      "bytes": 3020
     },
     {
       "path": "spec/scenario-tests.md",

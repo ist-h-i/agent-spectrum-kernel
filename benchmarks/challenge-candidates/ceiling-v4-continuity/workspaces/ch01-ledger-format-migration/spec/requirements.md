@@ -1,6 +1,8 @@
 # Requirement groups and quantitative profile
 
-Each group has a fixed weight; extra cases in that group do not dilute earlier obligations. All checks assigned to a group must pass for its points. Normal behavior totals 85, scope preservation 5, and valid meaningful submitted tests 10. Submitted tests must pass on both conforming designs and fail on a relevant semantic fault; always-failing tests and import/setup failures do not earn detection credit. A conforming-reference defect or unexplained failure is unresolved, not an automatic submission failure. Critical violations (tenant leakage, lost or duplicated accepted durable transactions, false activation) are reported separately from points.
+Each group has a fixed weight; extra cases in that group do not dilute earlier obligations. All checks assigned to a group must pass for its points. Normal behavior totals 85 points and scope preservation 5 points. Critical violations (tenant leakage, lost or duplicated accepted durable transactions, false activation) are reported separately from points.
+
+**Submitted tests are assessed on two axes.** The suite must pass both conforming designs. If a test is proven to reject behavior the contract allows, the suite is marked nonconforming and cannot be accepted as-is. Detection is scored separately, up to 10 points: exclude the proven-invalid tests, then award points in proportion to the fixed catalog of distinct semantic faults detected by the remaining conforming tests. Always-failing tests and import/setup errors earn no detection credit. A reference defect, infrastructure failure or insufficient evidence is unresolved, not an automatic zero or pass.
 
 <a id="r1"></a>
 
