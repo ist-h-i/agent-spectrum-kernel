@@ -29,7 +29,12 @@ function tree(root,allowInternalLinks=false){
   if(stat.isDirectory())walk(path);else{assert.ok(stat.isFile());result.push({path,digest:hash(bytes(join(root,path)))});}
  }};walk();return result;
 }
-function verified(ref){assertNoSymlinkPathSegments(ref.path,'challenge asset');assert.equal(hash(bytes(ref.path)),ref.digest,'challenge asset drift');return bytes(ref.path);}
+function verified(ref){
+ assertNoSymlinkPathSegments(ref.path,'challenge asset');
+ const content=bytes(ref.path);
+ assert.equal(hash(content),ref.digest,'challenge asset drift');
+ return content;
+}
 function copyFiles(source,target,files){for(const f of files){safe(f.path);const content=verified({path:join(source,f.path),digest:f.digest});mkdirSync(dirname(join(target,f.path)),{recursive:true});writeFileSync(join(target,f.path),content,{flag:'wx',mode:0o644});}}
 export function listPracticalChallenges(){
  return readPracticalChallengeRegistrations();
@@ -128,11 +133,15 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  assert.ok(!existsSync(join(root,stage)),'stage consumed or unknown; inspect, never replay');
  const revealPath=join(workspace,m.registration.stages[1].update.target);
  assert.ok(!existsSync(revealPath),'reassessment update already exists in the solver workspace');
- let previous=null;
- if(stage==='reassessment'){previous=verifyStage(root,'initial');assert.ok(previous.receipt.session_id,'same-session resume requires observed session id');verified(m.update);}
+ let previous=null,updateBytes=null;
+ if(stage==='reassessment'){
+  previous=verifyStage(root,'initial');
+  assert.ok(previous.receipt.session_id,'same-session resume requires observed session id');
+  updateBytes=verified(m.update);
+ }
  for(const output of spec.outputs)assert.ok(!existsSync(join(workspace,output)),'stage output must not preexist');
  const before=tree(workspace,true);mkdirSync(join(root,stage),{mode:0o700});save(join(root,stage,'before.json'),before);
- if(stage==='reassessment')writeFileSync(join(workspace,spec.update.target),verified(m.update),{flag:'wx',mode:0o644});
+ if(updateBytes)writeFileSync(revealPath,updateBytes,{flag:'wx',mode:0o644});
  const invocationDigest=canonicalDigest({manifest:confirmation,stage});
  const outcome=await executeCodexPracticalAdapter({settings:{kind:'practical_codex_settings_v1',...m.options,evidence_kind:m.evidence_kind},
   controlRoot:join(root,stage),requestDigest:confirmation,commandDigest:canonicalDigest(m.options),invocationDigest,role:'task'},session,

@@ -53,9 +53,9 @@ private grader as an overlay. The overlay is inventoried and protected just like
 public task files. An absent overlay is a different experimental condition, not
 an implicit Full installation. Dependency installation is not performed by the
 runner; provision the same dependency/tool state in each workspace before start,
-without changing the frozen files. In-workspace dependency symlinks are allowed;
-links escaping the workspace are not. All additional initial-stage files are
-frozen before reassessment. Each inventoried file is bounded to 16 MiB.
+without changing the frozen files. Retain regular files in the workspace for
+the completed submission snapshot. All additional initial-stage files
+are frozen before reassessment. Each inventoried file is bounded to 16 MiB.
 
 The staged execution port reuses `executeCodexPracticalAdapter`,
 `executeCodexSession`, `parseUserCodexTelemetry` and standard provider receipts.
@@ -245,17 +245,13 @@ distributed. Actual AI APIs and external services are prohibited.
 Use the same `task-list`, `task-prepare --id ch08-growth-workspace --root /absolute/new-run --config /absolute/config.json`, exact-approval `challenge-start`,
 `challenge-resume`, and semantic handoff/import commands with the CH08 ID. The
 initial stage creates a runnable `app/` and `DELIVERY.md`; the second stage adds
-only `REASSESSMENT.md` after read-only checks. Unlike the review-only RC01,
-CH08 opts into `freeze_submission`: all files, including newly authored app
-sources, are pinned after initial delivery and after reassessment. Every stage
-verification checks those file bytes, and the final inventory rejects late
-additions before scoring. Symlinks are disallowed in that frozen submission;
-each file must fit the common 16 MiB bound. Existing RC01 registrations/runs
-retain their existing behavior. Neither stage executes without model-call
-authorization; synthetic injected sessions are explicitly labeled synthetic.
+only `REASSESSMENT.md` after read-only checks. Both RC01 and CH08 pin every
+workspace file after initial delivery and after reassessment, including authored
+app sources and reviews. The final inventory rejects changes to those files
+and late additions before scoring. Authorization is required for model calls.
+Injected sessions are labeled synthetic.
 
-The three files for the current CH08 evaluator are under `evaluator-v2/`.
-Copy them to the external isolated evaluator directory for a run.
+Use the three pinned CH08 evaluator files in the protected assets root.
 For `ui-functional-v2.2`, public `brief/rubric.json` presents the registered 2.1.0 evaluator rubric. There are
 no hidden functional requirements. An independent assessor must exercise the
 actual browser interactions and bind decisions to evidence. Functional /40 and

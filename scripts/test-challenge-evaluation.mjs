@@ -75,6 +75,12 @@ test('the reveal path is reserved and a post-turn update cannot be substituted b
  assert.equal(f.calls.length,0);
  rmSync(update);
  await f.run();
+ const protectedBytes=readFileSync(f.config.updatePath);
+ writeFileSync(f.config.updatePath,'Changed source.');
+ await assert.rejects(f.run('reassessment'),/challenge asset drift/);
+ assert.equal(f.calls.length,1);
+ assert.ok(!existsSync(join(f.root,'reassessment')));
+ writeFileSync(f.config.updatePath,protectedBytes);
  await f.run('reassessment');
  writeFileSync(update,'Substituted after the provider completed.');
  assert.throws(()=>preparePracticalChallengeScoreHandoff(f.root),/challenge asset drift/);

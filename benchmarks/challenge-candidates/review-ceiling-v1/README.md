@@ -2,7 +2,7 @@
 
 This **new candidate** is separate from the existing 24 tasks and ceiling CH01–CH06. It is a review task, not a repair contest. A large existing TypeScript system plus a synthetic multi-team portal must be assessed against product constraints, architecture contracts, operational evidence and observed UI behavior.
 
-Status: **registered separately from primary24; staged integration verified synthetically; real entry-point execution unverified**. Two pilot trials are documented below; model difficulty is not established. A large source tree does not establish difficulty. No score target is enforced by changing grading after a run.
+Status: **staged integration verified synthetically**. No model trials have measured this edition. A large source tree does not establish difficulty. The grading contract is fixed before a run.
 
 - `workspace/`: answer-free reviewer input; `task.md` is the starting point.
 - `evaluation-protocol.md`: public scoring dimensions and evidence semantics.
