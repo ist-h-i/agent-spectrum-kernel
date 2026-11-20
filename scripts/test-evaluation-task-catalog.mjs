@@ -28,6 +28,10 @@ test('one selection entry lists the current primary, business and staged tasks',
   assert.ok(matches[0].observations.some(item => item.skills.includes('controlled-implementation') && item.observation));
   assert.ok(cli('task-list', '--difficulty', 'unassessed').some(task => task.id === 'ch02-report-operations'));
   assert.ok(cli('task-list', '--type', 'test').some(task => task.id === 'ch08-growth-workspace'));
+  const staged = tasks.filter(task => task.input.kind === 'staged');
+  for (const task of staged) assert.ok(existsSync(join(source, task.difficulty_source)), task.id);
+  const logistics = tasks.find(task => task.input.kind === 'private');
+  assert.match(logistics.input.archive_api_path, new RegExp(`^repositories/[0-9]+/tarball/${logistics.input.revision}$`, 'u'));
   const business = tasks.find(task => task.id === 'ch02-report-operations');
   assert.ok(business.assessment.sources.some(source => source.path.endsWith('/contract.md')));
   assert.equal(business.assessment.input_manifest_digest, business.input.digest);

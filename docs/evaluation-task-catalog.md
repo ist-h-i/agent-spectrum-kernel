@@ -10,7 +10,7 @@ node scripts/practical-evaluation-cli.mjs task-prepare --id pf-observability-red
 
 パッケージ導入済みの環境では、同じ引数を `ask evaluate task-list` と `ask evaluate task-prepare` に渡します。
 
-- 難易度は `easy`、`easy_medium`、`medium`、`medium_hard`、`hard`、`unassessed` から指定できます。見立てに使った資料の種類は `difficulty_basis` に表示されます。
+- 難易度は `easy`、`easy_medium`、`medium`、`medium_hard`、`hard`、`unassessed` から指定できます。見立てに使った資料の種類は `difficulty_basis`、RC01・CH08の見立ての出典は `difficulty_source` に表示されます。
 - 課題タイプは `implementation`、`review`、`investigation`、`design`、`test`、`handoff`、`documentation` から指定できます。複数のタイプを持つ課題も同じIDで準備します。
 - スキルには [manifest.json](../manifest.json) のIDを指定します。複数の絞り込みを指定すると、すべてに一致する課題を表示します。採点で観測する内容は `observations` にあり、項目IDは同じ課題の `assessment` を参照します。
 
@@ -27,11 +27,17 @@ CH02〜CH06の既定は `one_shot` です。両モードとも共通仕様への
 
 ### 在庫・予約・物流
 
-権限のある評価担当者は、回答者向けの配布元から `task-list` に表示されたコミットを取得し、アクセス制限のある手元のディレクトリに置きます。`public-manifest.json`、`prompt.txt`、`public/` を含む配布先のルートを指定してください。配布目録とプロンプトのハッシュ、目録内の各ファイルを検証して回答者向け入力を準備します。
+一覧の `input.archive_api_path` は、回答者向け固定版を取得するGitHub APIのパスです。配布元を閲覧できるアカウントで認証済みの `gh` を使い、手元のアクセス制限されたディレクトリに展開します。`task-prepare` は配布目録とプロンプトのハッシュ、目録内の各ファイルを照合します。
 
 ```sh
+archive=$(node scripts/practical-evaluation-cli.mjs task-list |
+  jq -er '.[] | select(.id == "ch01-inventory-reservation-logistics") | .input.archive_api_path')
+input_dir=$(mktemp -d)
+input_dir=$(cd "$input_dir" && pwd -P)
+(umask 077; gh api "$archive" | tar -xzf - --strip-components 1 -C "$input_dir")
+
 node scripts/practical-evaluation-cli.mjs task-prepare --id ch01-inventory-reservation-logistics \
-  --root /absolute/new-logistics --logistics-source /absolute/authorized-distribution
+  --root /absolute/new-logistics --logistics-source "$input_dir"
 ```
 
 ### RC01・CH08

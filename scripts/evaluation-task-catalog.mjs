@@ -104,6 +104,7 @@ function stagedEntries(registrations) {
     return {
       id: row.id, title: title(join(row.workspace, taskPath)), domain: selection.domain,
       ...withDifficulty(selection.difficulty, 'author_estimate'),
+      difficulty_source: selection.difficulty_source,
       task_types: selection.task_types,
       input: {
         kind: 'staged', root: row.workspace, manifest: row.input_manifest.path,
@@ -128,6 +129,7 @@ function externalEntries(registrations) {
       kind: 'private', manifest: row.input_manifest.path, digest: row.input_manifest.digest,
       task_path: row.task_path, prompt_path: row.prompt.path, prompt_digest: row.prompt.digest,
       revision: row.revision, version: row.version,
+      archive_api_path: `repositories/${row.github_repository_id}/tarball/${row.revision}`,
     },
     assessment: { kind: 'access_controlled_acceptance_criteria', version: row.version, ...row.acceptance },
     criterionIds: row.acceptance_criterion_ids,

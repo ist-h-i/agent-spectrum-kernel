@@ -75,7 +75,8 @@
           "review",
           "investigation"
         ],
-        "difficulty": "hard"
+        "difficulty": "hard",
+        "difficulty_source": "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
       }
     },
     {
@@ -149,7 +150,8 @@
           "implementation",
           "test"
         ],
-        "difficulty": "hard"
+        "difficulty": "hard",
+        "difficulty_source": "benchmarks/challenge-candidates/ui-reconstruction-v1/README.md"
       }
     }
   ],
@@ -158,6 +160,7 @@
       "id": "ch01-inventory-reservation-logistics",
       "title": "複数職務で使う在庫・予約・物流アプリ",
       "domain": "inventory_reservation_logistics",
+      "github_repository_id": 1442456886,
       "revision": "714ea785dbbdb89111808e9b55b9d5f907cac9cf",
       "version": "comparison-business-2026-11-02.1",
       "input_manifest": {
