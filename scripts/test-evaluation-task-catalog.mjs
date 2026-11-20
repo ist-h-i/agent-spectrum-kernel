@@ -122,6 +122,28 @@ test('measured scores stay bound to the tested input, scoring definition and pro
   assert.equal(observe().edition, 'previous_input');
   result.conditions[0].scores.push(11);
   assert.throws(observe, /invalid model scores/u);
+
+  const staged = readEvaluationTaskRegistrations().tasks.find(task => task.id === 'ch08-growth-workspace');
+  registration.tasks = [staged];
+  const files = [`benchmarks/task-revisions/${staged.id}/input-manifest.json`, `benchmarks/task-revisions/${staged.id}/rubric.json`,
+    join(staged.input.root, 'task.md'), ...staged.acceptance_files];
+  for (const path of files) {
+    mkdirSync(join(root, path, '..'), { recursive: true });
+    copyFileSync(join(source, path), join(root, path));
+  }
+  const [study] = registration.model_studies;
+  registration.model_studies = [];
+  write();
+  const [challenge] = listEvaluationTasks();
+  study.protected_revision = registration.assets.revision;
+  study.results = [{task_id: challenge.id, input_version: challenge.input.version, input_digest: challenge.input.digest,
+    assessment_digest: challenge.assessment.digest, score_group: 'challenge', maximum_points: 100,
+    conditions: [{condition: 'control', scores: [50.25]}]}];
+  registration.model_studies = [study];
+  assert.equal(observe().edition, 'current');
+  study.results[0].score_group = 'product';
+  study.results[0].conditions[0].scores = [50];
+  assert.throws(observe, /maximum must match the registered rubric group/u);
 });
 
 test('every listed public task prepares independently through the selection CLI', () => {

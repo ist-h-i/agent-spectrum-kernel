@@ -107,7 +107,8 @@ function studyResultsByTask(studies, tasks) {
       const conditions = result.conditions.map(condition => {
         const { scores } = condition;
         assert.ok(condition.condition?.trim() && Array.isArray(scores) && scores.length
-          && scores.every(score => score === null || Number.isSafeInteger(score) && score >= 0 && score <= result.maximum_points),
+          && scores.every(score => score === null || (result.score_group === 'challenge' ? Number.isFinite(score) : Number.isSafeInteger(score))
+            && score >= 0 && score <= result.maximum_points),
         `invalid model scores for ${task_id}`);
         return { ...condition, trial_count: scores.length, scored_count: scores.filter(score => score !== null).length };
       });
