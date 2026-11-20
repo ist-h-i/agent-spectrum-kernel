@@ -1,45 +1,44 @@
 {
   "criteria": [
     {
-      "id": "reference-behavior",
+      "id": "statements",
       "points": 2,
-      "observation": "Returned groups match the reference, including strict selector identity, order, windows and repeated occurrences.",
+      "observation": "Reconstructs the records and amounts of issued statements across supported archive generations.",
       "skills": [
         "controlled-implementation"
       ]
     },
     {
-      "id": "next-call",
+      "id": "historical-changes",
       "points": 2,
-      "observation": "After in-place input edits a new call observes current events and boundaries while preserving inputs and fresh result arrays.",
+      "observation": "Reproduces the requested revisions after corrections, including repeated deliveries and pagination.",
       "skills": [
         "controlled-implementation"
       ]
     },
     {
-      "id": "sparse-runtime",
+      "id": "read-plan",
       "points": 2,
-      "observation": "On the fixed sparse workload the measured candidate meets the configured median target. Timing skipped after failed equivalence, missing output or inconclusive samples are unobserved.",
+      "observation": "Determines the attainable cost of complete historical evidence and enforces the caller’s allowance.",
       "skills": [
         "doubt-driven-development"
       ]
     },
     {
-      "id": "dense-runtime",
+      "id": "batch-efficiency",
       "points": 2,
-      "observation": "On the fixed dense workload the measured candidate meets the configured median target. Preserve observed failure, inconclusive and not timed as different outcomes.",
+      "observation": "Shares paid work across requests and serves the specified multi-zone workload.",
       "skills": [
         "doubt-driven-development"
       ]
     },
     {
-      "id": "measurement-evidence",
+      "id": "interrupted-restore",
       "points": 2,
-      "observation": "The account links exact source, workload and raw measurement to each functional or performance claim, preserves uncertainty and identifies which measurement would resolve it.",
+      "observation": "Handles supplier failures and subsequent calls within the statement and charging contracts.",
       "skills": [
-        "evidence-ledger"
-      ],
-      "requires_delivery": true
+        "doubt-driven-development"
+      ]
     }
   ]
 }
