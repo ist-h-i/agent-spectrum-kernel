@@ -1,6 +1,6 @@
 # CH08 UI-first semantic assessment v2
 
-Version 2.1.0; input version ui-functional-v2.1. Same CH08 task identity, not a ninth challenge.
+Rubric version 2.1.0. The common catalog identifies the version of the prepared task input.
 
 ## Why 40 functional / 60 UX
 

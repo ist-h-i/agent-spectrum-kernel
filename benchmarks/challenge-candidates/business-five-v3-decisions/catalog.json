@@ -1,6 +1,5 @@
 {
   "schema_version": 1,
-  "version": "business-five-20261120-outcomes1",
   "package": "business-five-v3-decisions",
   "task_count": 5,
   "task_type": "business_application_implementation",

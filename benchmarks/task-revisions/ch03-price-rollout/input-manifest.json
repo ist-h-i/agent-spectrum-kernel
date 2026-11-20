@@ -15,8 +15,8 @@
         },
         {
           "path": "public/tasks/ch03-price-rollout/TASK.md",
-          "bytes": 2367,
-          "sha256": "54f611ba792f4a290efc094a7d7c06cd1cb5545f49e5b9e5c11a9f4caae4c669"
+          "bytes": 2210,
+          "sha256": "293f0a269ee135a343c61c56b0c98d8f990156d15e5aed8eab52e9466011116a"
         },
         {
           "path": "public/tasks/ch03-price-rollout/acceptance.md",
@@ -82,8 +82,8 @@
         },
         {
           "path": "public/tasks/ch03-price-rollout/TASK.md",
-          "bytes": 2367,
-          "sha256": "54f611ba792f4a290efc094a7d7c06cd1cb5545f49e5b9e5c11a9f4caae4c669"
+          "bytes": 2210,
+          "sha256": "293f0a269ee135a343c61c56b0c98d8f990156d15e5aed8eab52e9466011116a"
         },
         {
           "path": "public/tasks/ch03-price-rollout/acceptance.md",
