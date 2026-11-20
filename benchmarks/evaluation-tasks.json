@@ -2,7 +2,7 @@
   "kind": "evaluation_task_registrations_v2",
   "assets": {
     "github_repository_id": 1442549076,
-    "revision": "823bab12e367e333bf475c4998e5bc84459b1668"
+    "revision": "02576c9c55f7393005c9ba203f9befd0264b556d"
   },
   "tasks": [
     {
@@ -602,7 +602,7 @@
         "kind": "private",
         "asset_path": "solver-inputs/ch01-inventory-reservation-logistics",
         "version": "comparison-business-2026-11-20.2",
-        "digest": "sha256:749bde3d6ac91c29bf24860013d5133fe373243ee7b407d663e770112d00eaf3",
+        "digest": "sha256:a3e83d4fe2fec623e06a7b4123b4d3a9fd576737d573062bc5707bd35aaf48a3",
         "modes": {
           "default": {
             "working_directory": "public",
@@ -837,7 +837,7 @@
             ],
             "update": {
               "target": "OPERATIONAL-UPDATE.md",
-              "digest": "sha256:b20b277e9357f72b9302bbdf2837c7baecab88844d684ee53889530890d77c7d",
+              "digest": "sha256:026e524c131082931172d6ef5cb039bb7829c22c7124a649629828e6101360af",
               "path": "task-revisions/rc01-shared-review-platform/stage-2.md",
               "scope": "protected"
             },
@@ -919,7 +919,7 @@
             "update": {
               "target": "OPERATIONAL-UPDATE.md",
               "path": "task-revisions/ch08-growth-workspace/stage-2.md",
-              "digest": "sha256:586fea7e247c527141b204e80893164ff7f7fe3289c7ceddbc7bd75faa8da5a1",
+              "digest": "sha256:8e10747b94197e86d354773981f9a7d548c0bbd1da7688f7e7672d2a368d0c38",
               "scope": "protected"
             },
             "prompt": "Continue this same trial. Read OPERATIONAL-UPDATE.md and perform its read-only checks against the frozen implementation. Add REASSESSMENT.md only. Change no existing files and add no other files. Retain the original workspace, local-only network boundary, tools, model and settings. Missing runtime evidence must remain explicit. Stop when the reassessment is saved."
