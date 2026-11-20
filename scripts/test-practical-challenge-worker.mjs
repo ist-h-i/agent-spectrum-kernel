@@ -10,11 +10,16 @@ import {createPracticalEvaluationCommandRuntime} from './instruction-loop-comman
 import {advancePracticalEvaluation} from './practical-evaluation-runner.mjs';
 const id='rc01-shared-review-platform',read=p=>JSON.parse(readFileSync(p));
 function tmp(t){const root=realpathSync(mkdtempSync(join(tmpdir(),'challenge-worker-')));t.after(()=>rmSync(root,{recursive:true,force:true}));return root;}
+function syntheticUpdate(root){
+ const path=join(root,'synthetic-update.md');
+ writeFileSync(path,'Synthetic later evidence for the stage lifecycle test.');
+ return path;
+}
 
 test('pinned supplements preserve declared Full context and reject missing, duplicate or drifted extras',t=>{
  const root=tmp(t),overlay=join(root,'overlay');mkdirSync(overlay);mkdirSync(join(overlay,'docs'));writeFileSync(join(overlay,'docs','contract.md'),'public instruction');
  const f={path:'docs/contract.md',digest:hash(Buffer.from('public instruction'))};
- const config={id,root:join(root,'run'),instructionsRoot:overlay,instructionsSupplements:[f],evidenceKind:'synthetic',options:{executable:realpathSync('/bin/echo'),model:'synthetic',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']};
+ const config={id,root:join(root,'run'),instructionsRoot:overlay,instructionsSupplements:[f],evidenceKind:'synthetic',updatePath:syntheticUpdate(root),options:{executable:realpathSync('/bin/echo'),model:'synthetic',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']};
  assert.equal(challenge.preparePracticalChallenge(config).status,'prepared');
  assert.deepEqual(read(join(config.root,'manifest.json')).instruction_supplements,[f]);
  assert.throws(()=>challenge.preparePracticalChallenge({...config,root:join(root,'no'),instructionsSupplements:[]}),/instruction-only/);
@@ -27,7 +32,7 @@ test('a standard staged trial dispatches exactly two linked turns; inspect and f
  t.mock.module('./practical-challenge-evaluation.mjs',{namedExports:{...challenge,preparePracticalChallengeScoreHandoff:()=>{handoffs++;return {semantic_assessment_required:true};}}});
  const worker=await import('./practical-challenge-worker.mjs?staged-test');
  const files=worker.registeredChallengeFiles(id),pub=canonicalDigest(files.map(({target,digest})=>({target,digest})));
- const settings={evidence_kind:'synthetic',cases:{[id]:{files,challenge:{id,toolchainRoots:['/usr']}}},conditions:{baseline:{files:[],codex:{executable:realpathSync('/bin/echo'),model:'synthetic',reasoning:'low',task_file:'task.md',timeout_ms:1000}}}};
+ const settings={evidence_kind:'synthetic',cases:{[id]:{files,challenge:{id,toolchainRoots:['/usr'],updatePath:syntheticUpdate(root)}}},conditions:{baseline:{files:[],codex:{executable:realpathSync('/bin/echo'),model:'synthetic',reasoning:'low',task_file:'task.md',timeout_ms:1000}}}};
  const job={kind:'trial',key:'synthetic',input:{row:{case_id:id,condition:'baseline',public_input_digest:pub}}};
  const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';t.after(()=>{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;});
  const session=async request=>{calls++;const resume=request.argv[1]==='resume';if(resume)assert.ok(request.argv.includes('synthetic-session'));
@@ -48,7 +53,7 @@ test('stage closure requires terminal results for required or allocated stages w
  t.mock.module('./practical-challenge-evaluation.mjs',{namedExports:{...challenge,preparePracticalChallengeScoreHandoff:()=>({semantic_assessment_required:true})}});
  const worker=await import('./practical-challenge-worker.mjs?allocated-stage-closure');
  const files=worker.registeredChallengeFiles(id),pub=canonicalDigest(files.map(({target,digest})=>({target,digest})));
- const settings={evidence_kind:'synthetic',cases:{[id]:{files,challenge:{id,toolchainRoots:['/usr']}}},conditions:{baseline:{files:[],codex:{executable:realpathSync('/bin/echo'),model:'synthetic',reasoning:'low',task_file:'task.md',timeout_ms:1000}}}};
+ const settings={evidence_kind:'synthetic',cases:{[id]:{files,challenge:{id,toolchainRoots:['/usr'],updatePath:syntheticUpdate(tmp(t))}}},conditions:{baseline:{files:[],codex:{executable:realpathSync('/bin/echo'),model:'synthetic',reasoning:'low',task_file:'task.md',timeout_ms:1000}}}};
  const job={kind:'trial',key:'closure',input:{row:{case_id:id,condition:'baseline',public_input_digest:pub}}};
  const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';t.after(()=>{if(old===undefined)delete process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;else process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED=old;});
  for(const scenario of [

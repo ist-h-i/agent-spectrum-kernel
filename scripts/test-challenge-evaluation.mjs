@@ -67,6 +67,19 @@ test('prepare freezes 151 public files; update and evaluator are not solver inpu
  assert.equal(existsSync(join(f.root,'workspace','rubric.json')),false);
  assert.throws(()=>preparePracticalChallenge(f.config),/fresh run/);
 });
+test('the reveal path is reserved and a post-turn update cannot be substituted before handoff', async t=>{
+ const f=setup(t);
+ const update=join(f.root,'workspace','OPERATIONAL-UPDATE.md');
+ writeFileSync(update,'Unauthorised update');
+ await assert.rejects(f.run(),/reassessment update already exists/);
+ assert.equal(f.calls.length,0);
+ rmSync(update);
+ await f.run();
+ await f.run('reassessment');
+ writeFileSync(update,'Substituted after the provider completed.');
+ assert.throws(()=>preparePracticalChallengeScoreHandoff(f.root),/challenge asset drift/);
+ assert.ok(!existsSync(join(f.root,'score-handoff.json')));
+});
 test('initial and same-session resume retain standard provider usage and frozen answers',async t=>{
  const f=setup(t);const first=await f.run();assert.equal(first.status,'awaiting_resume_confirmation');
  assert.equal(first.stages.initial.receipt.observation.metrics.input_tokens,9);

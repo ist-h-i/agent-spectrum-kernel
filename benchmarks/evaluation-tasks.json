@@ -869,7 +869,8 @@
           "status": "not_run",
           "ready_for_measurement": false,
           "limits": "Current staged input and private reveal have no measured model trials."
-        }
+        },
+        "freeze_submission": true
       },
       "acceptance_files": [
         "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"

@@ -126,6 +126,8 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  assert.ok(['initial','reassessment'].includes(stage));frozen(root,m);
  const spec=m.registration.stages.find(s=>s.id===stage),workspace=join(root,'workspace');
  assert.ok(!existsSync(join(root,stage)),'stage consumed or unknown; inspect, never replay');
+ const revealPath=join(workspace,m.registration.stages[1].update.target);
+ assert.ok(!existsSync(revealPath),'reassessment update already exists in the solver workspace');
  let previous=null;
  if(stage==='reassessment'){previous=verifyStage(root,'initial');assert.ok(previous.receipt.session_id,'same-session resume requires observed session id');verified(m.update);}
  for(const output of spec.outputs)assert.ok(!existsSync(join(workspace,output)),'stage output must not preexist');
@@ -138,6 +140,7 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
  let integrityError=null,outputs=[],submissionFiles=null;
  try{
   frozen(root,m);
+  if(!previous)assert.ok(!existsSync(revealPath),'initial submission supplied a reserved reassessment file');
   if(previous){verifyStage(root,'initial',{reassessmentSpec:spec});for(const f of before){if(f.link!==undefined)assert.equal(readlinkSync(join(workspace,f.path)),f.link,'runtime link changed');else verified({path:join(workspace,f.path),digest:f.digest});}
    const allowed=new Set([...before.map(f=>f.path),spec.update.target,...spec.outputs]);assert.ok(tree(workspace,true).every(f=>allowed.has(f.path)),'reassessment may only add REASSESSMENT.md');
    verified({path:join(workspace,spec.update.target),digest:m.update.digest});
@@ -159,11 +162,13 @@ export async function startPracticalChallenge(root,confirmation,{allowModelCalls
 }
 function challengeScorePacket(root,{evaluatorRoot=null}={}){
  root=resolve(root);const m=load(root);frozen(root,m);const stages=m.registration.stages.map(s=>verifyStage(root,s.id,{reassessmentSpec:m.registration.stages[1]}));
+ const reassessmentUpdate={path:m.registration.stages[1].update.target,digest:m.update.digest};
+ verified({path:join(root,'workspace',reassessmentUpdate.path),digest:reassessmentUpdate.digest});
  assert.ok(evaluatorRoot||m.evaluator?.root,'external semantic evaluator assets required');
  const evaluator=bindEvaluator(m.registration,evaluatorRoot??m.evaluator.root,root);
  for(const p of m.toolchain_roots)assert.ok(outside(p,evaluator.root),'evaluator overlaps solver toolchain access');
  const packet={kind:'practical_challenge_semantic_handoff_v1',fixture_id:m.registration.id,manifest_digest:canonicalDigest(m),evidence_kind:m.evidence_kind,
-  evaluator,stages:stages.map((s,i)=>({id:m.registration.stages[i].id,outputs:s.outputs,...(s.submission_files?{submission_files:s.submission_files}:{}),receipt:pin(join(root,m.registration.stages[i].id,'task-codex-provider.json')),usage_snapshot:pin(join(root,m.registration.stages[i].id,'usage-hierarchy.json'))})),
+  evaluator,reassessment_update:reassessmentUpdate,stages:stages.map((s,i)=>({id:m.registration.stages[i].id,outputs:s.outputs,...(s.submission_files?{submission_files:s.submission_files}:{}),receipt:pin(join(root,m.registration.stages[i].id,'task-codex-provider.json')),usage_snapshot:pin(join(root,m.registration.stages[i].id,'usage-hierarchy.json'))})),
   workspace:join(root,'workspace'),quality_score:null,semantic_assessment_required:true,automatic_semantic_scoring:false,
   method:'External semantic assessor evaluates frozen rubric against answer/source/transcript evidence; the pinned external score.mjs validates and totals those decisions only.',
   comparison_limits:m.comparison_limits};
