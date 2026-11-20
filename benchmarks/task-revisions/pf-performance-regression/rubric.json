@@ -38,7 +38,8 @@
       "observation": "The account links exact source, workload and raw measurement to each functional or performance claim, preserves uncertainty and identifies which measurement would resolve it.",
       "skills": [
         "evidence-ledger"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

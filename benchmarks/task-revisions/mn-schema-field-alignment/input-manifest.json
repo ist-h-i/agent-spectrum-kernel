@@ -1,7 +1,7 @@
 {
   "id": "mn-schema-field-alignment",
   "version": "task-revision-1",
-  "rubric_sha256": "a74c3b76d34bef3525762f4407d85d3c22988204272656743ef0b513142c68bf",
+  "rubric_sha256": "a17e6507e8e5ba318c026fb04580b8a990504dd3e2534267d0383dd1ef8bac37",
   "editable": [
     "workspace/schemas/member.schema.json",
     "workspace/test/member-record.test.mjs"

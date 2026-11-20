@@ -1,7 +1,7 @@
 {
   "id": "mn-build-option-update",
   "version": "task-revision-1",
-  "rubric_sha256": "e3c14ea80b6d7a5c06dd6805129d3f045b9a1d7e3fb695a2c3a9920370e219ae",
+  "rubric_sha256": "e87a898250be8a208794dad593550b3ba0601e5fa7df3558611810b6a93566f6",
   "editable": [
     "workspace/build.config.json"
   ],

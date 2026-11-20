@@ -30,7 +30,8 @@
       "observation": "The submitted sequence of starts, settlements and closing agrees with the adapter’s actual notifications for one and two views.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

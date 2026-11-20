@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { lstatSync, readdirSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { canonicalDigest, parseJsonRejectDuplicateKeys, assertNoSymlinkPathSegments } from './content-addressed-store.mjs';
 import { readStableFile } from './ask-benchmark-stable-file.mjs';
 import { listEvaluationTasks } from './evaluation-task-catalog.mjs';
+import { inspectPracticalChallengeScoreHandoff } from './practical-challenge-evaluation.mjs';
 import { readPrimaryRevision } from './evaluation-task-inputs.mjs';
 
 const boundedRead = (path, label) => readStableFile(path, label, 256 * 1024 * 1024);
@@ -37,8 +38,8 @@ function fixedChanges(task, workspace, current) {
     if (bytes.equals(actual)) continue;
     if (allowed.has(`${path}#json-block`)) {
       const outside = content => {
-        const blocks = [...content.matchAll(/^```json[^\S\n]*\r?\n[\s\S]*?^```[^\S\n]*(?=\n|$)/gmu)];
-        return blocks.length === 1 ? content.slice(0, blocks[0].index) + content.slice(blocks[0].index + blocks[0][0].length) : null;
+        const block = /(^```json[^\S\n]*\r?\n)([\s\S]*?)(^```[^\S\n]*(?=\n|$))/gmu;
+        return [...content.matchAll(block)].length === 1 ? content.replace(block, '$1<example>\n$3') : null;
       };
       const before = outside(bytes.toString('utf8'));
       if (before !== null && before === outside(actual.toString('utf8'))) continue;
@@ -61,8 +62,20 @@ export function inspectEvaluationSubmission(root) {
   assert.equal(preparation.workspace, workspace, 'preparation workspace changed');
   assertNoSymlinkPathSegments(workspace, 'submission workspace');
   const files = inventory(workspace);
+  const fileSetDigest = inventory => canonicalDigest([...inventory].map(([path, digest]) => ({path, digest})));
+  const delivery = join(directory, 'delivery');
+  let deliveryDigest = null;
+  if (existsSync(delivery)) {
+    assertNoSymlinkPathSegments(delivery, 'host delivery');
+    assert.ok(boundedRead(join(delivery, 'answer.md'), 'submitted final answer').bytes.toString('utf8').trim(),
+      'host delivery needs the final answer in answer.md');
+    deliveryDigest = fileSetDigest(inventory(delivery));
+  }
+  const staged = task.input.kind === 'staged';
+  const handoffDigest = staged && existsSync(join(directory, 'score-handoff.json'))
+    ? canonicalDigest(inspectPracticalChallengeScoreHandoff(directory)) : null;
   const subject = { task_id: task.id, input_digest: task.input.digest, assessment_digest: task.assessment.digest,
-    submission_digest: canonicalDigest([...files].map(([path, digest]) => ({ path, digest }))) };
+    submission_digest: fileSetDigest(files), delivery_digest: deliveryDigest, ...(staged ? {stage_handoff_digest: handoffDigest} : {}) };
   return { subject, file_count: files.size, fixed_input_changes: task.input.kind === 'primary' ? fixedChanges(task, workspace, files) : null,
     scoring_scope: task.assessment.scoring_scope, criteria: task.observations };
 }
@@ -86,12 +99,16 @@ export function scoreEvaluationSubmission(root, recordPath) {
   assert.equal(judgments.size, record.items.length, 'duplicate criterion judgment');
   const ids = new Set(criteria.map(item => item.criterion_id));
   assert.ok([...judgments.keys()].every(id => ids.has(id)), 'unknown criterion judgment');
-  const results = criteria.map(({ criterion_id, points: maximum, group }) => {
+  const results = criteria.map(({ criterion_id, points: maximum, group, requires_delivery }) => {
     const item = judgments.get(criterion_id);
     const reason = item?.reason ?? (item ? '' : 'No observation supplied.');
     assert.ok(typeof reason === 'string' && reason.trim(), 'a judgment needs its observation or missing evidence');
     if (item) assert.ok(item.points === null || (Number.isInteger(item.points) && item.points >= 0 && item.points <= maximum), 'points outside criterion range');
     const points = item?.points ?? null;
+    if (points !== null) {
+      assert.ok(!requires_delivery || subject.delivery_digest, 'submitted final answer is required for this judgment');
+      assert.ok(subject.stage_handoff_digest !== null, 'complete and verify the staged score handoff before judging stage outcomes');
+    }
     const evidence = points === null && !item?.evidence?.length ? [] : checkedEvidence(dirname(path), item.evidence);
     return { criterion_id, group: group ?? 'task', maximum, points, status: points === null ? 'unobserved' : 'observed', reason, evidence };
   });
@@ -105,6 +122,7 @@ export function scoreEvaluationSubmission(root, recordPath) {
   }
   const critical = record.critical_violations ?? [];
   assert.ok(Array.isArray(critical), 'critical violations must be an array');
+  assert.ok(!critical.length || subject.stage_handoff_digest !== null, 'a staged violation requires a verified score handoff');
   for (const entry of critical) {
     assert.ok(typeof entry.impact === 'string' && entry.impact.trim(), 'critical violation requires observed impact');
     checkedEvidence(dirname(path), entry.evidence);

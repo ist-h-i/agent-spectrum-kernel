@@ -1,7 +1,7 @@
 {
   "id": "mn-frontend-default-fix",
   "version": "task-revision-1",
-  "rubric_sha256": "56c379b09fc400ed39f8edaf0da58484818362d8d9a3725a2cddae86b5bf5c95",
+  "rubric_sha256": "f2286d7fa604d81885e20ecf509f42cc678fe866d2fcc8c287e6756d46a89359",
   "editable": [
     "workspace/src/display-preferences.mjs",
     "workspace/test/display-preferences.test.mjs"

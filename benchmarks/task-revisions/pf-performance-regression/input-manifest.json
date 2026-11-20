@@ -1,7 +1,7 @@
 {
   "id": "pf-performance-regression",
   "version": "task-revision-1",
-  "rubric_sha256": "06c18f3a5c8e50a2321938b48033662eeba177d0d634674ec977a0483f244a39",
+  "rubric_sha256": "4e378277a939a50d484c845f7129b0706546a1808485e15bf2dd146328a4a628",
   "editable": [
     "workspace/src/event-lookup.mjs"
   ],

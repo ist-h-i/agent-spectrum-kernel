@@ -1,7 +1,7 @@
 {
   "id": "mn-doc-config-correction",
   "version": "task-revision-1",
-  "rubric_sha256": "98ed8139e9958e03c8f4a520679d8c25bd2f8886691fcb0a541d821b1cef76c5",
+  "rubric_sha256": "b224125b604c8e518c0c38196891db4ed6649541f6e3c7cd02400e3d6c0b9551",
   "editable": [
     "workspace/docs/worker-retries.md#json-block"
   ],

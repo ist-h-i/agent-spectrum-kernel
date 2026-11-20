@@ -22,7 +22,8 @@
       "observation": "The submitted local suite passes for conforming readers on both capabilities and catches a combined legacy/saved-value regression missed by the distributed tests. Its report identifies the simulated environment.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

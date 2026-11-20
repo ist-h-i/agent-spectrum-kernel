@@ -1,7 +1,7 @@
 {
   "id": "hi-financial-state-integrity",
   "version": "task-revision-1",
-  "rubric_sha256": "1bce4959b40d6917a309bb27757a58b4748091c097947cd45af0c8324d02069f",
+  "rubric_sha256": "9b0df40bffbdef98adcdc475f50105f8da0adb759d4365e252c45619ffa0508f",
   "editable": [
     "workspace/src/ledger.mjs"
   ],

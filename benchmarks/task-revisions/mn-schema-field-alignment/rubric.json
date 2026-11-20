@@ -38,7 +38,8 @@
       "observation": "Actual public-API checks and the report distinguish a valid round trip from rejection and identify the observed error type.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

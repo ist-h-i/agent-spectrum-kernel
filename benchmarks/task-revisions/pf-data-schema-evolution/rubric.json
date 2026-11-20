@@ -38,7 +38,8 @@
       "observation": "The answer’s read, transition, repeat, rollback and rejection observations can be reproduced from its inputs; unexecuted evidence is identified.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

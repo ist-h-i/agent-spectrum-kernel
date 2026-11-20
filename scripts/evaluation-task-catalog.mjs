@@ -155,7 +155,7 @@ export function listEvaluationTasks({ difficulty, type, skill } = {}) {
     const observations = criteria.map(({ id: criterion_id, ...entry }) => {
       assert.ok(typeof criterion_id === 'string' && criterion_id.length && entry.observation?.trim() &&
         Number.isSafeInteger(entry.points) && entry.points > 0 && entry.skills?.length &&
-        entry.skills.every(id => skills.has(id)) && [undefined, 'product', 'submission'].includes(entry.group),
+        entry.skills.every(id => skills.has(id)) && [undefined, true].includes(entry.requires_delivery) && [undefined, 'product', 'submission'].includes(entry.group),
         `invalid skill observation in ${task.id}: ${criterion_id}`);
       return { criterion_id, ...entry };
     });

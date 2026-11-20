@@ -38,7 +38,8 @@
       "observation": "The reported input sequence, before-values and actual observations reproduce and distinguish a change that corrupts an earlier state despite matching final balances. A missing execution record is unobserved.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

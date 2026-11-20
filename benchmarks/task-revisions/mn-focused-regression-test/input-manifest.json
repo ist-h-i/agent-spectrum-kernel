@@ -1,7 +1,7 @@
 {
   "id": "mn-focused-regression-test",
   "version": "task-revision-1",
-  "rubric_sha256": "93f6596ddd56ebba283e4f5fc95da52d852c875a8652995e0978efa02fa1cab5",
+  "rubric_sha256": "934d85f483a90838046e52c9f204b0c3897d4018c8b6f29953d08d5a8cbd0c34",
   "editable": [
     "workspace/test/session-key.test.mjs"
   ],

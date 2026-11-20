@@ -1,7 +1,7 @@
 {
   "id": "pf-frontend-async-state",
   "version": "task-revision-1",
-  "rubric_sha256": "8eeb2765dc0b056b2b3a1cb93e439cf8d44f6a738ad009907403b7b9b859f467",
+  "rubric_sha256": "ca8ec9776f7f6c497e9c394cc368e235b363d61f18d7268a7390813fecda7022",
   "editable": [
     "workspace/src/search-controller.mjs"
   ],

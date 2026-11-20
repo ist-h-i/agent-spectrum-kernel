@@ -30,7 +30,8 @@
       "observation": "The reported result and description of the new observed coverage match the submitted test run.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

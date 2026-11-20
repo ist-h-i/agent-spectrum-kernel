@@ -1,7 +1,7 @@
 {
   "id": "pf-data-schema-evolution",
   "version": "task-revision-1",
-  "rubric_sha256": "a66b206a9d46547e4c23064b9cc5a25b6f60b823ffc55810899eb48aad48b714",
+  "rubric_sha256": "3663228b78e7ffdd73d3fc749d4142d2ec74e66b6c9717b18ea185155811a09a",
   "editable": [
     "workspace/migrations/v1-v2.plan.json",
     "workspace/schemas/customer-v2.schema.json"

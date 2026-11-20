@@ -38,7 +38,8 @@
       "observation": "The submitted report matches an actual check through initialization, display projection and later operations, within the adapter’s observable scope.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

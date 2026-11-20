@@ -30,7 +30,8 @@
       "observation": "The report agrees with the original documentation check on the submitted guide against the original defaults. Record an unexecuted check as unobserved.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

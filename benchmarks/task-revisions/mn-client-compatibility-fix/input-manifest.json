@@ -1,7 +1,7 @@
 {
   "id": "mn-client-compatibility-fix",
   "version": "task-revision-1",
-  "rubric_sha256": "e737df3d8f2b1f34e9411d6ec31b7c2ee88eb067e6de88fd3aa333c67aaf325c",
+  "rubric_sha256": "ef3ee29b21ad165db5887e29570d995227d41a461900b6eee5a5de93ceb8e956",
   "editable": [
     "workspace/src/preferences.mjs",
     "workspace/test/preferences.test.mjs"

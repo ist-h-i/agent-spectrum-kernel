@@ -22,7 +22,8 @@
       "observation": "The reported npm test result matches evidence for that check on the submitted configuration. An unexecuted check is unobserved.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     },
     {
       "id": "config-result",
@@ -30,7 +31,8 @@
       "observation": "The reported validate:build result agrees with the configuration check and limits claims to what it examined. An unexecuted check is unobserved.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }
