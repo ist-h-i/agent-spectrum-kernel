@@ -9,8 +9,16 @@
       ]
     },
     {
+      "id": "ci-state",
+      "points": 1,
+      "observation": "Reports the saved job's required-check outcome using the review schema.",
+      "skills": [
+        "review-automated-gate"
+      ]
+    },
+    {
       "id": "evidence-origin",
-      "points": 2,
+      "points": 1,
       "observation": "Accurately attributes each claim to its evidence.",
       "skills": [
         "review-automated-gate"

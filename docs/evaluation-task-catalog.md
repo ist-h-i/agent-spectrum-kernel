@@ -1,14 +1,37 @@
 # 評価課題の一覧と実行準備
 
-現行課題は [共通カタログ](../benchmarks/evaluation-tasks.json) に登録します。通常24問、業務6問、RC01、CH08が同じ入力目録と版の識別方法を使います。課題によって、配布モードや初回提出後の追加資料を指定できます。
+通常24問、業務6問、RC01、CH08を一つのカタログから選べます。全32問に固定番号（`ASK-001` など）、主な作業種別、対象領域のラベル、難易度の見立てがあります。[共通カタログ](../benchmarks/evaluation-tasks.json)
 
 ```sh
-ask evaluate task-list
+ask evaluate task-list --format table
+ask evaluate task-list --type review --label ui --format table
+ask evaluate task-list --label data-migration --label recovery --format table
+ask evaluate task-list --difficulty expert --format table
 ask evaluate task-list --difficulty medium_hard --type review --skill controlled-implementation
-ask evaluate task-prepare --id pf-observability-redaction --root /absolute/fresh-run
+ask evaluate task-list --id ASK-012
+ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
 ```
 
-ソースから使う場合は `ask evaluate` を `node scripts/practical-evaluation-cli.mjs` に置き換えます。難易度は出題時の見立てです。新しく校正した結果がなければ `unassessed` を使います。
+ソースから使う場合は `ask evaluate` を `node scripts/practical-evaluation-cli.mjs` に置き換えます。`task-list` の標準出力はJSONです。`--format table` では見立てと現行版の実測点を並べます。角括弧内は各試行の素点、`?` は採点不能、`—` は現行版の観測が未登録であることを表します。`earlier edition in JSON` が出た場合は、同じIDのJSONで以前の観測を参照できます。
+
+- `catalog_id` は領域、難易度、入力版が変わっても同じ問題を指します。新問には未使用の次の番号を割り当てます。`--id` には固定番号と従来の `id` のどちらも使えます。準備・採点記録の `task_id` には従来の `id` を使います。
+- `primary_type` は成果物から決めた主な作業種別です。`task_types` の先頭に置き、必要な副次作業を続けます。`--type` は両方を検索します。
+- `labels` は課題が扱う対象領域です。たとえば `ui` と `accessibility` は同じ課題に付けられます。`--label` を繰り返すと、すべてに合う課題を返します。使用できる語は共通カタログ冒頭の `labels` にあります。
+
+## 難易度と実モデルの観測
+
+`--difficulty` は出題者の見立てで絞り込みます。`unassessed` は見立てが未設定の課題、`expert` は上位モデルの評価を想定して設計した課題です。`difficulty_basis` でその根拠を確認できます。
+
+`task-list --id <ID>` の `difficulty_observations` には、実モデルで得た条件ごとの素点、満点、試行数、採点できた件数が入ります。空配列は登録済みの観測がないことを示します。試行したが採点できなかった点数は `null` です。`edition` は観測と現在の版との関係を示します。
+
+| 値 | 対象 |
+| --- | --- |
+| `current` | 入力版、入力目録、採点基準と非公開資材の固定値が一致 |
+| `previous_input` | 別の入力版または入力目録 |
+| `previous_protected_revision` | 同一入力で、以前の非公開資材の固定コミットを使うと元の採点定義を再現できる |
+| `previous_assessment` | 同一入力に対する異なる採点定義 |
+
+観測を追加するときは、`model_studies` に出典レポートの名前とSHA-256、ソースと非公開資材のコミット、モデル・推論強度・実行環境を記録します。各課題の観測は、実行した版の `input.version`、`input.digest`、`assessment.digest` に結び付けます。難易度を校正するときは条件ごとに得点分布と満点率を見て、同じ条件の反復と採点上の制約を確認します。1回の試行からは、その条件で実際に得た点数を報告できます。
 
 ## 回答者に渡す範囲
 

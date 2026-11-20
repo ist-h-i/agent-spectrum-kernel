@@ -1,91 +1,216 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Data migration resume handoff",
+  "title": "Profile migration shift report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["current_state", "safe_next_action", "resume_gate", "rollback", "continuation"],
+  "required": [
+    "dispatch",
+    "pages",
+    "containment"
+  ],
   "properties": {
-    "current_state": {
+    "dispatch": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "work",
+          "checkpoint",
+          "gates",
+          "next",
+          "sources",
+          "instruction"
+        ],
+        "properties": {
+          "work": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checkpoint": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "link",
+              "batch",
+              "upper"
+            ],
+            "properties": {
+              "link": {
+                "type": "string",
+                "minLength": 1
+              },
+              "batch": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "upper": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "gates": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "comparison",
+              "clients",
+              "release",
+              "delivery"
+            ],
+            "properties": {
+              "comparison": {
+                "enum": [
+                  "cleared",
+                  "open"
+                ]
+              },
+              "clients": {
+                "enum": [
+                  "cleared",
+                  "open"
+                ]
+              },
+              "release": {
+                "enum": [
+                  "cleared",
+                  "open"
+                ]
+              },
+              "delivery": {
+                "enum": [
+                  "never_sent",
+                  "unsettled",
+                  "applied",
+                  "not_applied"
+                ]
+              }
+            },
+            "description": "Open means that the current record does not establish clearance for the work order."
+          },
+          "next": {
+            "$ref": "#/$defs/action"
+          },
+          "sources": {
+            "$ref": "#/$defs/sources"
+          },
+          "instruction": {
+            "$ref": "#/$defs/instruction"
+          }
+        }
+      },
+      "description": "One instruction per assigned work order."
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "page",
+          "next",
+          "sources",
+          "instruction"
+        ],
+        "properties": {
+          "page": {
+            "type": "string",
+            "minLength": 1
+          },
+          "next": {
+            "$ref": "#/$defs/action"
+          },
+          "sources": {
+            "$ref": "#/$defs/sources"
+          },
+          "instruction": {
+            "$ref": "#/$defs/instruction"
+          }
+        }
+      },
+      "description": "One instruction for the affected work order in each independent page."
+    },
+    "containment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["phase", "last_completed_batch", "next_batch", "cursor", "write_traffic", "read_traffic", "blocking_condition_ids"],
+      "required": [
+        "actions",
+        "retain",
+        "instruction"
+      ],
       "properties": {
-        "phase": { "type": "string", "minLength": 1 },
-        "last_completed_batch": { "type": "integer", "minimum": 0 },
-        "next_batch": { "type": "integer", "minimum": 1 },
-        "cursor": { "type": "integer", "minimum": 0 },
-        "write_traffic": { "$ref": "#/$defs/trafficSplit" },
-        "read_traffic": { "$ref": "#/$defs/trafficSplit" },
-        "blocking_condition_ids": { "$ref": "#/$defs/nonEmptyStringArray" }
-      }
-    },
-    "safe_next_action": {
-      "type": ["object", "null"],
-      "additionalProperties": false,
-      "required": ["command_id", "mode", "owner", "required_evidence_ids"],
-      "properties": {
-        "command_id": { "type": "string", "minLength": 1 },
-        "mode": { "enum": ["read_only", "write"] },
-        "owner": { "type": "string", "minLength": 1 },
-        "required_evidence_ids": { "$ref": "#/$defs/nonEmptyStringArray" }
-      }
-    },
-    "resume_gate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["approval_role", "required_condition_ids"],
-      "properties": {
-        "approval_role": { "type": "string", "minLength": 1 },
-        "required_condition_ids": { "$ref": "#/$defs/nonEmptyStringArray" }
-      }
-    },
-    "rollback": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["supported_action_ids", "forbidden_action_ids", "data_preservation"],
-      "properties": {
-        "supported_action_ids": { "$ref": "#/$defs/nonEmptyStringArray" },
-        "forbidden_action_ids": { "$ref": "#/$defs/nonEmptyStringArray" },
-        "data_preservation": { "type": "string", "minLength": 1 }
-      }
-    },
-    "continuation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["stop_condition_ids", "verification_states", "evidence_references", "open_questions"],
-      "properties": {
-        "stop_condition_ids": { "$ref": "#/$defs/nonEmptyStringArray" },
-        "verification_states": {
+        "actions": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["verification_id", "state"],
-            "properties": {
-              "verification_id": { "type": "string", "minLength": 1 },
-              "state": { "enum": ["passed", "failed", "not_run"] }
-            }
+            "type": "string",
+            "minLength": 1
           }
         },
-        "evidence_references": { "$ref": "#/$defs/nonEmptyStringArray" },
-        "open_questions": { "$ref": "#/$defs/nonEmptyStringArray" }
-      }
+        "retain": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "instruction": {
+          "$ref": "#/$defs/instruction"
+        }
+      },
+      "description": "Specify the incident actions and record stores from the catalog that the on-call team needs."
     }
   },
   "$defs": {
-    "trafficSplit": {
+    "action": {
       "type": "object",
-      "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 100 },
-      "minProperties": 1,
-      "propertyNames": { "minLength": 1 }
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "owner",
+        "delivery_key"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dispatch command ID from the operations catalog."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delivery_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Use the recorded delivery key for key-bound commands and null otherwise."
+        }
+      }
     },
-    "nonEmptyStringArray": {
+    "sources": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Cite individual IDs from the supplied operational records for this decision."
+    },
+    "instruction": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Explain the choice, its scope and what the operator should do next."
     }
   }
 }

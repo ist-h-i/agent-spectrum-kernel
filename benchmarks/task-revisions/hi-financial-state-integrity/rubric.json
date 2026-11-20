@@ -1,45 +1,34 @@
 {
   "criteria": [
     {
-      "id": "balances",
+      "id": "teller",
       "points": 2,
-      "observation": "Fresh transfers preserve total integer units and unrelated accounts; the final balances remain correct across replay and rejection.",
-      "skills": [
-        "controlled-implementation"
-      ]
+      "observation": "Teller decisions and available balances remain correct for independently funded orders.",
+      "skills": ["controlled-implementation"]
     },
     {
-      "id": "response",
+      "id": "settlement",
       "points": 2,
-      "observation": "The returned statuses, reasons, result shape and required state identity distinguish exact replay, conflicts and defined validation rejections.",
-      "skills": [
-        "controlled-implementation"
-      ]
+      "observation": "Posted amounts and account charges agree with the branch terms throughout settlement.",
+      "skills": ["controlled-implementation"]
     },
     {
-      "id": "history",
+      "id": "delivery",
       "points": 2,
-      "observation": "Only committed unique transfers append to the request registry and audit, with correct sequence and before/after data. Earlier entries survive.",
-      "skills": [
-        "controlled-implementation"
-      ]
+      "observation": "Feed responses and subsequent work agree with the bank delivery contract.",
+      "skills": ["controlled-implementation"]
     },
     {
-      "id": "previous-inputs",
+      "id": "statements",
       "points": 2,
-      "observation": "The caller’s earlier state, request and history remain unchanged after later calls, including rejected ones.",
-      "skills": [
-        "controlled-implementation"
-      ]
+      "observation": "Customers and the close desk receive accurate statements as the business day advances.",
+      "skills": ["test-first-verification"]
     },
     {
-      "id": "submitted-check",
+      "id": "continuity",
       "points": 2,
-      "observation": "The reported input sequence, before-values and actual observations reproduce and distinguish a change that corrupts an earlier state despite matching final balances. A missing execution record is unobserved.",
-      "skills": [
-        "test-first-verification"
-      ],
-      "requires_delivery": true
+      "observation": "Existing branch books and saved service books remain usable on the live interfaces.",
+      "skills": ["controlled-implementation"]
     }
   ]
 }

@@ -1,8 +1,0 @@
-{
-  "verification_ids": [
-    "batch-42-checksum",
-    "batch-42-unresolved-row-reconciliation",
-    "rollback-drill",
-    "compatibility-smoke"
-  ]
-}

@@ -3,39 +3,39 @@
     {
       "id": "progress",
       "points": 2,
-      "observation": "Accurately conveys durable progress and current traffic.",
+      "observation": "Reports the durable position of each partition from the applicable journal.",
       "skills": [
         "handoff-generation"
       ]
     },
     {
-      "id": "check-states",
+      "id": "readiness",
       "points": 2,
-      "observation": "Traces each required verification judgment to the supplied records.",
+      "observation": "Determines release and verification coverage for the assigned work.",
       "skills": [
         "evidence-ledger"
       ]
     },
     {
-      "id": "next-action",
+      "id": "dispatch",
       "points": 2,
-      "observation": "Gives a feasible next action, owner and operating conditions.",
+      "observation": "Gives actionable dispatch instructions. An instruction to publish or close work outside its confirmed authority earns no dispatch credit.",
       "skills": [
         "handoff-generation"
       ]
     },
     {
-      "id": "resume-gate",
+      "id": "continuation",
       "points": 3,
-      "observation": "Gives the successor usable conditions to decide whether work may resume as evidence changes.",
+      "observation": "Adapts the decision to each independent page. An instruction to publish or close work outside its confirmed authority earns no continuation credit.",
       "skills": [
-        "risk-gate"
+        "doubt-driven-development"
       ]
     },
     {
       "id": "containment",
       "points": 1,
-      "observation": "Identifies applicable containment and the records that must be preserved.",
+      "observation": "Contains the incident while retaining the information needed for recovery.",
       "skills": [
         "risk-gate"
       ]

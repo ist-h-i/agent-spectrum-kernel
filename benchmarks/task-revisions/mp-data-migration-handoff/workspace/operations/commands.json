@@ -1,18 +1,71 @@
 {
-  "commands": [
+  "dispatch": [
     {
-      "command_id": "reconcile-batch-42-read-only",
-      "mode": "read_only",
-      "owner": "migration-operator",
-      "allowed_before_resume_approval": true,
-      "description": "Recompute batch 42 differences without changing persisted values or the durable cursor."
+      "id": "publish-range",
+      "owner": "backfill-operator",
+      "delivery_key": true,
+      "purpose": "Enqueue the work order at the primary."
     },
     {
-      "command_id": "resume-batch-42-write",
-      "mode": "write",
-      "owner": "migration-operator",
-      "allowed_before_resume_approval": false,
-      "description": "Resume batch 42 writes only after every recorded condition and owner approval are satisfied."
+      "id": "redeliver",
+      "owner": "backfill-operator",
+      "delivery_key": true,
+      "purpose": "Re-enqueue an established undelivered work order using its existing key."
+    },
+    {
+      "id": "read-primary-receipt",
+      "owner": "journal-operator",
+      "delivery_key": true,
+      "purpose": "Read current primary status for the recorded send and its barrier."
+    },
+    {
+      "id": "certify-nondelivery",
+      "owner": "journal-operator",
+      "delivery_key": true,
+      "purpose": "Fence the sender and resolve the key at the primary before reporting a disposition."
+    },
+    {
+      "id": "close-work-order",
+      "owner": "backfill-operator",
+      "delivery_key": true,
+      "purpose": "Acknowledge a range already published at the primary."
+    },
+    {
+      "id": "compare-range",
+      "owner": "profile-data-operator",
+      "delivery_key": false,
+      "purpose": "Obtain a current comparison for the assigned range and input fence."
+    },
+    {
+      "id": "certify-clients",
+      "owner": "compatibility-operator",
+      "delivery_key": false,
+      "purpose": "Obtain a certificate for the active builds and map."
+    },
+    {
+      "id": "request-grant",
+      "owner": "change-coordinator",
+      "delivery_key": false,
+      "purpose": "Submit this work order to the profile change owner for release."
+    },
+    {
+      "id": "wait",
+      "owner": "shift-lead",
+      "delivery_key": false,
+      "purpose": "Hold all action on the assignment."
     }
+  ],
+  "incident_actions": [
+    "pause-publisher",
+    "route-legacy",
+    "truncate-shadow",
+    "clear-outbox"
+  ],
+  "record_stores": [
+    "profile_v2",
+    "profile_v3",
+    "checkpoint-journal",
+    "dispatch-outbox",
+    "dashboard-cache"
   ]
 }

@@ -11,9 +11,13 @@
       "additionalProperties": false,
       "required": ["state", "evidence"],
       "properties": {
-        "state": { "enum": ["passed", "failed", "incomplete"] },
+        "state": {
+          "description": "Outcome of the required checks in the saved pull-request job. Use failed if a required check recorded a failure, passed if all required checks recorded success, and incomplete otherwise.",
+          "enum": ["passed", "failed", "incomplete"]
+        },
         "evidence": {
           "type": "array",
+          "description": "Identify the source of each result. For checks run during this review, identify the local command or observation in the conclusion.",
           "items": {
             "type": "object",
             "additionalProperties": false,

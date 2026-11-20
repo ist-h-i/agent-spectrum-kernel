@@ -1,0 +1,134 @@
+{
+  "pages": [
+    {
+      "page": "P-732",
+      "at": "2026-08-15T11:30:00Z",
+      "work": "W-682",
+      "entries": [
+        {
+          "id": "S-370",
+          "stream": "prod-w3",
+          "store": "primary",
+          "delivery_key": "i-24-c",
+          "status": "APPLIED",
+          "batch": 24,
+          "upper": 19680,
+          "journal": "L-680"
+        }
+      ]
+    },
+    {
+      "page": "P-738",
+      "at": "2026-08-15T11:30:00Z",
+      "work": "W-682",
+      "entries": [
+        {
+          "id": "F-272",
+          "stream": "prod-w3",
+          "sender": "g8",
+          "event": "fenced",
+          "barrier": 201
+        },
+        {
+          "id": "S-377",
+          "stream": "prod-w3",
+          "store": "primary",
+          "delivery_key": "i-24-c",
+          "status": "NOT_FOUND",
+          "read_through": 199
+        }
+      ]
+    },
+    {
+      "page": "P-751",
+      "at": "2026-08-15T11:30:00Z",
+      "work": "W-682",
+      "entries": [
+        {
+          "id": "F-275",
+          "stream": "prod-w3",
+          "sender": "g8",
+          "event": "fenced",
+          "barrier": 201
+        },
+        {
+          "id": "S-381",
+          "stream": "prod-w3",
+          "store": "primary",
+          "delivery_key": "i-24-c",
+          "status": "NOT_FOUND",
+          "read_through": 201
+        }
+      ]
+    },
+    {
+      "page": "P-760",
+      "at": "2026-08-15T11:30:00Z",
+      "work": "W-683",
+      "entries": [
+        {
+          "id": "R-604",
+          "grant": "center-14",
+          "issuer_seq": 1,
+          "issuer": "profile-change-owner",
+          "partition": "mesa",
+          "map": "p5",
+          "from_batch": 14,
+          "to_batch": 14,
+          "valid_from": "2026-08-15T10:00:00Z",
+          "valid_until": "2026-08-15T12:00:00Z",
+          "disposition": "granted"
+        }
+      ]
+    },
+    {
+      "page": "P-765",
+      "at": "2026-08-15T11:30:00Z",
+      "work": "W-683",
+      "entries": [
+        {
+          "id": "D-690",
+          "partition": "mesa",
+          "map": "p5",
+          "lower": 70410,
+          "upper": 70890,
+          "source_lsn": 1120,
+          "v2": "859f",
+          "v3": "859f",
+          "unresolved": 0
+        }
+      ]
+    },
+    {
+      "page": "P-769",
+      "at": "2026-08-15T11:30:00Z",
+      "work": "W-683",
+      "entries": [
+        {
+          "id": "D-694",
+          "partition": "mesa",
+          "map": "p5",
+          "lower": 70410,
+          "upper": 70890,
+          "source_lsn": 1120,
+          "v2": "859f",
+          "v3": "859f",
+          "unresolved": 0
+        },
+        {
+          "id": "R-621",
+          "grant": "center-14",
+          "issuer_seq": 1,
+          "issuer": "profile-change-owner",
+          "partition": "mesa",
+          "map": "p5",
+          "from_batch": 14,
+          "to_batch": 14,
+          "valid_from": "2026-08-15T10:00:00Z",
+          "valid_until": "2026-08-15T12:00:00Z",
+          "disposition": "granted"
+        }
+      ]
+    }
+  ]
+}

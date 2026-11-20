@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "id": "RT-21",
+      "partition": "grove",
+      "legacy": "2.8",
+      "current": "4.1"
+    },
+    {
+      "id": "RT-22",
+      "partition": "inlet",
+      "legacy": "2.8",
+      "current": "4.1"
+    },
+    {
+      "id": "RT-23",
+      "partition": "mesa",
+      "legacy": "2.9",
+      "current": "4.1"
+    }
+  ]
+}

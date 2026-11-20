@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "hi-financial-state-integrity",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,23 +9,33 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 2618,
-          "sha256": "7505b7c595118d5721357b024fcd039f10cb4858a32d8c4bc21dbeeeda8c0398"
+          "bytes": 1262,
+          "sha256": "b770aca5dd632d078eefcd663d55a3ce64d794c95abafe45147fbbd257415eb3"
         },
         {
           "path": "workspace/data/incident.json",
-          "bytes": 451,
-          "sha256": "044860fee3e97446b7955ee4b6602ce5bfb3447feccb37d730f1821f0bb7143e"
+          "bytes": 436,
+          "sha256": "a03062732f2408e285d0f62b6cb0524ba09d3e950ea04ad8ccb2520b5a63237d"
         },
         {
           "path": "workspace/data/initial-state.json",
-          "bytes": 142,
-          "sha256": "7e0bb7baeacb9b18406dca3985ce6ce45b03bebf7cb7c65d3fba4a8ed9a71d4e"
+          "bytes": 1232,
+          "sha256": "097d53fb1b80a7ee570292c9f19b8d3631b1331eddad7f7cefa0e40bc2691947"
+        },
+        {
+          "path": "workspace/docs/bank-interchange.md",
+          "bytes": 3279,
+          "sha256": "5e0bd7c76827dfce4f91ff5973d577e6a78fdda533e1a46e2bd731b39f7f7439"
+        },
+        {
+          "path": "workspace/docs/close-instructions.md",
+          "bytes": 2184,
+          "sha256": "dcd2c3bd5edfe5ce55e2087f8d6a3da4b523eb71cf7be780bbcbd1a154011544"
         },
         {
           "path": "workspace/docs/ledger-contract.md",
-          "bytes": 2677,
-          "sha256": "68ec21a9b07c506eabc47cb567250b1e409407fabce77cd6bca9105dc2fab8b4"
+          "bytes": 2543,
+          "sha256": "d1e791a382063312871a0041e8d72889625d578be3bd009b879698e96252b509"
         },
         {
           "path": "workspace/package.json",
@@ -33,20 +43,38 @@
           "sha256": "94fcbb8eafdca97376b4cb987d196f018d1ecc61cf8201421a8830d09a00bc86"
         },
         {
+          "path": "workspace/src/archive.mjs",
+          "bytes": 1570,
+          "sha256": "b9963a54212c537ebe8241724d153c3bd1f27b5f1909457624317221d2ae38e0"
+        },
+        {
+          "path": "workspace/src/clearing.mjs",
+          "bytes": 2001,
+          "sha256": "d7521a593cc0178c96dc26599cfce6ea03ca4593d3a72bff6b621a476dc7acd4"
+        },
+        {
           "path": "workspace/src/ledger.mjs",
-          "bytes": 663,
-          "sha256": "cc3ccada6f45ab113a65a80f6e54def1df66f380ec5d743ebbf8c7eaa17f76ed"
+          "bytes": 1400,
+          "sha256": "52bf7efe42dec2648238a4e8ac20603fb35e1e0d30ee4cb05b0184b7b5d102eb"
+        },
+        {
+          "path": "workspace/src/money.mjs",
+          "bytes": 378,
+          "sha256": "1a156288f844ad6c1148778099fe98831ef09cad35307381743d67b474b9ef58"
         },
         {
           "path": "workspace/test/ledger.test.mjs",
-          "bytes": 4073,
-          "sha256": "1ee13d777325c2dad8381ed0d23cdd3da959d6dbe8547270622e71a2897f3c5b"
+          "bytes": 1624,
+          "sha256": "ff7b611ce96892d473b22eef64c921ae7d4943fb4e6971cd38bf43bef33b79cf"
         }
       ]
     }
   },
-  "rubric_digest": "sha256:9b0df40bffbdef98adcdc475f50105f8da0adb759d4365e252c45619ffa0508f",
+  "rubric_digest": "sha256:c6b36c2405c9d63efe71883d84787fa3bb444ac51a2814c399bfe7237a067530",
   "editable": [
-    "workspace/src/ledger.mjs"
+    "workspace/src/archive.mjs",
+    "workspace/src/clearing.mjs",
+    "workspace/src/ledger.mjs",
+    "workspace/src/money.mjs"
   ]
 }

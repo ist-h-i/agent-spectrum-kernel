@@ -4,9 +4,123 @@
     "github_repository_id": 1442549076,
     "revision": "c9f261882bb72c7f4b2519f79408c47dd900a8d4"
   },
+  "labels": [
+    "accessibility",
+    "api",
+    "authorization",
+    "build",
+    "caching",
+    "ci",
+    "compatibility",
+    "concurrency",
+    "configuration",
+    "data-integrity",
+    "data-migration",
+    "dependencies",
+    "financial-records",
+    "infrastructure",
+    "observability",
+    "performance",
+    "persistence",
+    "privacy",
+    "recovery",
+    "release",
+    "schema",
+    "technical-debt",
+    "ui"
+  ],
+  "model_studies": [
+    {
+      "id": "sol-medium-20261120",
+      "report": "ASK-three-task-evaluation-20261120.md.txt",
+      "report_digest": "sha256:38dcca372d3712d15229a06a115a7387df2dde7579ab3f5e5d458d3727ba079d",
+      "source_revision": "941ed1dc6276cfec126671ee882ccb509a7d1619",
+      "protected_revision": "c9f261882bb72c7f4b2519f79408c47dd900a8d4",
+      "model": "gpt-6.2-sol",
+      "reasoning_effort": "medium",
+      "runtime": "Codex CLI 0.169.1",
+      "limitations": [
+        "One run per task and condition. The assessor scored anonymized answers. Independent test re-execution, byte checks and supplementary log checks were incomplete."
+      ],
+      "results": [
+        {
+          "task_id": "mn-doc-config-correction",
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:25dfcc2ff0542bcbe26d9c3bceb53939a1876193ffb61bb63b3466bda26f206c",
+          "assessment_digest": "sha256:1f87625149473cf823a4ab5f34273ddcc3d3af8a02f0ed4567ae127a7ee48b3b",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "ask_none",
+              "scores": [
+                10
+              ]
+            },
+            {
+              "condition": "ask_full_explicit_skill",
+              "skill": "test-first-verification",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "mp-ci-evidence-gap",
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:ff4f8c4a8230872dd6571ac607153b13db52b5cb090a3d39adf56e9cee24b953",
+          "assessment_digest": "sha256:9677252b5b1a52b1f877723c6954a7066ff61c2558ea62010c87e894c7e6a739",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "ask_none",
+              "scores": [
+                8
+              ]
+            },
+            {
+              "condition": "ask_full_explicit_skill",
+              "skill": "review-ai-quality",
+              "scores": [
+                8
+              ]
+            }
+          ],
+          "caveat": "Both scores include a deduction on a field whose scope was ambiguous in this edition."
+        },
+        {
+          "task_id": "mp-data-migration-handoff",
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:aebfe9500ab094999a4d79e7df42cf2aeb5cfd744f45b09c7bc1e44ff4ebde8e",
+          "assessment_digest": "sha256:56cdb23935dc85e23326d4cf3d16817909cce296dc760cb6d43c86d61b5cacf4",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "ask_none",
+              "scores": [
+                10
+              ]
+            },
+            {
+              "condition": "ask_full_explicit_skill",
+              "skill": "handoff-generation",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "tasks": [
     {
       "id": "hi-authorization-exception",
+      "catalog_id": "ASK-001",
+      "labels": [
+        "authorization",
+        "api"
+      ],
       "domain": "security_authorization",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -30,6 +144,13 @@
     },
     {
       "id": "hi-external-action-approval",
+      "catalog_id": "ASK-002",
+      "labels": [
+        "infrastructure",
+        "authorization",
+        "release",
+        "recovery"
+      ],
       "domain": "iac_operations",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -53,19 +174,30 @@
     },
     {
       "id": "hi-financial-state-integrity",
+      "catalog_id": "ASK-003",
+      "labels": [
+        "financial-records",
+        "data-integrity",
+        "compatibility",
+        "persistence",
+        "technical-debt"
+      ],
       "domain": "backend_financial",
-      "difficulty": "hard",
-      "difficulty_basis": "portfolio_estimate",
+      "difficulty": "expert",
+      "difficulty_basis": "author_estimate",
       "task_types": [
-        "investigation",
-        "implementation"
+        "implementation",
+        "investigation"
       ],
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-financial-state-integrity",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
-          "workspace/src/ledger.mjs"
+          "workspace/src/archive.mjs",
+          "workspace/src/clearing.mjs",
+          "workspace/src/ledger.mjs",
+          "workspace/src/money.mjs"
         ],
         "modes": {
           "default": {
@@ -77,6 +209,12 @@
     },
     {
       "id": "hi-versioned-migration-safety",
+      "catalog_id": "ASK-004",
+      "labels": [
+        "data-migration",
+        "compatibility",
+        "recovery"
+      ],
       "domain": "data_schema",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -100,6 +238,12 @@
     },
     {
       "id": "mn-build-option-update",
+      "catalog_id": "ASK-005",
+      "labels": [
+        "build",
+        "ci",
+        "configuration"
+      ],
       "domain": "ci_build",
       "difficulty": "medium",
       "difficulty_basis": "portfolio_estimate",
@@ -123,6 +267,11 @@
     },
     {
       "id": "mn-client-compatibility-fix",
+      "catalog_id": "ASK-006",
+      "labels": [
+        "compatibility",
+        "persistence"
+      ],
       "domain": "client_mobile",
       "difficulty": "medium",
       "difficulty_basis": "portfolio_estimate",
@@ -147,6 +296,10 @@
     },
     {
       "id": "mn-doc-config-correction",
+      "catalog_id": "ASK-007",
+      "labels": [
+        "configuration"
+      ],
       "domain": "docs_config",
       "difficulty": "easy",
       "difficulty_basis": "portfolio_estimate",
@@ -170,6 +323,10 @@
     },
     {
       "id": "mn-focused-regression-test",
+      "catalog_id": "ASK-008",
+      "labels": [
+        "caching"
+      ],
       "domain": "testing",
       "difficulty": "medium",
       "difficulty_basis": "portfolio_estimate",
@@ -193,6 +350,11 @@
     },
     {
       "id": "mn-frontend-default-fix",
+      "catalog_id": "ASK-009",
+      "labels": [
+        "ui",
+        "persistence"
+      ],
       "domain": "frontend",
       "difficulty": "medium",
       "difficulty_basis": "portfolio_estimate",
@@ -217,6 +379,11 @@
     },
     {
       "id": "mn-schema-field-alignment",
+      "catalog_id": "ASK-010",
+      "labels": [
+        "schema",
+        "compatibility"
+      ],
       "domain": "data_schema",
       "difficulty": "easy_medium",
       "difficulty_basis": "portfolio_estimate",
@@ -241,6 +408,11 @@
     },
     {
       "id": "mp-accessibility-interaction-review",
+      "catalog_id": "ASK-011",
+      "labels": [
+        "ui",
+        "accessibility"
+      ],
       "domain": "accessibility",
       "difficulty": "medium_hard",
       "difficulty_basis": "portfolio_estimate",
@@ -264,6 +436,11 @@
     },
     {
       "id": "mp-ci-evidence-gap",
+      "catalog_id": "ASK-012",
+      "labels": [
+        "ci",
+        "build"
+      ],
       "domain": "ci_build",
       "difficulty": "medium_hard",
       "difficulty_basis": "portfolio_estimate",
@@ -274,7 +451,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/mp-ci-evidence-gap",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/review.json"
         ],
@@ -288,6 +465,12 @@
     },
     {
       "id": "mp-data-migration-handoff",
+      "catalog_id": "ASK-013",
+      "labels": [
+        "data-migration",
+        "compatibility",
+        "recovery"
+      ],
       "domain": "data_schema",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -297,7 +480,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/mp-data-migration-handoff",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/handoff.json"
         ],
@@ -311,6 +494,10 @@
     },
     {
       "id": "mp-frontend-state-review",
+      "catalog_id": "ASK-014",
+      "labels": [
+        "ui"
+      ],
       "domain": "frontend",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -334,6 +521,12 @@
     },
     {
       "id": "mp-iac-rollback-design",
+      "catalog_id": "ASK-015",
+      "labels": [
+        "infrastructure",
+        "release",
+        "recovery"
+      ],
       "domain": "iac_cloud",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -357,6 +550,11 @@
     },
     {
       "id": "mp-performance-investigation",
+      "catalog_id": "ASK-016",
+      "labels": [
+        "performance",
+        "observability"
+      ],
       "domain": "performance",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -380,6 +578,11 @@
     },
     {
       "id": "pf-api-pagination-behavior",
+      "catalog_id": "ASK-017",
+      "labels": [
+        "api",
+        "compatibility"
+      ],
       "domain": "backend_api",
       "difficulty": "medium",
       "difficulty_basis": "portfolio_estimate",
@@ -405,6 +608,12 @@
     },
     {
       "id": "pf-ci-cache-flake",
+      "catalog_id": "ASK-018",
+      "labels": [
+        "ci",
+        "build",
+        "caching"
+      ],
       "domain": "ci_build",
       "difficulty": "medium_hard",
       "difficulty_basis": "portfolio_estimate",
@@ -428,6 +637,13 @@
     },
     {
       "id": "pf-data-schema-evolution",
+      "catalog_id": "ASK-019",
+      "labels": [
+        "schema",
+        "data-migration",
+        "compatibility",
+        "recovery"
+      ],
       "domain": "data_schema",
       "difficulty": "medium",
       "difficulty_basis": "portfolio_estimate",
@@ -453,12 +669,17 @@
     },
     {
       "id": "pf-frontend-async-state",
+      "catalog_id": "ASK-020",
+      "labels": [
+        "ui",
+        "concurrency"
+      ],
       "domain": "frontend",
       "difficulty": "medium_hard",
       "difficulty_basis": "portfolio_estimate",
       "task_types": [
-        "investigation",
-        "implementation"
+        "implementation",
+        "investigation"
       ],
       "input": {
         "kind": "primary",
@@ -477,6 +698,12 @@
     },
     {
       "id": "pf-library-compat-upgrade",
+      "catalog_id": "ASK-021",
+      "labels": [
+        "dependencies",
+        "compatibility",
+        "recovery"
+      ],
       "domain": "cross_platform",
       "difficulty": "hard",
       "difficulty_basis": "portfolio_estimate",
@@ -519,6 +746,11 @@
     },
     {
       "id": "pf-observability-redaction",
+      "catalog_id": "ASK-022",
+      "labels": [
+        "observability",
+        "privacy"
+      ],
       "domain": "observability_security",
       "difficulty": "medium_hard",
       "difficulty_basis": "portfolio_estimate",
@@ -544,17 +776,24 @@
     },
     {
       "id": "pf-performance-regression",
+      "catalog_id": "ASK-023",
+      "labels": [
+        "performance",
+        "compatibility",
+        "data-integrity",
+        "technical-debt"
+      ],
       "domain": "performance",
-      "difficulty": "hard",
-      "difficulty_basis": "portfolio_estimate",
+      "difficulty": "expert",
+      "difficulty_basis": "author_estimate",
       "task_types": [
-        "investigation",
-        "implementation"
+        "implementation",
+        "investigation"
       ],
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/pf-performance-regression",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/src/event-lookup.mjs"
         ],
@@ -568,6 +807,12 @@
     },
     {
       "id": "pf-review-error-contract",
+      "catalog_id": "ASK-024",
+      "labels": [
+        "api",
+        "compatibility",
+        "recovery"
+      ],
       "domain": "backend_api",
       "difficulty": "medium_hard",
       "difficulty_basis": "portfolio_estimate",
@@ -591,6 +836,15 @@
     },
     {
       "id": "ch01-inventory-reservation-logistics",
+      "catalog_id": "ASK-025",
+      "labels": [
+        "ui",
+        "concurrency",
+        "data-integrity",
+        "authorization",
+        "persistence",
+        "performance"
+      ],
       "domain": "inventory_reservation_logistics",
       "difficulty": "unassessed",
       "difficulty_basis": "no_difficulty_estimate",
@@ -601,8 +855,8 @@
       "input": {
         "kind": "private",
         "asset_path": "solver-inputs/ch01-inventory-reservation-logistics",
-        "version": "comparison-business-2026-11-20.2",
-        "digest": "sha256:a3e83d4fe2fec623e06a7b4123b4d3a9fd576737d573062bc5707bd35aaf48a3",
+        "version": "comparison-business-2026-11-21.1",
+        "digest": "sha256:edcdab835818027b17f1719315c71ba2bcafabdc4d7e516f27f5590547fb3a7a",
         "modes": {
           "default": {
             "working_directory": "public",
@@ -629,6 +883,13 @@
     },
     {
       "id": "ch02-report-operations",
+      "catalog_id": "ASK-026",
+      "labels": [
+        "ui",
+        "compatibility",
+        "persistence",
+        "recovery"
+      ],
       "domain": "durable_compatibility_recovery",
       "difficulty": "unassessed",
       "difficulty_basis": "no_difficulty_estimate",
@@ -663,6 +924,13 @@
     },
     {
       "id": "ch03-price-rollout",
+      "catalog_id": "ASK-027",
+      "labels": [
+        "ui",
+        "data-migration",
+        "compatibility",
+        "recovery"
+      ],
       "domain": "live_migration_rollback",
       "difficulty": "unassessed",
       "difficulty_basis": "no_difficulty_estimate",
@@ -697,6 +965,12 @@
     },
     {
       "id": "ch04-document-access",
+      "catalog_id": "ASK-028",
+      "labels": [
+        "ui",
+        "authorization",
+        "privacy"
+      ],
       "domain": "authorization_lifetime",
       "difficulty": "unassessed",
       "difficulty_basis": "no_difficulty_estimate",
@@ -731,6 +1005,14 @@
     },
     {
       "id": "ch05-sales-reconciliation",
+      "catalog_id": "ASK-029",
+      "labels": [
+        "ui",
+        "financial-records",
+        "data-integrity",
+        "compatibility",
+        "recovery"
+      ],
       "domain": "stream_reconciliation_space",
       "difficulty": "unassessed",
       "difficulty_basis": "no_difficulty_estimate",
@@ -765,6 +1047,14 @@
     },
     {
       "id": "ch06-build-operations",
+      "catalog_id": "ASK-030",
+      "labels": [
+        "ui",
+        "build",
+        "caching",
+        "release",
+        "dependencies"
+      ],
       "domain": "build_release_dependencies",
       "difficulty": "unassessed",
       "difficulty_basis": "no_difficulty_estimate",
@@ -799,6 +1089,14 @@
     },
     {
       "id": "rc01-shared-review-platform",
+      "catalog_id": "ASK-031",
+      "labels": [
+        "ui",
+        "accessibility",
+        "release",
+        "compatibility",
+        "authorization"
+      ],
       "domain": "release_review",
       "difficulty": "hard",
       "difficulty_basis": "author_estimate",
@@ -878,13 +1176,19 @@
     },
     {
       "id": "ch08-growth-workspace",
+      "catalog_id": "ASK-032",
+      "labels": [
+        "ui",
+        "accessibility",
+        "persistence"
+      ],
       "domain": "ui_reconstruction",
       "difficulty": "hard",
       "difficulty_basis": "author_estimate",
       "difficulty_source": "benchmarks/challenge-candidates/ui-reconstruction-v1/README.md",
       "task_types": [
-        "design",
         "implementation",
+        "design",
         "test"
       ],
       "input": {

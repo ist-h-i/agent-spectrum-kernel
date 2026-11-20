@@ -14,8 +14,7 @@ import {prepareEvaluationTaskInput} from './evaluation-task-inputs.mjs';
 function prepareSelectedTask(options) {
   assert.ok(options['--id'] && options['--root'], 'task-prepare requires --id and --root');
   const root = resolve(options['--root']);
-  const task = listEvaluationTasks().find(row => row.id === options['--id']);
-  assert.ok(task, `unknown evaluation task: ${options['--id']}`);
+  const [task] = listEvaluationTasks({ id: options['--id'] });
   const { input, assessment } = task;
   const deliveryMode = options['--delivery-mode'], assetsRoot = options['--assets-root'];
   assert.ok(!deliveryMode || input.kind === 'business', '--delivery-mode requires CH02–06');
@@ -25,7 +24,7 @@ function prepareSelectedTask(options) {
   let prepared;
   if (configPath) {
     const config = readJsonFileStrict(resolve(configPath));
-    assert.ok(config.id === undefined || config.id === task.id, 'staged config task ID differs from --id');
+    assert.ok(config.id === undefined || config.id === task.id || config.id === task.catalog_id, 'staged config task ID differs from --id');
     assert.ok(config.root === undefined || resolve(config.root) === root, 'staged config root differs from --root');
     assert.ok(!assetsRoot || !config.assetsRoot || resolve(assetsRoot) === resolve(config.assetsRoot),
       'staged config assets root differs from --assets-root');
@@ -43,16 +42,44 @@ function prepareSelectedTask(options) {
   return report;
 }
 
+function catalogTable(tasks) {
+  const scoreCell = task => task.difficulty_observations.filter(row => row.edition === 'current').flatMap(study =>
+    study.conditions.map(({ condition, scores }) => {
+      const values = scores.map(value => value === null ? '?' : value).join(', ');
+      return `${study.model}/${study.reasoning_effort} ${condition} [${values}]/${study.maximum_points}`;
+    })
+  ).join('<br>') || (task.difficulty_observations.length ? '— (earlier edition in JSON)' : '—');
+  const rows = [
+    ['ID', 'Estimated difficulty', 'Current observed scores', 'Work', 'Labels', 'Task'],
+    ['---', '---', '---', '---', '---', '---'],
+    ...tasks.map(task => [task.catalog_id, task.difficulty, scoreCell(task), task.task_types.join(', '), task.labels.join(', '), task.title]),
+  ];
+  return rows.map(row => `| ${row.map(cell => cell.replaceAll('|', '\\|')).join(' | ')} |`).join('\n');
+}
+
 const args=process.argv.slice(2),command=args.shift(),o={};
 try{
-  while(args.length){
-    const key=args.shift();assert.match(key,/^--[a-z-]+$/u);assert.equal(o[key],undefined);
-    if(key==='--allow-model-calls')o[key]=true;
-    else{const value=args.shift();assert.ok(value&&!value.startsWith('--'),`missing value for ${key}`);o[key]=value;}
+  while (args.length) {
+    const key = args.shift();
+    assert.match(key, /^--[a-z-]+$/u);
+    if (key !== '--label') assert.equal(o[key], undefined);
+    if (key === '--allow-model-calls') {
+      o[key] = true;
+      continue;
+    }
+    const value = args.shift();
+    assert.ok(value && !value.startsWith('--'), `missing value for ${key}`);
+    if (key === '--label') (o[key] ??= []).push(value);
+    else o[key] = value;
   }
-  if(command==='task-list'){
-    assert.ok(Object.keys(o).every(key=>['--difficulty','--type','--skill'].includes(key)),'unsupported task-list options');
-    console.log(JSON.stringify(listEvaluationTasks({difficulty:o['--difficulty'],type:o['--type'],skill:o['--skill']}),null,2));
+  if (command === 'task-list') {
+    const options = ['--id', '--difficulty', '--type', '--label', '--skill', '--format'];
+    assert.ok(Object.keys(o).every(key => options.includes(key)), 'unsupported task-list options');
+    assert.ok([undefined, 'json', 'table'].includes(o['--format']), 'task-list --format must be json or table');
+    const tasks = listEvaluationTasks({
+      id: o['--id'], difficulty: o['--difficulty'], type: o['--type'], labels: o['--label'], skill: o['--skill'],
+    });
+    console.log(o['--format'] === 'table' ? catalogTable(tasks) : JSON.stringify(tasks, null, 2));
   }
   else if(command==='task-prepare'){
     assert.ok(Object.keys(o).every(key=>['--id','--root','--delivery-mode','--assets-root','--config'].includes(key)),

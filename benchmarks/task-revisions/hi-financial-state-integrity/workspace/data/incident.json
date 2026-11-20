@@ -1,19 +1,8 @@
 {
-  "description": "Fictional same-request retry charged the source balance twice; a rejected transfer also altered an input balance.",
-  "requests": [
-    {
-      "id": "txn-one",
-      "from": "account-a",
-      "to": "account-b",
-      "amount": "7"
-    },
-    {
-      "id": "txn-one",
-      "from": "account-a",
-      "to": "account-b",
-      "amount": "7"
-    }
-  ],
-  "observed_audit_entries": 2,
-  "source_type": "original_fictional_example"
+  "source": "Fictional operations desk, incident 811",
+  "observations": [
+    "The teller balances agreed when the branch signed its April export.",
+    "After a relay restart, the dashboard acknowledged a page that the close desk still showed as outstanding.",
+    "A value-date correction arrived after April's close. The monthly statement and the teller's posted balance could not both be reconciled to the branch records."
+  ]
 }

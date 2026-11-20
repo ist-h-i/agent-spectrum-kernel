@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "mp-ci-evidence-gap",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1003,
-          "sha256": "234b5986dc8f1d279caf44e2813fe468330c48e21c409e303c6bdbbe1428b322"
+          "bytes": 1098,
+          "sha256": "4058ef546cc194e26f88c27773ac52cd1b0be43413f1076e64016fa559ff4876"
         },
         {
           "path": "workspace/.github/workflows/pull-request.yml",
@@ -44,8 +44,8 @@
         },
         {
           "path": "workspace/review.schema.json",
-          "bytes": 1849,
-          "sha256": "22e7984d1a6b3c8e92177500b7a566d5f0cc06fa5325acc55dc6c4dc6e91a62a"
+          "bytes": 2242,
+          "sha256": "9e2598713bba25372d38653a591e4c6d3d8cde79082b1752a409dedaf714b52c"
         },
         {
           "path": "workspace/scripts/upload-diagnostics.mjs",
@@ -80,7 +80,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:fccfea392cbcd546c1c67baeca843fc12c97e512d8735760e53137832470d877",
+  "rubric_digest": "sha256:2e315ed04a860a9ec7dbbbceca2ec4030d169e4d8235f39add74c8b4f8ad2c97",
   "editable": [
     "workspace/review.json"
   ]

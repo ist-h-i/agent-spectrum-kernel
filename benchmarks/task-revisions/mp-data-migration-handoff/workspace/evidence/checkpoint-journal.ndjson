@@ -1,0 +1,10 @@
+{"id":"AN-70","stream":"prod-e1","partition":"grove","store":"primary","kind":"compaction","batch":90,"upper":12000}
+{"id":"AN-71","stream":"prod-w3","partition":"inlet","store":"primary","kind":"compaction","batch":22,"upper":19080}
+{"id":"AN-72","stream":"prod-c2","partition":"mesa","store":"primary","kind":"compaction","batch":12,"upper":70000}
+{"id":"L-811","stream":"prod-e1","partition":"grove","store":"primary","kind":"published","batch":91,"upper":12450,"parent":"AN-70","lower":12000}
+{"id":"L-651","stream":"prod-w3","partition":"inlet","store":"primary","kind":"published","batch":23,"upper":19240,"parent":"AN-71","lower":19080}
+{"id":"M-220","stream":"prod-w3","partition":"inlet","store":"worker","kind":"range_complete","batch":24,"upper":19680,"parent":"L-651","lower":19240}
+{"id":"L-811","stream":"prod-e1","partition":"grove","store":"primary","kind":"published","batch":91,"upper":12450,"parent":"AN-70","lower":12000}
+{"id":"L-935","stream":"prod-c2","partition":"mesa","store":"primary","kind":"published","batch":13,"upper":70410,"parent":"AN-72","lower":70000}
+{"id":"L-982","stream":"dr-c2","partition":"mesa","store":"primary","kind":"published","batch":14,"upper":70890,"parent":"L-935","lower":70410}
+{"id":"E-870","stream":"prod-e1","partition":"grove","store":"mirror","kind":"range_complete","batch":92,"upper":12800,"parent":"L-811","lower":12450}
