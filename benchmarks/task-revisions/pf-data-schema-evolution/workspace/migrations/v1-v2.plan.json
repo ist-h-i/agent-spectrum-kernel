@@ -1,0 +1,11 @@
+{
+  "up": {
+    "operation": "set_field",
+    "field": "contactNote",
+    "value": ""
+  },
+  "down": {
+    "operation": "drop_field",
+    "field": "contactNote"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "local-artifact-migration",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "rollback": "node scripts/check-rollback.mjs",
+    "validate:migration": "node scripts/validate-migration.mjs"
+  }
+}

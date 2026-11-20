@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Customer record v1",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contactNote": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional legacy extension; the v1 reader projects id/name only."
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "additionalProperties": true
+}

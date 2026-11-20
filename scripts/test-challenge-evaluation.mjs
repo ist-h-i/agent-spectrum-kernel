@@ -12,7 +12,9 @@ const id='rc01-shared-review-platform';
 function setup(t){
  const base=realpathSync(mkdtempSync(join(tmpdir(),'challenge-test-')));t.after(()=>rmSync(base,{recursive:true,force:true}));
  const root=join(base,'run');
- const config={id,root,evidenceKind:'synthetic',options:{executable:realpathSync('/bin/echo'),model:'test-model',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']};
+ const updatePath=join(base,'synthetic-update.md');
+ writeFileSync(updatePath,'Synthetic later-turn observation. Re-evaluate the frozen review.');
+ const config={id,root,evidenceKind:'synthetic',updatePath,options:{executable:realpathSync('/bin/echo'),model:'test-model',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']};
  const ready=preparePracticalChallenge(config),calls=[];
  const fake=async request=>{calls.push(request);
   const resume=request.argv[1]==='resume';
@@ -31,12 +33,14 @@ function setup(t){
  const run=(stage='initial',session=fake)=>startPracticalChallenge(root,ready.manifest_digest,{allowModelCalls:true,stage,session});
  return {base,root,config,ready,calls,fake,run};
 }
-test('staged registrations retain their primary boundary and their legacy JSON view',()=>{
+test('staged registrations share the only task selection and preparation entry points',()=>{
  const rows=listPracticalChallenges();assert.equal(rows.length,2);assert.deepEqual(rows.map(c=>c.id),[id,'ch08-growth-workspace']);
  assert.equal(rows[0].primary_catalog_member,false);
  assert.equal(Object.keys(PRIMARY_FIXTURE_REGISTRY).length,24);
- const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs','challenge-list'],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);
- assert.deepEqual(JSON.parse(r.stdout),rows);
+ for(const entry of ['challenge-list','challenge-prepare']){
+  const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs',entry],{encoding:'utf8'});
+  assert.equal(r.status,1);
+ }
  assert.ok(rows.every(row=>row.stages.length===2&&row.input_manifest&&row.evaluator));
 });
 test('unified task preparation can bind a staged run without a model call', t => {

@@ -1,46 +1,47 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "pf-frontend-async-state",
-  "version": "task-revision-1",
-  "rubric_sha256": "ca8ec9776f7f6c497e9c394cc368e235b363d61f18d7268a7390813fecda7022",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1070,
+          "sha256": "6b49442ed9fffdfd63d5b21313acc4503b793ebfc65167ab1ac1da5caeb6bf84"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 93,
+          "sha256": "a1334e7d677ec2df23b95a284b1a7179c07280762028c38fcb43ca16bfe5b943"
+        },
+        {
+          "path": "workspace/spec/search-state-contract.md",
+          "bytes": 1423,
+          "sha256": "a4e981c2a5200f5ef4bcdaffc58a43a00fd697bbd311ebf07ddd5538ac53420c"
+        },
+        {
+          "path": "workspace/src/search-controller.mjs",
+          "bytes": 505,
+          "sha256": "45f537540747220d76042c250665559dad3a2919707436580aa5d38bf7857b72"
+        },
+        {
+          "path": "workspace/src/search-view.mjs",
+          "bytes": 617,
+          "sha256": "2d76ec1961c6888e9c321d8f47df7e54a8aed317fd9524ba3180b74d9664ea68"
+        },
+        {
+          "path": "workspace/test/search-state.test.mjs",
+          "bytes": 4414,
+          "sha256": "1474fb9f6f54e7de19e96eed04491859f7f84fd656369d2fdba52c45adc7df17"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:45a484a3f46c994ab5d950d45bbc5a44f5345d122a3b979ca1191912199afbf1",
   "editable": [
     "workspace/src/search-controller.mjs"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 2509,
-      "sha256": "d652a7e5b5b3e7bc0cdfa7a3fb43f38d5ee93a0222943a702162a8bc91dd450e",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "a1334e7d677ec2df23b95a284b1a7179c07280762028c38fcb43ca16bfe5b943",
-      "bytes": 93,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/spec/search-state-contract.md",
-      "sha256": "a4e981c2a5200f5ef4bcdaffc58a43a00fd697bbd311ebf07ddd5538ac53420c",
-      "bytes": 1423,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/search-controller.mjs",
-      "sha256": "45f537540747220d76042c250665559dad3a2919707436580aa5d38bf7857b72",
-      "bytes": 505,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/search-view.mjs",
-      "sha256": "2d76ec1961c6888e9c321d8f47df7e54a8aed317fd9524ba3180b74d9664ea68",
-      "bytes": 617,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/search-state.test.mjs",
-      "sha256": "1474fb9f6f54e7de19e96eed04491859f7f84fd656369d2fdba52c45adc7df17",
-      "bytes": 4414,
-      "source": "inherited"
-    }
   ]
 }

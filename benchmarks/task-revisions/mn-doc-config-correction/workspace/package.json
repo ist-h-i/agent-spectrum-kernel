@@ -1,0 +1,8 @@
+{
+  "name": "worker-retry-docs-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/worker-retries.test.mjs"
+  }
+}

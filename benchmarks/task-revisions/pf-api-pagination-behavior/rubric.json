@@ -3,7 +3,7 @@
     {
       "id": "records",
       "points": 2,
-      "observation": "The reconciler receives all full records, including extra fields, repeated IDs and occurrence order.",
+      "observation": "Exports complete records with the documented values and order.",
       "skills": [
         "controlled-implementation"
       ]
@@ -11,7 +11,7 @@
     {
       "id": "requests",
       "points": 2,
-      "observation": "The recorded first request, continuations, empty pages, bounds and repeat rejection satisfy the request contract.",
+      "observation": "Issues the requests required by the supplier contract.",
       "skills": [
         "controlled-implementation"
       ]
@@ -19,7 +19,7 @@
     {
       "id": "failure",
       "points": 2,
-      "observation": "A transport or decode failure after an earlier page is reported to the caller without returning a partial export as complete.",
+      "observation": "Reports failures in accordance with the caller contract.",
       "skills": [
         "controlled-implementation"
       ]
@@ -27,7 +27,7 @@
     {
       "id": "decoder-boundary",
       "points": 2,
-      "observation": "A different wire format behind the same decoded interface preserves the observed records and request sequence.",
+      "observation": "Preserves the behavior of the documented component interfaces.",
       "skills": [
         "application-boundary-architecture"
       ]
@@ -35,7 +35,7 @@
     {
       "id": "regression-tests",
       "points": 2,
-      "observation": "The submitted tests accept a contract-compliant collector and detect lost detail and a partial success on failure. Credit each independent detection.",
+      "observation": "Submitted tests distinguish correct behavior from relevant independently checked regressions.",
       "skills": [
         "test-first-verification"
       ]

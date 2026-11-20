@@ -1,0 +1,10 @@
+{
+  "name": "record-api-review",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "trace": "node scripts/trace-cases.mjs",
+    "validate:review": "node scripts/validate-review.mjs review.json"
+  }
+}

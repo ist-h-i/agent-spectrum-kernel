@@ -1,0 +1,9 @@
+{
+  "balances": {
+    "account-a": "9007199254740993000",
+    "account-b": "300",
+    "account-c": "0"
+  },
+  "requests": {},
+  "audit": []
+}

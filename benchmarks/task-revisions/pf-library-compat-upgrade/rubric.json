@@ -3,7 +3,7 @@
     {
       "id": "exports",
       "points": 3,
-      "observation": "Both callers and the public application function produce the documented content, order, freshness and path semantics on POSIX and Windows selections through the chosen library.",
+      "observation": "The application API and its callers meet the export contract.",
       "skills": [
         "controlled-implementation"
       ]
@@ -11,7 +11,7 @@
     {
       "id": "rollback",
       "points": 2,
-      "observation": "An explicit fallback invokes the preserved version1 library and both application callers return compatible manifests.",
+      "observation": "The explicit fallback meets the same application contract.",
       "skills": [
         "controlled-implementation"
       ]
@@ -19,18 +19,20 @@
     {
       "id": "caller-dependencies",
       "points": 3,
-      "observation": "The initial and follow-up diffs plus calls show whether a vendor result-format change forces either application caller to reinterpret library fields.",
+      "observation": "Observed follow-up effects support the explanation of the design’s dependencies.",
       "skills": [
         "application-boundary-architecture"
-      ]
+      ],
+      "requires_followup": true
     },
     {
       "id": "local-change",
       "points": 2,
-      "observation": "After the published change in dependency shape, conversion can be updated at its owning boundary while the fixed application checks and rollback still pass. Credit observed change propagation independent of file count.",
+      "observation": "The follow-up preserves the application behavior and records the changes required.",
       "skills": [
         "refactor-implementation"
-      ]
+      ],
+      "requires_followup": true
     }
   ],
   "additional_editable_paths": [

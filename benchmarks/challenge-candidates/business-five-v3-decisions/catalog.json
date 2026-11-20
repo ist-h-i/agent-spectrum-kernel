@@ -41,7 +41,6 @@
       "roles_path": "public/tasks/ch02-report-operations/roles.md",
       "one_shot_prompt": "public/tasks/ch02-report-operations/prompt.txt",
       "goal_with_pr_prompt": "public/tasks/ch02-report-operations/goal-pr.txt",
-      "input_manifest": "input-manifests/ch02-report-operations.json",
       "workflow_path": "public/tasks/ch02-report-operations/workflows.md",
       "workflows": [
         {
@@ -122,7 +121,6 @@
       "roles_path": "public/tasks/ch03-price-rollout/roles.md",
       "one_shot_prompt": "public/tasks/ch03-price-rollout/prompt.txt",
       "goal_with_pr_prompt": "public/tasks/ch03-price-rollout/goal-pr.txt",
-      "input_manifest": "input-manifests/ch03-price-rollout.json",
       "workflow_path": "public/tasks/ch03-price-rollout/workflows.md",
       "workflows": [
         {
@@ -207,7 +205,6 @@
       "roles_path": "public/tasks/ch04-document-access/roles.md",
       "one_shot_prompt": "public/tasks/ch04-document-access/prompt.txt",
       "goal_with_pr_prompt": "public/tasks/ch04-document-access/goal-pr.txt",
-      "input_manifest": "input-manifests/ch04-document-access.json",
       "workflow_path": "public/tasks/ch04-document-access/workflows.md",
       "workflows": [
         {
@@ -290,7 +287,6 @@
       "roles_path": "public/tasks/ch05-sales-reconciliation/roles.md",
       "one_shot_prompt": "public/tasks/ch05-sales-reconciliation/prompt.txt",
       "goal_with_pr_prompt": "public/tasks/ch05-sales-reconciliation/goal-pr.txt",
-      "input_manifest": "input-manifests/ch05-sales-reconciliation.json",
       "workflow_path": "public/tasks/ch05-sales-reconciliation/workflows.md",
       "workflows": [
         {
@@ -375,7 +371,6 @@
       "roles_path": "public/tasks/ch06-build-operations/roles.md",
       "one_shot_prompt": "public/tasks/ch06-build-operations/prompt.txt",
       "goal_with_pr_prompt": "public/tasks/ch06-build-operations/goal-pr.txt",
-      "input_manifest": "input-manifests/ch06-build-operations.json",
       "workflow_path": "public/tasks/ch06-build-operations/workflows.md",
       "workflows": [
         {

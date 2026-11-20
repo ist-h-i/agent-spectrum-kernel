@@ -1,213 +1,964 @@
 {
-  "kind": "evaluation_task_registrations_v1",
-  "challenges": [
+  "kind": "evaluation_task_registrations_v2",
+  "assets": {
+    "github_repository_id": 1442549076,
+    "revision": "823bab12e367e333bf475c4998e5bc84459b1668"
+  },
+  "tasks": [
     {
-      "kind": "practical_challenge_registration_v1",
-      "id": "rc01-shared-review-platform",
-      "series": "review-ceiling-v1",
-      "input_version": "review-public-v2",
-      "workspace": "benchmarks/challenge-candidates/review-ceiling-v1/workspace",
-      "input_manifest": {
-        "path": "benchmarks/challenge-candidates/review-ceiling-v1/input-manifests/rc01-shared-review-platform.json",
-        "digest": "sha256:4936e8dce085da65bf047827f30b038b2cba752571c9f8fb4187eda9feee013d"
-      },
-      "stages": [
-        {
-          "id": "initial",
-          "outputs": [
-            "INITIAL.md",
-            "REVIEW.md"
-          ],
-          "prompt": "Read and follow task.md. Complete steps 1 and 2 only: save INITIAL.md before investigation, then REVIEW.md. Do not invent the optional operational update. Keep original application, tests, contracts and evidence unchanged. Use only local workspace and localhost endpoints, never external network services. Work only in this workspace and system toolchains; do not inspect unrelated directories, user repositories or host history. Use only synthetic data and localhost services. Save reproducible probes and observations. If UI access or dependencies are unavailable, preserve explicit missing evidence. Stop after the initial review."
-        },
-        {
-          "id": "reassessment",
-          "outputs": [
-            "REASSESSMENT.md"
-          ],
-          "update": {
-            "target": "OPERATIONAL-UPDATE.md",
-            "digest": "sha256:58eda2d842e0861b944f30b580eadf3c7b00a105ecb71ecd08e74d5619a74711",
-            "path": "benchmarks/challenge-candidates/review-ceiling-v1/stages/reassessment.md"
-          },
-          "prompt": "Continue this same trial with the fixed operational update in OPERATIONAL-UPDATE.md. Read that file and add REASSESSMENT.md only, explaining which judgments remain or change and why. INITIAL.md and REVIEW.md are frozen: do not modify them. Do not modify application, original tests, contracts or existing evidence. This is a bounded reassessment, not a new task or a full review restart. Do not invent additional updates. Retain the original execution boundaries, tools, model and settings. Stop when REASSESSMENT.md is saved."
-        }
+      "id": "hi-authorization-exception",
+      "domain": "security_authorization",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "review"
       ],
-      "evaluator": {
-        "kind": "external_semantic_assessment",
-        "maximum": 100,
-        "automatic_semantic_scoring": false,
-        "files": [
-          {
-            "path": "rubric.json",
-            "digest": "sha256:e2601a827eb1d9897e83c8de8618ddbc6a07f80a2ec3e1816ffcb1e2fbfb0fab"
-          },
-          {
-            "path": "score.mjs",
-            "digest": "sha256:9be03afca50a210719f7f79a29554d9b51475ca8156f113d51575701c4e7e8e6"
-          },
-          {
-            "path": "README.md",
-            "digest": "sha256:9cb3d1bd59f827a823605c974bcfcb18fe81bb45399bb4c03de5d823ff293841"
-          }
-        ]
-      },
-      "primary_catalog_member": false,
-      "formal_primary_admission": false,
-      "calibration": {
-        "status": "not_run",
-        "ready_for_measurement": false,
-        "limits": "This revised input and rubric have no solver trials. Archived scores for review-public-v1 refer to its frozen input and assessment."
-      },
-      "selection": {
-        "domain": "release_review",
-        "task_types": [
-          "review",
-          "investigation"
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/hi-authorization-exception",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/review.json"
         ],
-        "difficulty": "hard",
-        "difficulty_source": "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
       }
     },
     {
-      "kind": "practical_challenge_registration_v1",
-      "id": "ch08-growth-workspace",
-      "display_id": "CH08",
-      "ordinal": 8,
-      "series": "ui-reconstruction-v1",
-      "input_version": "ui-functional-v2.1",
-      "workspace": "benchmarks/challenge-candidates/ui-reconstruction-v1/workspace",
-      "freeze_submission": true,
-      "input_manifest": {
-        "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/input-manifests/ch08-growth-workspace.json",
-        "digest": "sha256:75b2907177fc4154c5f9575020070a919fdbf3b0a0d0fc930d6df553afd6f9f7"
-      },
-      "stages": [
-        {
-          "id": "initial",
-          "outputs": [
-            "DELIVERY.md"
-          ],
-          "prompt": "Read task.md and all referenced public specifications. Design, implement and verify the local web UI in app/. Save DELIVERY.md with exact startup and verification instructions, observed results and limitations. Keep all original public files unchanged. Complete runnable artifacts before ending this turn; stage two is read-only and freezes every file, with no dependency symlinks. Use only this workspace, localhost and allowed system toolchains, never external services, host repositories or history. Do not call an actual AI service. Stop after delivery."
-        },
-        {
-          "id": "reassessment",
-          "outputs": [
-            "REASSESSMENT.md"
-          ],
-          "update": {
-            "target": "OPERATIONAL-UPDATE.md",
-            "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/stages/verification-turn.md",
-            "digest": "sha256:c00ab9233289e3b4d04fe23f63660832a8735bdb7cacba0ee3f50a19b07fea38"
-          },
-          "prompt": "Continue this same trial. Read OPERATIONAL-UPDATE.md and perform its read-only checks against the frozen implementation. Add REASSESSMENT.md only. Change no existing files and add no other files. Retain the original workspace, local-only network boundary, tools, model and settings. Missing runtime evidence must remain explicit. Stop when the reassessment is saved."
-        }
+      "id": "hi-external-action-approval",
+      "domain": "iac_operations",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "design"
       ],
-      "evaluator": {
-        "kind": "external_semantic_assessment",
-        "maximum": 100,
-        "categories": {
-          "functional": 40,
-          "ux": 60
-        },
-        "automatic_semantic_scoring": false,
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/hi-external-action-approval",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/operation-plan.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "hi-financial-state-integrity",
+      "domain": "backend_financial",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "investigation",
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/hi-financial-state-integrity",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/src/ledger.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "hi-versioned-migration-safety",
+      "domain": "data_schema",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "design"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/hi-versioned-migration-safety",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/migration-plan.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mn-build-option-update",
+      "domain": "ci_build",
+      "difficulty": "medium",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mn-build-option-update",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/build.config.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mn-client-compatibility-fix",
+      "domain": "client_mobile",
+      "difficulty": "medium",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mn-client-compatibility-fix",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/src/preferences.mjs",
+          "workspace/test/preferences.test.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mn-doc-config-correction",
+      "domain": "docs_config",
+      "difficulty": "easy",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "documentation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mn-doc-config-correction",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/docs/worker-retries.md#json-block"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mn-focused-regression-test",
+      "domain": "testing",
+      "difficulty": "medium",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "test"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mn-focused-regression-test",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/test/session-key.test.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mn-frontend-default-fix",
+      "domain": "frontend",
+      "difficulty": "medium",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mn-frontend-default-fix",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/src/display-preferences.mjs",
+          "workspace/test/display-preferences.test.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mn-schema-field-alignment",
+      "domain": "data_schema",
+      "difficulty": "easy_medium",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mn-schema-field-alignment",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/schemas/member.schema.json",
+          "workspace/test/member-record.test.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mp-accessibility-interaction-review",
+      "domain": "accessibility",
+      "difficulty": "medium_hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "review"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mp-accessibility-interaction-review",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/review.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mp-ci-evidence-gap",
+      "domain": "ci_build",
+      "difficulty": "medium_hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "review",
+        "test"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mp-ci-evidence-gap",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/review.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mp-data-migration-handoff",
+      "domain": "data_schema",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "handoff"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mp-data-migration-handoff",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/handoff.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mp-frontend-state-review",
+      "domain": "frontend",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "review"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mp-frontend-state-review",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/review.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mp-iac-rollback-design",
+      "domain": "iac_cloud",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "design"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mp-iac-rollback-design",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/change-plan.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "mp-performance-investigation",
+      "domain": "performance",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "investigation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/mp-performance-investigation",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/investigation.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "pf-api-pagination-behavior",
+      "domain": "backend_api",
+      "difficulty": "medium",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation",
+        "test"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-api-pagination-behavior",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/src/pagination.mjs",
+          "workspace/test/pagination.test.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "pf-ci-cache-flake",
+      "domain": "ci_build",
+      "difficulty": "medium_hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "investigation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-ci-cache-flake",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/investigation.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "pf-data-schema-evolution",
+      "domain": "data_schema",
+      "difficulty": "medium",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation",
+        "test"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-data-schema-evolution",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/migrations/v1-v2.plan.json",
+          "workspace/schemas/customer-v2.schema.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "pf-frontend-async-state",
+      "domain": "frontend",
+      "difficulty": "medium_hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "investigation",
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-frontend-async-state",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/src/search-controller.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "pf-library-compat-upgrade",
+      "domain": "cross_platform",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-library-compat-upgrade",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/migration-record.json",
+          "workspace/src/archive-compat.mjs",
+          "workspace/src/download-export.mjs",
+          "workspace/src/scheduled-export.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      },
+      "followup": {
+        "working_directory": "workspace",
+        "task_path": "FOLLOWUP.md",
         "files": [
           {
-            "path": "rubric.json",
-            "digest": "sha256:16d59a5cf7a6c3b579711a58282472429475a7ad8776d2f15eca8363e5754150"
+            "target": "FOLLOWUP.md",
+            "path": "task-revisions/pf-library-compat-upgrade/followup/task.md",
+            "digest": "sha256:f491b5d8b8de8bd0de4864fc8cf33fb1481e00e594d3403a21a414ee6c74eafd"
           },
           {
-            "path": "score.mjs",
-            "digest": "sha256:b8549ef6ebe1d900240c07c034cb095d7468d32561ec3df974b88381fa9d862d"
-          },
-          {
-            "path": "README.md",
-            "digest": "sha256:82dc58c732c271063ee6fd58f31a2518981ce76f9ff65625bab9da68e5290854"
+            "target": "workspace/vendor/archive-v2.mjs",
+            "path": "task-revisions/pf-library-compat-upgrade/followup/workspace/vendor/archive-v2.mjs",
+            "digest": "sha256:4f55adc60aab1e6307403398d1aea5ddce66f4d854e20d08773cee5a5b253b94"
           }
         ]
-      },
-      "primary_catalog_member": false,
-      "formal_primary_admission": false,
-      "calibration": {
-        "status": "not_run",
-        "ready_for_measurement": false,
-        "limits": "Registered task and model-free contract checks only. No actual solver trial, correct UI reference implementation or difficulty calibration has been run. Historical seven-challenge acceptance is unchanged."
-      },
-      "selection": {
-        "domain": "ui_reconstruction",
-        "task_types": [
-          "design",
-          "implementation",
-          "test"
-        ],
-        "difficulty": "hard",
-        "difficulty_source": "benchmarks/challenge-candidates/ui-reconstruction-v1/README.md"
       }
-    }
-  ],
-  "external": [
+    },
+    {
+      "id": "pf-observability-redaction",
+      "domain": "observability_security",
+      "difficulty": "medium_hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "implementation",
+        "review"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-observability-redaction",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/config/projection-policy.json",
+          "workspace/review.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "pf-performance-regression",
+      "domain": "performance",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "investigation",
+        "implementation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-performance-regression",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/src/event-lookup.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "pf-review-error-contract",
+      "domain": "backend_api",
+      "difficulty": "medium_hard",
+      "difficulty_basis": "portfolio_estimate",
+      "task_types": [
+        "review"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/pf-review-error-contract",
+        "version": "task-revision-2",
+        "editable": [
+          "workspace/review.json"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
     {
       "id": "ch01-inventory-reservation-logistics",
-      "title": "複数職務で使う在庫・予約・物流アプリ",
       "domain": "inventory_reservation_logistics",
-      "github_repository_id": 1442456886,
-      "revision": "29764bf8f387e6134c8a6d4453f6af87888a7144",
-      "version": "comparison-business-2026-11-20.1",
-      "input_manifest": {
-        "path": "public-manifest.json",
-        "digest": "sha256:9dd9ad37644506cb4380609cff4eb2bb4c3f4c9023cdb108c18f049c1444d30d"
-      },
-      "task_path": "public/TASK.md",
-      "prompt": {
-        "path": "prompt.txt",
-        "digest": "sha256:abe180ffd6d34f85a27877fb7ffed48294ea7f527924ff453fe5e60a4eb4b8cb"
-      },
-      "acceptance": {
-        "path": "public/acceptance.md",
-        "digest": "sha256:cc7ca12c579a96631f69df34c2811daacc58605c2d79802341bef74929e59f6f"
-      },
-      "observations": [
-        {
-          "id": "RH01",
-          "points": 1,
-          "observation": "引き継ぎ後の保存結果と業務記録を照合する。",
-          "skills": [
-            "controlled-implementation"
-          ],
-          "group": "product"
-        },
-        {
-          "id": "RH02",
-          "points": 1,
-          "observation": "担当者が最新の状況を読み取り、作業を続けられる。",
-          "skills": [
-            "ui-ux-design"
-          ],
-          "group": "product"
-        },
-        {
-          "id": "RH03",
-          "points": 1,
-          "observation": "条件を変更した後の各操作経路の結果を照合する。",
-          "skills": [
-            "application-boundary-architecture"
-          ],
-          "group": "product"
-        },
-        {
-          "id": "RH04",
-          "points": 1,
-          "observation": "提出者の検証記録を独立した業務観測に照らす。",
-          "skills": [
-            "review-domain-impact"
-          ],
-          "group": "submission"
+      "difficulty": "unassessed",
+      "difficulty_basis": "no_difficulty_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "title": "複数職務で使う在庫・予約・物流アプリ",
+      "input": {
+        "kind": "private",
+        "asset_path": "solver-inputs/ch01-inventory-reservation-logistics",
+        "version": "comparison-business-2026-11-20.2",
+        "digest": "sha256:749bde3d6ac91c29bf24860013d5133fe373243ee7b407d663e770112d00eaf3",
+        "modes": {
+          "default": {
+            "working_directory": "public",
+            "task_path": "public/TASK.md",
+            "prompt_path": "prompt.txt"
+          }
         }
+      },
+      "private_acceptance": {
+        "path": "public/acceptance.md",
+        "digest": "sha256:eaed2484e128e700ce8ad71201cad3dc4e2c64c6e586a89d98721753de99b97e"
+      },
+      "followup": {
+        "working_directory": "public",
+        "task_path": "FOLLOWUP.md",
+        "files": [
+          {
+            "target": "FOLLOWUP.md",
+            "path": "task-revisions/ch01-inventory-reservation-logistics/followup.md",
+            "digest": "sha256:80c2e47b4d575d1465b62c9a2b253b57872644b67891aef2df2dc128e48407fd"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch02-report-operations",
+      "domain": "durable_compatibility_recovery",
+      "difficulty": "unassessed",
+      "difficulty_basis": "no_difficulty_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "title": "帳票の配信・取消・復旧を行う業務アプリ",
+      "input": {
+        "kind": "business",
+        "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
+        "version": "business-five-20261120-outcomes2",
+        "modes": {
+          "one_shot": {
+            "working_directory": "public/tasks/ch02-report-operations",
+            "task_path": "public/tasks/ch02-report-operations/TASK.md",
+            "prompt_path": "public/tasks/ch02-report-operations/prompt.txt"
+          },
+          "goal_with_pr": {
+            "working_directory": "public/tasks/ch02-report-operations",
+            "task_path": "public/tasks/ch02-report-operations/TASK.md",
+            "prompt_path": "public/tasks/ch02-report-operations/goal-pr.txt"
+          }
+        }
+      },
+      "acceptance_files": [
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch02-report-operations/acceptance.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch02-report-operations/contract.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch02-report-operations/nonfunctional.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch02-report-operations/business-decisions.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
+      ]
+    },
+    {
+      "id": "ch03-price-rollout",
+      "domain": "live_migration_rollback",
+      "difficulty": "unassessed",
+      "difficulty_basis": "no_difficulty_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "title": "店舗価格カタログの移行・切替・差戻しアプリ",
+      "input": {
+        "kind": "business",
+        "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
+        "version": "business-five-20261120-outcomes2",
+        "modes": {
+          "one_shot": {
+            "working_directory": "public/tasks/ch03-price-rollout",
+            "task_path": "public/tasks/ch03-price-rollout/TASK.md",
+            "prompt_path": "public/tasks/ch03-price-rollout/prompt.txt"
+          },
+          "goal_with_pr": {
+            "working_directory": "public/tasks/ch03-price-rollout",
+            "task_path": "public/tasks/ch03-price-rollout/TASK.md",
+            "prompt_path": "public/tasks/ch03-price-rollout/goal-pr.txt"
+          }
+        }
+      },
+      "acceptance_files": [
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch03-price-rollout/acceptance.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch03-price-rollout/contract.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch03-price-rollout/nonfunctional.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch03-price-rollout/business-decisions.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
+      ]
+    },
+    {
+      "id": "ch04-document-access",
+      "domain": "authorization_lifetime",
+      "difficulty": "unassessed",
+      "difficulty_basis": "no_difficulty_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "title": "委譲権限のある文書閲覧・配信アプリ",
+      "input": {
+        "kind": "business",
+        "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
+        "version": "business-five-20261120-outcomes2",
+        "modes": {
+          "one_shot": {
+            "working_directory": "public/tasks/ch04-document-access",
+            "task_path": "public/tasks/ch04-document-access/TASK.md",
+            "prompt_path": "public/tasks/ch04-document-access/prompt.txt"
+          },
+          "goal_with_pr": {
+            "working_directory": "public/tasks/ch04-document-access",
+            "task_path": "public/tasks/ch04-document-access/TASK.md",
+            "prompt_path": "public/tasks/ch04-document-access/goal-pr.txt"
+          }
+        }
+      },
+      "acceptance_files": [
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/acceptance.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/contract.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/nonfunctional.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/business-decisions.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
+      ]
+    },
+    {
+      "id": "ch05-sales-reconciliation",
+      "domain": "stream_reconciliation_space",
+      "difficulty": "unassessed",
+      "difficulty_basis": "no_difficulty_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "title": "訂正売上の照合・締め・再接続アプリ",
+      "input": {
+        "kind": "business",
+        "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
+        "version": "business-five-20261120-outcomes2",
+        "modes": {
+          "one_shot": {
+            "working_directory": "public/tasks/ch05-sales-reconciliation",
+            "task_path": "public/tasks/ch05-sales-reconciliation/TASK.md",
+            "prompt_path": "public/tasks/ch05-sales-reconciliation/prompt.txt"
+          },
+          "goal_with_pr": {
+            "working_directory": "public/tasks/ch05-sales-reconciliation",
+            "task_path": "public/tasks/ch05-sales-reconciliation/TASK.md",
+            "prompt_path": "public/tasks/ch05-sales-reconciliation/goal-pr.txt"
+          }
+        }
+      },
+      "acceptance_files": [
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/acceptance.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/contract.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/nonfunctional.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/business-decisions.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
+      ]
+    },
+    {
+      "id": "ch06-build-operations",
+      "domain": "build_release_dependencies",
+      "difficulty": "unassessed",
+      "difficulty_basis": "no_difficulty_estimate",
+      "task_types": [
+        "implementation"
+      ],
+      "title": "複数プロジェクトのビルド・成果物公開アプリ",
+      "input": {
+        "kind": "business",
+        "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
+        "version": "business-five-20261120-outcomes2",
+        "modes": {
+          "one_shot": {
+            "working_directory": "public/tasks/ch06-build-operations",
+            "task_path": "public/tasks/ch06-build-operations/TASK.md",
+            "prompt_path": "public/tasks/ch06-build-operations/prompt.txt"
+          },
+          "goal_with_pr": {
+            "working_directory": "public/tasks/ch06-build-operations",
+            "task_path": "public/tasks/ch06-build-operations/TASK.md",
+            "prompt_path": "public/tasks/ch06-build-operations/goal-pr.txt"
+          }
+        }
+      },
+      "acceptance_files": [
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch06-build-operations/acceptance.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch06-build-operations/contract.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch06-build-operations/nonfunctional.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch06-build-operations/business-decisions.md",
+        "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
+      ]
+    },
+    {
+      "id": "rc01-shared-review-platform",
+      "domain": "release_review",
+      "difficulty": "hard",
+      "difficulty_basis": "author_estimate",
+      "difficulty_source": "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md",
+      "task_types": [
+        "review",
+        "investigation"
+      ],
+      "input": {
+        "kind": "staged",
+        "root": "benchmarks/challenge-candidates/review-ceiling-v1/workspace",
+        "version": "review-public-v3",
+        "modes": {
+          "default": {
+            "working_directory": ".",
+            "task_path": "task.md"
+          }
+        }
+      },
+      "runner": {
+        "kind": "practical_challenge_registration_v1",
+        "series": "review-ceiling-v1",
+        "stages": [
+          {
+            "id": "initial",
+            "outputs": [
+              "INITIAL.md",
+              "REVIEW.md"
+            ],
+            "prompt": "Read and follow task.md. Complete steps 1 and 2 only: save INITIAL.md before investigation, then REVIEW.md. Do not invent the optional operational update. Keep original application, tests, contracts and evidence unchanged. Use only local workspace and localhost endpoints, never external network services. Work only in this workspace and system toolchains; do not inspect unrelated directories, user repositories or host history. Use only synthetic data and localhost services. Save reproducible probes and observations. If UI access or dependencies are unavailable, preserve explicit missing evidence. Stop after the initial review."
+          },
+          {
+            "id": "reassessment",
+            "outputs": [
+              "REASSESSMENT.md"
+            ],
+            "update": {
+              "target": "OPERATIONAL-UPDATE.md",
+              "digest": "sha256:b20b277e9357f72b9302bbdf2837c7baecab88844d684ee53889530890d77c7d",
+              "path": "task-revisions/rc01-shared-review-platform/stage-2.md",
+              "scope": "protected"
+            },
+            "prompt": "Continue this same trial with the fixed operational update in OPERATIONAL-UPDATE.md. Read that file and add REASSESSMENT.md only, explaining which judgments remain or change and why. INITIAL.md and REVIEW.md are frozen: do not modify them. Do not modify application, original tests, contracts or existing evidence. This is a bounded reassessment, not a new task or a full review restart. Do not invent additional updates. Retain the original execution boundaries, tools, model and settings. Stop when REASSESSMENT.md is saved."
+          }
+        ],
+        "evaluator": {
+          "kind": "external_semantic_assessment",
+          "maximum": 100,
+          "automatic_semantic_scoring": false,
+          "files": [
+            {
+              "path": "rubric.json",
+              "digest": "sha256:e2601a827eb1d9897e83c8de8618ddbc6a07f80a2ec3e1816ffcb1e2fbfb0fab"
+            },
+            {
+              "path": "score.mjs",
+              "digest": "sha256:9be03afca50a210719f7f79a29554d9b51475ca8156f113d51575701c4e7e8e6"
+            },
+            {
+              "path": "README.md",
+              "digest": "sha256:afe0ec19c82a5e99cfc1343fb2fcdb1ed2c760ad420b97d53e0baf44f05ebccb"
+            }
+          ]
+        },
+        "primary_catalog_member": false,
+        "formal_primary_admission": false,
+        "calibration": {
+          "status": "not_run",
+          "ready_for_measurement": false,
+          "limits": "Current staged input and private reveal have no measured model trials."
+        }
+      },
+      "acceptance_files": [
+        "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
+      ]
+    },
+    {
+      "id": "ch08-growth-workspace",
+      "domain": "ui_reconstruction",
+      "difficulty": "hard",
+      "difficulty_basis": "author_estimate",
+      "difficulty_source": "benchmarks/challenge-candidates/ui-reconstruction-v1/README.md",
+      "task_types": [
+        "design",
+        "implementation",
+        "test"
+      ],
+      "input": {
+        "kind": "staged",
+        "root": "benchmarks/challenge-candidates/ui-reconstruction-v1/workspace",
+        "version": "ui-functional-v2.2",
+        "modes": {
+          "default": {
+            "working_directory": ".",
+            "task_path": "task.md"
+          }
+        }
+      },
+      "runner": {
+        "kind": "practical_challenge_registration_v1",
+        "display_id": "CH08",
+        "ordinal": 8,
+        "series": "ui-reconstruction-v1",
+        "freeze_submission": true,
+        "stages": [
+          {
+            "id": "initial",
+            "outputs": [
+              "DELIVERY.md"
+            ],
+            "prompt": "Read task.md and all referenced public specifications. Design, implement and verify the local web UI in app/. Save DELIVERY.md with exact startup and verification instructions, observed results and limitations. Keep all original public files unchanged. Complete runnable artifacts before ending this turn; stage two is read-only and freezes every file, with no dependency symlinks. Use only this workspace, localhost and allowed system toolchains, never external services, host repositories or history. Do not call an actual AI service. Stop after delivery."
+          },
+          {
+            "id": "reassessment",
+            "outputs": [
+              "REASSESSMENT.md"
+            ],
+            "update": {
+              "target": "OPERATIONAL-UPDATE.md",
+              "path": "task-revisions/ch08-growth-workspace/stage-2.md",
+              "digest": "sha256:586fea7e247c527141b204e80893164ff7f7fe3289c7ceddbc7bd75faa8da5a1",
+              "scope": "protected"
+            },
+            "prompt": "Continue this same trial. Read OPERATIONAL-UPDATE.md and perform its read-only checks against the frozen implementation. Add REASSESSMENT.md only. Change no existing files and add no other files. Retain the original workspace, local-only network boundary, tools, model and settings. Missing runtime evidence must remain explicit. Stop when the reassessment is saved."
+          }
+        ],
+        "evaluator": {
+          "kind": "external_semantic_assessment",
+          "maximum": 100,
+          "categories": {
+            "functional": 40,
+            "ux": 60
+          },
+          "automatic_semantic_scoring": false,
+          "files": [
+            {
+              "path": "rubric.json",
+              "digest": "sha256:16d59a5cf7a6c3b579711a58282472429475a7ad8776d2f15eca8363e5754150"
+            },
+            {
+              "path": "score.mjs",
+              "digest": "sha256:b8549ef6ebe1d900240c07c034cb095d7468d32561ec3df974b88381fa9d862d"
+            },
+            {
+              "path": "README.md",
+              "digest": "sha256:9db05b0cf31dde5666ad43c3a6df3b101aed7ed5cc68eb0b12ff16703be914f4"
+            }
+          ]
+        },
+        "primary_catalog_member": false,
+        "formal_primary_admission": false,
+        "calibration": {
+          "status": "not_run",
+          "ready_for_measurement": false,
+          "limits": "Current staged input and private reveal have no measured model trials."
+        }
+      },
+      "acceptance_files": [
+        "benchmarks/challenge-candidates/ui-reconstruction-v1/workspace/brief/rubric.json"
       ]
     }
-  ],
-  "calibration": {
-    "github_repository_id": 1442549076,
-    "revision": "823bab12e367e333bf475c4998e5bc84459b1668"
-  }
+  ]
 }

@@ -1,0 +1,44 @@
+{
+  "platforms": [
+    "posix",
+    "win32"
+  ],
+  "library_versions": [
+    1,
+    2
+  ],
+  "roots": {
+    "posix": "/fictional/artifacts",
+    "win32": "Q:\\fictional\\artifacts"
+  },
+  "cases": [
+    [
+      "nested/report.txt",
+      "plain"
+    ],
+    [
+      "nested/café.txt",
+      "日本語é"
+    ],
+    [
+      "empty.txt",
+      ""
+    ],
+    [
+      "left/shared.txt",
+      "one"
+    ],
+    [
+      "right/shared.txt",
+      "two"
+    ],
+    [
+      "dot/../normal.txt",
+      "three"
+    ],
+    [
+      "double//child.txt",
+      "four"
+    ]
+  ]
+}

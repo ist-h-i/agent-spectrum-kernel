@@ -1,73 +1,61 @@
-# 評価課題を探して実行準備する
+# 評価課題の一覧と実行準備
 
-通常課題、在庫・予約・物流、CH02〜CH06、RC01、CH08を同じコマンドで選べます。一覧には課題ID、タイトル、分野、難易度、課題タイプ、入力と採点定義の参照、スキルごとに観測できる採点項目が表示されます。
-
-```sh
-node scripts/practical-evaluation-cli.mjs task-list
-node scripts/practical-evaluation-cli.mjs task-list --difficulty medium_hard --type review --skill controlled-implementation
-node scripts/practical-evaluation-cli.mjs task-prepare --id pf-observability-redaction --root /absolute/new-evaluation
-```
-
-パッケージ導入済みの環境では、同じ引数を `ask evaluate task-list` と `ask evaluate task-prepare` に渡します。
-
-- 難易度は `easy`、`easy_medium`、`medium`、`medium_hard`、`hard`、`unassessed` から指定できます。見立てに使った資料の種類は `difficulty_basis`、RC01・CH08の見立ての出典は `difficulty_source` に表示されます。
-- 課題タイプは `implementation`、`review`、`investigation`、`design`、`test`、`handoff`、`documentation` から指定できます。複数のタイプを持つ課題も同じIDで準備します。
-- スキルには [manifest.json](../manifest.json) のIDを指定します。複数の絞り込みを指定すると、すべてに一致する課題を表示します。採点で観測する内容は `observations` にあり、項目IDは同じ課題の `assessment` を参照します。
-
-## 作業領域と版を確認する
-
-`task-prepare` は、チェックアウトの外にある既存の親ディレクトリに未使用の `--root` を作り、選択した課題の固定入力を照合して用意します。通常・業務課題では結果の `working_directory` で作業し、`prompt_file` があればそれを使用します。それ以外は `task_file` が実行時の問題文です。準備が完了するとホスト側の `evaluation-preparation.json` に、入力と採点定義の版および作業場所を保存します。
+現行課題は [共通カタログ](../benchmarks/evaluation-tasks.json) に登録します。通常24問、業務6問、RC01、CH08が同じ入力目録と版の識別方法を使います。課題によって、配布モードや初回提出後の追加資料を指定できます。
 
 ```sh
-node scripts/practical-evaluation-cli.mjs task-prepare --id ch02-report-operations --root /absolute/new-ch02 --delivery-mode one_shot
-node scripts/practical-evaluation-cli.mjs task-prepare --id ch06-build-operations --root /absolute/new-ch06 --delivery-mode goal_with_pr
+ask evaluate task-list
+ask evaluate task-list --difficulty medium_hard --type review --skill controlled-implementation
+ask evaluate task-prepare --id pf-observability-redaction --root /absolute/fresh-run
 ```
 
-CH02〜CH06の既定は `one_shot` です。両モードとも共通仕様への相対参照が解決できるように準備します。実行の承認、モデル呼び出し、採点はそれぞれ既存の手順に従います。採点定義は通常課題の新版の問題文・項目別配点と評価者用の固定版、業務課題の受入仕様、段階課題の固定評価器参照に対応します。業務課題では、受入仕様が参照する個別の仕様書も入力目録のハッシュで結び付けます。
+ソースから使う場合は `ask evaluate` を `node scripts/practical-evaluation-cli.mjs` に置き換えます。難易度は出題時の見立てです。新しく校正した結果がなければ `unassessed` を使います。
 
-### 在庫・予約・物流
+## 回答者に渡す範囲
 
-一覧の `input.archive_api_path` は、回答者向け固定版を取得するGitHub APIのパスです。配布元を閲覧できるアカウントで認証済みの `gh` を使い、手元のアクセス制限されたディレクトリに展開します。`task-prepare` は配布目録とプロンプトのハッシュ、目録内の各ファイルを照合します。
+`task-prepare` は新しい `--root` に固定入力を照合して用意します。運用者は出力の `workspace/` だけを回答者の作業領域に渡します。`working_directory` から作業し、`prompt_file` があればそれを使います。ホスト側の準備記録、ソースリポジトリ、npmパッケージ、閲覧用の認証情報は運用者側に置きます。CH02〜CH06は `--delivery-mode one_shot` と `--delivery-mode goal_with_pr` を使えます。
+
+通常課題の問題文は業務要件、提出形式、公開の配点を示します。評価者が使う具体的な反例、独立した検査値、追加資料は認証が必要な共通の資材保管先にあります。配布用パッケージから旧問題のファイルと評価者用の追加資料を除外しています。
+
+## 非公開資材を使う準備
+
+カタログ出力の `assessment.calibration` が、全問に共通する非公開リポジトリと固定コミットを示します。認証済みの運用者が、アクセスを制限した作業領域にその版を展開します。以下のコマンドは絶対パスで指定する既存の親ディレクトリを使います。`assets_dir` は回答者の作業領域とソースチェックアウトの外に置きます。
 
 ```sh
-archive=$(node scripts/practical-evaluation-cli.mjs task-list |
-  jq -er '.[] | select(.id == "ch01-inventory-reservation-logistics") | .input.archive_api_path')
-input_dir=$(mktemp -d)
-input_dir=$(cd "$input_dir" && pwd -P)
-(umask 077; gh api "$archive" | tar -xzf - --strip-components 1 -C "$input_dir")
+ref=$(ask evaluate task-list | jq -er '.[] | select(.input.kind == "private") | .input.archive_api_path')
+assets_dir=$(mktemp -d)
+assets_dir=$(cd "$assets_dir" && pwd -P)
+(umask 077; gh api "$ref" | tar -xzf - --strip-components 1 -C "$assets_dir")
 
-node scripts/practical-evaluation-cli.mjs task-prepare --id ch01-inventory-reservation-logistics \
-  --root /absolute/new-logistics --logistics-source "$input_dir"
+ask evaluate task-prepare --id ch01-inventory-reservation-logistics \
+  --root /absolute/fresh-logistics-run --assets-root "$assets_dir"
 ```
 
-### RC01・CH08
+物流も共通形式の目録と同じファイル照合処理で準備します。評価者用のファイルは物流の回答者用目録から外れています。
 
-引数 `--id` と `--root` だけで初回の固定入力を用意できます。既存の段階実行器の準備まで行う場合は、実行環境を記載した `--config` を同じコマンドに渡します。設定ファイルと以後の承認・実行手順は [段階実行ガイド](practical-challenge-evaluation.md) を参照してください。
+## 初回提出後の追加資料
 
-保存済みの試行や旧版を再現する場合は、その試行が固定したソースと入力・採点定義を揃えます。会計台帳移行や旧予約・配送の資材は [移行前のV4固定版](https://github.com/ist-h-i/agent-spectrum-kernel/tree/e27575504f306772a13d568c3fcfa986060d6d37/benchmarks/challenge-candidates/ceiling-v4-continuity) から参照できます。改訂前に固定した通常24問の入力を一括で検証する作業には [公開入力の一括点検](primary-24-public-inputs.md) を使えます。
-
-## 改訂版を採点する
-
-通常24問では、回答者が受け取る `task.md` の末尾に10点の内訳を表示します。`task-prepare` が初期入力を照合します。提出後は、評価者が次のコマンドで提出物を識別し、どの固定ファイルに変更があったかを確認します。回答者にハッシュの転記を求める手順はありません。
+#528のライブラリ更新と#536の物流課題では、初回の最終回答をホスト側の `delivery/answer.md` に保存してから初回提出を固定します。次のコマンドは、その提出物を照合して別の作業領域を作り、そこで使う追加資料だけを渡します。追試の提出が終わったら `followup/delivery/answer.md` に最終回答を保存します。
 
 ```sh
-node scripts/practical-evaluation-cli.mjs task-inspect --root /absolute/new-evaluation
-node scripts/practical-evaluation-cli.mjs task-score --root /absolute/new-evaluation --record /absolute/assessor/record.json
+ask evaluate task-freeze --root /absolute/fresh-run
+ask evaluate task-followup --root /absolute/fresh-run --assets-root "$assets_dir"
 ```
 
-1. `task-list` の `assessment.calibration` が示すリポジトリ・コミット・ディレクトリを、アクセスできる評価者が開きます。一つのコミットから共通の補助ファイルも取得してください。校正用の答案と評価手順は評価者の作業領域に置きます。
-2. 最終回答を作業領域外で受け取った場合は、ホスト側の `--root` 直下に `delivery/answer.md` として保存します。回答者の実行記録も `delivery/` にまとめてから `task-inspect` を実行してください。回答本文や記録だけが違う提出も区別できます。最終報告を要する項目は、報告を取得できなければ未観測とします。`subject` は課題ID、入力・採点基準の版、提出ファイルの一覧と内容から求めたダイジェストを含みます。評価者は、この提出物に対して行った操作、保存状態、提出者のテストが検出した差など、各項目が求める証拠を保存します。固定入力の差分は変更範囲の判断に使い、設定・テストを変えて得た結果を元の条件での成功に数えないでください。
-3. 評価者用JSONの `subject` に先ほどの値を入れ、`items` に項目ごとの `criterion_id`、`points`、`reason`、`evidence` を記録します。`evidence` は採点記録からの相対パス `path` とファイルの `digest`（`sha256:` と16進64桁）の組です。評価できなかった項目は `points: null` と理由を記録します。`critical_violations` には業務への実害 `impact` と根拠 `evidence` を記録できます。
-4. `task-score` は提出内容・版・証拠ファイルを照合し、評価者の判断を集計します。根拠を確認して0点とした項目と未観測の項目を分けて表示します。未観測を含むグループでは確定分だけを `confirmed_points` に表示し、合計 `points` は `null` にします。
+RC01とCH08は、`task-prepare` に `--config` と `--assets-root` を渡すと既存の段階実行器を使えます。運用者が初回提出を固定し、第2段階を始めるときに追加資料をコピーします。採点では両段階を照合する引き渡しが必要です。実行方法は [段階実行ガイド](practical-challenge-evaluation.md) を参照してください。
 
-在庫・予約・物流、CH02〜06、RC01、CH08の改訂項目は診断用です。製品の動作と提出者のレビュー・検証を別々に集計します。CH08の機能40点・UI/UX60点とRC01の100点には従来どおり段階実行器の採点経路を使用してください。第1段階の提出物を固定してから、第2段階の情報を渡します。RC01とCH08で観測に得点を付けるには、`challenge-score-handoff` で両段階の提出物を照合しておく必要があります。
+## 採点
 
-比較には `task_id`、`input.digest`、`assessment.digest` が一致する試行を使います。モデル・推論設定・対象外のスキルも固定します。実際に試行したときは、項目別結果と未観測数、採点できた件数とそのうちの満点件数を記録してください。時間・トークンは別に記録します。改訂前の答案と点数は、その試行のコミットから参照できます。
+```sh
+ask evaluate task-inspect --root /absolute/fresh-run
+ask evaluate task-score --root /absolute/fresh-run --record /absolute/assessor/record.json
+```
 
-## 検証契約
+評価者は `task-inspect` の `subject` に対して、項目ID、点数、観測結果、根拠ファイルを記録します。根拠ファイルは記録からの相対パス `path` と `sha256:` 付きの `digest` で指定します。最終報告を要する項目では `delivery/answer.md` を、追試が必要な項目では固定版に対応する追試結果を使います。
 
-- Artifact ID `issue-511-verification`。上流は [#511](https://github.com/ist-h-i/agent-spectrum-kernel/issues/511)。
-- `ask.verification-proof-policy@1.0.0` の Formal Verification Contract を使用します。既存CLI、配布パッケージと複数の入力契約をまたぐ変更です。
-- V1。現行32件のIDを重複なく表示し、難易度・タイプ・スキルの組み合わせで選べることをCLIで確かめます。
-- V2。選んだ各IDの固定入力を新規ディレクトリに準備し、入力と採点定義の参照を照合します。段階課題の追加情報、業務課題の別モード、物流の目録外ファイルが回答者の作業領域に混入しないことを確かめます。
-- V3。通常課題の一括検証、段階実行器、npm配布後の一覧と準備を既存経路から再確認します。物流の原本確認は既存のアクセス権で取得した固定版を使います。
+確認した結果が0点だった場合と、観測できなかった場合を区別します。後者は点数を `null` とし、観測不能の理由を記録します。段階課題に注入した合成実行結果は `stage_evidence_kind: "synthetic"` で識別できます。実モデル試行の結果には含めません。比較する試行では課題ID、入力版、採点基準、モデルと実行条件をそろえます。
+
+## 現行版を更新する
+
+課題IDと出題方法は共通カタログで、公開配点は `benchmarks/task-revisions/<id>/rubric.json` で編集します。公開入力を変更したら `node scripts/seal-evaluation-revisions.mjs --write` で共通目録を更新します。通常課題は現在の課題ディレクトリだけから入力を組み立てます。旧入力は現行の準備に使用しません。
+
+非公開の追加資料や物流入力を更新するときは、評価用資材を固定コミットにまとめ、そのコミットとファイルのハッシュを登録します。配布先の目録に評価者専用資材の本体を載せないこと、選択した版を準備できること、同じ初回提出に別版の追試・採点を流用できないことを確認します。

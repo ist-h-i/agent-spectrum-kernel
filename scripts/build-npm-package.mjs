@@ -18,12 +18,18 @@ export const RUNTIME_ENTRIES = [
 ];
 // These operate on a complete developer checkout, not an installed package.
 // The Git-backed route resolves them from that checkout when explicitly selected.
-const DEVELOPER_ONLY = new Set(['scripts/validate-repo.mjs',
+const DEVELOPER_ONLY = new Set(['scripts/validate-repo.mjs', 'scripts/ask-benchmark.mjs',
   'scripts/update-adapter-runtime-fixtures.mjs', 'scripts/update-claude-fixed-entry-fixtures.mjs',
   'scripts/update-codex-compact-fixtures.mjs']);
 const toPosix = p => p.split(sep).join('/');
 const within = (root, path) => { const rel = relative(root, path); return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel); };
-const forbidden = p => /^benchmarks\/challenge-candidates\/review-ceiling-v1\/calibration-(?:report\.md|summary\.json)$/u.test(p) || /^(?:dist|\.npm-dist-[^/]+)(?:\/|$)/u.test(p) || p.split('/').some(part => ['.git', 'node_modules', '.env', '.npmrc', '.DS_Store'].includes(part)) || /^scripts\/(?:test-|test-fixtures\/)/u.test(p) || /^(?:benchmarks\/(?:results|review-archives)\/|\.github\/)/u.test(p);
+const forbidden = path => /^(?:dist|\.npm-dist-[^/]+)(?:\/|$)/u.test(path)
+  || path.split('/').some(part => ['.git', 'node_modules', '.env', '.npmrc', '.DS_Store'].includes(part))
+  || /^scripts\/(?:test-|test-fixtures\/)/u.test(path)
+  || /^(?:benchmarks\/(?:fixtures|results|review-archives)\/|\.github\/)/u.test(path)
+  || /^benchmarks\/checkpoint-(?:b(?:2)?|c)\.config\.json$/u.test(path)
+  || /^benchmarks\/challenge-candidates\/[^/]+\/(?:stages|input-manifests|tools|evaluator(?:-v2)?)\//u.test(path)
+  || /^benchmarks\/challenge-candidates\/review-ceiling-v1\/calibration-(?:report\.md|summary\.json)$/u.test(path);
 
 export function runtimePackageFiles(root = ROOT) {
   root = resolve(root);
@@ -42,10 +48,11 @@ export function runtimePackageFiles(root = ROOT) {
   };
   for (const path of ['LICENSE', 'AGENTS.md', 'CUSTOM_INSTRUCTIONS.md', 'manifest.json',
     'skills', 'adapters', 'schemas', 'products', 'docs/ai',
-    'benchmarks/task-revisions', 'benchmarks/fixtures', 'benchmarks/contracts', 'benchmarks/schemas',
-    'benchmarks/challenge-candidates/business-five-v3-decisions',
-    'benchmarks/challenge-candidates/review-ceiling-v1',
-    'benchmarks/challenge-candidates/ui-reconstruction-v1',
+    'benchmarks/task-revisions', 'benchmarks/contracts', 'benchmarks/schemas',
+    'benchmarks/challenge-candidates/business-five-v3-decisions/public',
+    'benchmarks/challenge-candidates/review-ceiling-v1/workspace',
+    'benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md',
+    'benchmarks/challenge-candidates/ui-reconstruction-v1/workspace',
     'docs/fixtures/asset-registry', 'docs/fixtures/adapter-runtime-profiles.json', 'docs/npm-distribution.md', 'docs/npm-distribution-ja.md', 'docs/npm-loop-spec-example.mjs',
     ...RUNTIME_ENTRIES]) { assert.ok(existsSync(join(root,path)), `required package root missing: ${path}`); add(path); }
   while (queue.length) {

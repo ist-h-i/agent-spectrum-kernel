@@ -1,47 +1,48 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "mn-frontend-default-fix",
-  "version": "task-revision-1",
-  "rubric_sha256": "f2286d7fa604d81885e20ecf509f42cc678fe866d2fcc8c287e6756d46a89359",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1398,
+          "sha256": "1546016014ed507c392c177bfb30519f1605e39c872d567006db2bf8b7ac0666"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 183,
+          "sha256": "9b6a95efc3b02d8c5ebee76a529caea4ec8f49e3f84d416f79acac775e0f80a9"
+        },
+        {
+          "path": "workspace/spec/default-state.md",
+          "bytes": 1270,
+          "sha256": "f134c15818861177f67a599232da281d48df0d1725a7fae83d1d3bf71d20b450"
+        },
+        {
+          "path": "workspace/src/display-controls.mjs",
+          "bytes": 215,
+          "sha256": "cbb12c11a017555ac617a9577747b61679aed218a6098af13dc231c3b8b62dce"
+        },
+        {
+          "path": "workspace/src/display-preferences.mjs",
+          "bytes": 780,
+          "sha256": "6830b854fc22f74531aa1e42f60bed13721eab25338de90ed24452d13459d57d"
+        },
+        {
+          "path": "workspace/test/display-preferences.test.mjs",
+          "bytes": 2757,
+          "sha256": "cd1517ab18f65cbd70b91eb9999d46fbd7e4cd913f1e5506edaf6cb288cfcf94"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:f2286d7fa604d81885e20ecf509f42cc678fe866d2fcc8c287e6756d46a89359",
   "editable": [
     "workspace/src/display-preferences.mjs",
     "workspace/test/display-preferences.test.mjs"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 1398,
-      "sha256": "1546016014ed507c392c177bfb30519f1605e39c872d567006db2bf8b7ac0666",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "9b6a95efc3b02d8c5ebee76a529caea4ec8f49e3f84d416f79acac775e0f80a9",
-      "bytes": 183,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/spec/default-state.md",
-      "sha256": "f134c15818861177f67a599232da281d48df0d1725a7fae83d1d3bf71d20b450",
-      "bytes": 1270,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/display-controls.mjs",
-      "sha256": "cbb12c11a017555ac617a9577747b61679aed218a6098af13dc231c3b8b62dce",
-      "bytes": 215,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/display-preferences.mjs",
-      "sha256": "6830b854fc22f74531aa1e42f60bed13721eab25338de90ed24452d13459d57d",
-      "bytes": 780,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/display-preferences.test.mjs",
-      "sha256": "cd1517ab18f65cbd70b91eb9999d46fbd7e4cd913f1e5506edaf6cb288cfcf94",
-      "bytes": 2757,
-      "source": "inherited"
-    }
   ]
 }

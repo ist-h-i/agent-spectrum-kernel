@@ -5,17 +5,13 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { readEvaluationTaskRegistrations } from '../../../../scripts/evaluation-task-catalog.mjs';
 
 // These checks validate delivery assets, never candidate behavior or private scoring.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const source = resolve(root, '../../..');
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const sha = data => createHash('sha256').update(data).digest('hex');
-const canonical = value => JSON.stringify(sort(value));
-function sort(value) {
-  if (Array.isArray(value)) return value.map(sort);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, sort(value[key])]));
-  return value;
-}
 function files(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = join(directory, entry.name);
@@ -40,9 +36,12 @@ function inputPath(base, task, path) {
 
 const catalog = json(join(root, 'catalog.json'));
 const ids = ['ch02-report-operations', 'ch03-price-rollout', 'ch04-document-access', 'ch05-sales-reconciliation', 'ch06-build-operations'];
+const registered = readEvaluationTaskRegistrations().tasks.filter(task => task.input.kind === 'business');
+const manifests = id => json(join(source, 'benchmarks/task-revisions', id, 'input-manifest.json'));
 
-test('five separately versioned business tasks with explicit pending evaluation state', () => {
+test('the common catalog registers the five business tasks and their authoring contracts', () => {
   assert.deepEqual(catalog.tasks.map(task => task.id), ids);
+  assert.deepEqual(registered.map(task => task.id), ids);
   assert.equal(catalog.task_count, 5);
   assert.equal(catalog.private_assessment_included, false);
   assert.equal(catalog.ready_for_measurement, false);
@@ -51,25 +50,30 @@ test('five separately versioned business tasks with explicit pending evaluation 
   for (const task of catalog.tasks) {
     assert.deepEqual(task.delivery_modes, ['one_shot', 'goal_with_pr']);
     assert.equal(new Set(task.requirements).size, 14);
-    for (const field of ['task_path', 'roles_path', 'one_shot_prompt', 'goal_with_pr_prompt', 'input_manifest']) assert.ok(existsSync(join(root, task[field])));
+    assert.equal(Object.hasOwn(task, 'input_manifest'), false);
+    for (const field of ['task_path', 'roles_path', 'one_shot_prompt', 'goal_with_pr_prompt']) assert.ok(existsSync(join(root, task[field])));
   }
 });
 
 for (const task of catalog.tasks) {
   test(`${task.id}: both delivery modes bind complete public inputs by hash`, () => {
-    const manifest = json(join(root, task.input_manifest));
-    assert.equal(manifest.task_id, task.id);
-    assert.equal(manifest.version, catalog.version);
-    assert.equal(manifest.working_directory, `public/tasks/${task.id}`);
-    assert.equal(dirname(join(root, task.task_path)), join(root, manifest.working_directory));
+    const manifest = manifests(task.id);
+    const registration = registered.find(row => row.id === task.id);
+    assert.equal(manifest.kind, 'evaluation_input_manifest_v2');
+    assert.equal(manifest.id, task.id);
+    assert.equal(manifest.version, registration.input.version);
     assert.deepEqual(Object.keys(manifest.modes), ['one_shot', 'goal_with_pr']);
-    for (const inventory of Object.values(manifest.modes)) {
-      assert.equal(sha(canonical(inventory.files)), inventory.inventory_sha256);
-      const paths = inventory.files.map(row => row.path);
+    for (const [mode, inventory] of Object.entries(manifest.modes)) {
+      const {files: inputFiles, ...layout} = inventory;
+      assert.deepEqual(layout, registration.input.modes[mode]);
+      assert.equal(inventory.working_directory, `public/tasks/${task.id}`);
+      assert.equal(inventory.task_path, task.task_path);
+      assert.equal(dirname(join(root, task.task_path)), join(root, inventory.working_directory));
+      const paths = inputFiles.map(row => row.path);
       assert.equal(new Set(paths).size, paths.length);
       assert.deepEqual(paths, [...paths].sort());
       assert.ok(paths.includes('public/common/operation-and-observation.md'));
-      for (const row of inventory.files) {
+      for (const row of inputFiles) {
         const bytes = readFileSync(inputPath(root, task.id, row.path));
         assert.equal(bytes.length, row.bytes);
         assert.equal(sha(bytes), row.sha256, row.path);
@@ -109,8 +113,7 @@ for (const task of catalog.tasks) {
 test('published inventory contains only declared inputs and public delivery metadata', () => {
   const allowed = new Set(['README.md', 'catalog.json', 'tools/public-package.test.mjs']);
   for (const task of catalog.tasks) {
-    allowed.add(task.input_manifest);
-    for (const mode of Object.values(json(join(root, task.input_manifest)).modes)) for (const row of mode.files) allowed.add(row.path);
+    for (const mode of Object.values(manifests(task.id).modes)) for (const row of mode.files) allowed.add(row.path);
   }
   assert.deepEqual(new Set(files(root).map(path => relative(root, path).split(sep).join('/'))), allowed);
 });
@@ -140,7 +143,7 @@ test('workflows bind existing requirements and both delivery modes', () => {
       assert.ok(text.includes(`## ${flow.id} `));
     }
     assert.ok(text.includes('担当・開始状態') && text.includes('外から確認する結果') && text.includes('禁止結果'));
-    const manifest = json(join(root, task.input_manifest));
+    const manifest = manifests(task.id);
     for (const mode of Object.values(manifest.modes)) assert.ok(mode.files.some(row => row.path === task.workflow_path));
   }
   assert.equal(workflowIds.size, 15);
@@ -161,7 +164,7 @@ test('decision contracts are explicit and bound in both modes', () => {
     assert.ok(task.decision_requirements.every(id => task.requirements.includes(id)));
     const text = readFileSync(join(root, task.decision_path), 'utf8');
     for (const id of task.decision_requirements) assert.ok(text.includes(id));
-    const manifest = json(join(root, task.input_manifest));
+    const manifest = manifests(task.id);
     for (const mode of Object.values(manifest.modes)) assert.ok(mode.files.some(row => row.path === task.decision_path));
   }
 });

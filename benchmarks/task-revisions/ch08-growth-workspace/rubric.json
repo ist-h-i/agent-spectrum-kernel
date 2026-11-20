@@ -3,7 +3,7 @@
     {
       "id": "target-and-change",
       "points": 2,
-      "observation": "T03・T06の比較と一部採用で、360px・1280pxの現対象、差分、操作の結果が確認できる（U02・U04）。",
+      "observation": "画面幅が変わっても、対象、差分、操作結果を読み取れる。",
       "skills": [
         "ui-ux-design"
       ],
@@ -12,7 +12,7 @@
     {
       "id": "keyboard-return",
       "points": 2,
-      "observation": "各幅でキーボードだけで確認・取消・再度の採用と起点からの作業継続を観測する（T14・U06・U07）。",
+      "observation": "キーボードで主要操作を行い、元の作業を続けられる。",
       "skills": [
         "ui-ux-design"
       ],
@@ -21,7 +21,7 @@
     {
       "id": "formal-state",
       "points": 2,
-      "observation": "AI参考案、確認中、人が正式に採用した計画・評価が位置や色だけに頼らず画面と保存状態で区別できる（F03・F05・U04）。",
+      "observation": "参考案と正式な計画・評価を区別でき、画面と保存結果が一致する。",
       "skills": [
         "ui-ux-design"
       ],
@@ -30,7 +30,7 @@
     {
       "id": "review-match",
       "points": 2,
-      "observation": "提出者がREASSESSMENT.mdに記した画面・主操作とつまずきの位置が独立の操作記録に一致する（U01・U03）。",
+      "observation": "提出者が特定した使いやすい箇所や支障が、独立した操作記録と一致する。",
       "skills": [
         "review-output-quality"
       ],
@@ -39,7 +39,7 @@
     {
       "id": "verification-record",
       "points": 2,
-      "observation": "提出者の記録で確認のみ・取消・一部採用・再読後を識別し、結果を操作・保存の独立観測と照合できる（F03・F05）。",
+      "observation": "提出者が記録した操作・表示・保存結果が、独立した観測と一致する。",
       "skills": [
         "test-first-verification"
       ],

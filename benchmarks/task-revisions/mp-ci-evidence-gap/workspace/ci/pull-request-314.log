@@ -1,0 +1,22 @@
+Pull request #314 / verify
+Node.js 24.19.0
+Labels: checkout
+
+$ npm ci
+added 0 packages, and audited 1 package
+
+$ npm test
+> node --test test/unit/*.test.mjs
+ok 1 - quotes ordinary and large-quantity orders
+ok 2 - rejects out-of-domain quantities and invalid prices
+ok 3 - routes individually high-priced orders to review
+# pass 3
+# fail 0
+
+Run checkout contract tests: skipped (checkout-contract label absent).
+
+$ node scripts/upload-diagnostics.mjs
+diagnostics endpoint unavailable
+Process completed with exit code 7; step continued.
+
+Job conclusion: success

@@ -1,0 +1,7 @@
+{
+  "name": "mn-schema-field-alignment-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test test/member-record.test.mjs"}
+}

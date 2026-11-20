@@ -3,7 +3,7 @@
     {
       "id": "uncovered-requests",
       "points": 3,
-      "observation": "For every uncovered request the plan withholds readiness for the evidenced receipt, scope, state, time or use reasons.",
+      "observation": "Decisions to hold requests are supported by the supplied facts.",
       "skills": [
         "risk-gate"
       ]
@@ -11,7 +11,7 @@
     {
       "id": "covered-requests",
       "points": 2,
-      "observation": "Current exact approvals are recognized for their covered requests; avoid unnecessary holds.",
+      "observation": "Decisions to proceed with preparation are supported by the supplied facts.",
       "skills": [
         "risk-gate"
       ]
@@ -19,7 +19,7 @@
     {
       "id": "rollback-target",
       "points": 1,
-      "observation": "The rollback names the observed original image and replica count.",
+      "observation": "The plan identifies an evidence-backed recovery target.",
       "skills": [
         "risk-gate"
       ]
@@ -27,7 +27,7 @@
     {
       "id": "execution-authority",
       "points": 2,
-      "observation": "Preparation has no effect, any future execution revalidates live state and receipt, and recovery requires distinct new authority.",
+      "observation": "The plan preserves preparation, execution and recovery safeguards.",
       "skills": [
         "risk-gate"
       ]
@@ -35,7 +35,7 @@
     {
       "id": "handoff",
       "points": 2,
-      "observation": "For each request the next role, checkable evidence and resumption condition match the actual blocker or readiness state.",
+      "observation": "The handoff identifies the next actor, relevant evidence and the condition for proceeding.",
       "skills": [
         "handoff-generation"
       ]

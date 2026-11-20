@@ -1,88 +1,87 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "mp-ci-evidence-gap",
-  "version": "task-revision-1",
-  "rubric_sha256": "05ecf800126a7551fc32dbd269d22e95fe732a708da07b48760f8bc03dd8fd3a",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1003,
+          "sha256": "234b5986dc8f1d279caf44e2813fe468330c48e21c409e303c6bdbbe1428b322"
+        },
+        {
+          "path": "workspace/.github/workflows/pull-request.yml",
+          "bytes": 591,
+          "sha256": "495831137a067c47918698aacf3f5cb924c3ccaacedfcb37cc923c281b0098aa"
+        },
+        {
+          "path": "workspace/ci/pull-request-314.log",
+          "bytes": 560,
+          "sha256": "8359add99165746e636274b9fa0cd8667d034db962b2b3d856400a1f9606cfb5"
+        },
+        {
+          "path": "workspace/docs/verification.md",
+          "bytes": 624,
+          "sha256": "f8d9d374a1eb413e3ed9af7185d35d87c53698a342a89b4720556a6d4a29c83d"
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "bytes": 218,
+          "sha256": "1441bbf380d78c27f1604d32ba6c31806099a8d1e533877cd058c462e2b77723"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 373,
+          "sha256": "849ad5e187dfe0a542479aef8411203d606559ab0f140865601913e165a88fe7"
+        },
+        {
+          "path": "workspace/pr.diff",
+          "bytes": 1921,
+          "sha256": "9cee73c6d31c57f03d5d8b039d0f0c4ffc7b6cc4c75452fc8edb4bf2e87bca01"
+        },
+        {
+          "path": "workspace/review.schema.json",
+          "bytes": 1849,
+          "sha256": "22e7984d1a6b3c8e92177500b7a566d5f0cc06fa5325acc55dc6c4dc6e91a62a"
+        },
+        {
+          "path": "workspace/scripts/upload-diagnostics.mjs",
+          "bytes": 138,
+          "sha256": "4f82ac80e4c5622d0e33bdd44c8e01628ed63eee9a2d313a1cd0c6e73857dd2c"
+        },
+        {
+          "path": "workspace/scripts/validate-review.mjs",
+          "bytes": 2981,
+          "sha256": "04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682"
+        },
+        {
+          "path": "workspace/src/checkout.mjs",
+          "bytes": 235,
+          "sha256": "69d400c35ce0f4d5d0a508e9668a61f4c7111881a04ef639f822e225f7742adb"
+        },
+        {
+          "path": "workspace/src/quote-order.mjs",
+          "bytes": 546,
+          "sha256": "af9163dd965fe124b886857dd52e39d385dc83d280d2d23d1003760fcdeb657d"
+        },
+        {
+          "path": "workspace/test/checkout/quote-order-contract.test.mjs",
+          "bytes": 579,
+          "sha256": "5dd647e0b598c56be5cf0e32818325498185791d743e0a099caee217a3258103"
+        },
+        {
+          "path": "workspace/test/unit/quote-order.test.mjs",
+          "bytes": 1013,
+          "sha256": "e7854580f8b9c74e81104ad6f9e986a52440337772b5c3425a355aa62163fce1"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:fccfea392cbcd546c1c67baeca843fc12c97e512d8735760e53137832470d877",
   "editable": [
     "workspace/review.json"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 1731,
-      "sha256": "64b4b854ac53c11a40b3a14637083d73b35f7a663ce146658006e1bf219ad9a6",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/.github/workflows/pull-request.yml",
-      "sha256": "d1a079e6bf8aea15c532c1ee06e9f505e92e40f6492be626dc8fd24f86eb382c",
-      "bytes": 431,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/ci/pull-request-314.log",
-      "sha256": "8cdd6705480e8b6a859bf40098fe0e3c358564c1e775acd14d8bb8c55ec98fd6",
-      "bytes": 403,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/docs/verification.md",
-      "sha256": "fe1e2db5b00085d6e3d59cffd3a191a1bd2f9f149f86ff898ad893b4fb9b69bf",
-      "bytes": 449,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package-lock.json",
-      "sha256": "1441bbf380d78c27f1604d32ba6c31806099a8d1e533877cd058c462e2b77723",
-      "bytes": 218,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "849ad5e187dfe0a542479aef8411203d606559ab0f140865601913e165a88fe7",
-      "bytes": 373,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/pr.diff",
-      "sha256": "903d8a715665c7091aa7b7a0dba214235079abed3b09faa20510e46c64fbe834",
-      "bytes": 541,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/review.schema.json",
-      "sha256": "22e7984d1a6b3c8e92177500b7a566d5f0cc06fa5325acc55dc6c4dc6e91a62a",
-      "bytes": 1849,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/upload-diagnostics.mjs",
-      "sha256": "4f82ac80e4c5622d0e33bdd44c8e01628ed63eee9a2d313a1cd0c6e73857dd2c",
-      "bytes": 138,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/validate-review.mjs",
-      "sha256": "04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682",
-      "bytes": 2981,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/quote-order.mjs",
-      "sha256": "9b74bbd8aebbce93ccaca984dee24dcdef2161e219c6bb9f609381a46a7a43f4",
-      "bytes": 398,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/checkout/quote-order-contract.test.mjs",
-      "sha256": "92ec6bc43700ff64ae2c6d83725a3f71c1c871a5d9545a228f41f452f237f1fa",
-      "bytes": 381,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/unit/quote-order.test.mjs",
-      "sha256": "d82815c4131eb7fe5d42b83d88658bd6c3814b542203c15566848b2d4150e0c5",
-      "bytes": 664,
-      "source": "inherited"
-    }
   ]
 }

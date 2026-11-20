@@ -1,8 +1,0 @@
-{
-  "name": "ch06-incremental-build-generations-debt-v2",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test"
-  }
-}

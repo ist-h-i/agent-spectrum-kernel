@@ -1,13 +1,7 @@
 # Restore complete supplier catalog collection
 
-The buying team uses a catalog export to reconcile supplier stock before preparing replenishment orders. The service has moved to its v2 contract, but the local collector no longer produces a complete export for all supported responses. Repair the collector so downstream consumers receive the service's items faithfully.
+The buying team uses a catalog export to reconcile supplier stock before replenishment. The supplier service has moved to its v2 contract. Repair the collector so consumers receive a faithful and complete export through their existing interfaces.
 
-Read `spec/pagination-contract.md`, the collector, decoder, consumer and focused tests. The completed collector must use the v2 request contract, collect every continued page in order, preserve complete item data and duplicate occurrences, retain caller options and propagate failures. The existing request bound, repeated-URL rejection and decoder origin boundary must remain effective.
+Follow `spec/pagination-contract.md`. Change only `src/pagination.mjs` and `test/pagination.test.mjs`. Preserve the supplied decoder, consumer and dependencies. Add focused coverage and explain what the checks establish. Requests use injected local doubles with fictional URLs. Do not contact a service.
 
-Change only `src/pagination.mjs` and `test/pagination.test.mjs`; extend focused coverage where needed. Preserve the supplied decoder, consumer, contract, package and dependencies. Requests are injected local doubles using fictional URLs; no service connection or installation is needed.
-
-From the workspace, run `npm test`. Report the checks actually run and any remaining gap. Passing the public tests alone does not replace the published behavior contract.
-
-The ID list is one consumer. The stock reconciler also uses quantities and supplier-specific fields and needs to distinguish an incomplete export from a completed one. Extend the submitted tests to exercise full records and a failure after some records have arrived. Report which operation your tests ran and what they observed.
-
-The decoder owns the wire format. In a later compatibility check the service and decoder can change that format together while keeping the decoded `{items, next}` interface. The collector must still return the same records and issue the same requests with no change to its code.
+Run `npm test` and report its observed result and any remaining verification limits.

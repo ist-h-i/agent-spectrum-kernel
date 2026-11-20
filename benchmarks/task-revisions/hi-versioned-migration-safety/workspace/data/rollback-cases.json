@@ -1,0 +1,44 @@
+[
+  {
+    "case_id": "expanded-mixed",
+    "phase": "expanded",
+    "legacy_writers": 1,
+    "backfill_complete": false,
+    "post_snapshot_writes": 0
+  },
+  {
+    "case_id": "cutover-dual",
+    "phase": "cutover",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 0
+  },
+  {
+    "case_id": "cutover-incomplete",
+    "phase": "cutover",
+    "legacy_writers": 0,
+    "backfill_complete": false,
+    "post_snapshot_writes": 0
+  },
+  {
+    "case_id": "contracted-no-new-writes",
+    "phase": "contracted",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 0
+  },
+  {
+    "case_id": "contracted-later-write",
+    "phase": "contracted",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 1
+  },
+  {
+    "case_id": "contracted-write-count-unknown",
+    "phase": "contracted",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": null
+  }
+]

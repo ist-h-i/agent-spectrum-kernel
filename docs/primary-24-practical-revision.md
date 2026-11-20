@@ -89,12 +89,10 @@ Every row defaults to `one-shot`; `goal-pr` is an optional delivery wrapper.
 | pf-performance-regression | Measured optimization with behavior preservation | one-shot · goal-pr |
 | pf-review-error-contract | Caller-visible error-contract review | one-shot · goal-pr |
 
-Use the existing `ask-benchmark.mjs prepare-primary-inputs` command to produce
-`inputs/<fixture-id>/task.md` and `workspace/**`; provide only the selected input
-directory in a fresh model session. `records/`, source checkout, private grading,
-historical versions and other answers are operator inputs, not model inputs.
-The existing preparation report's 72 P/K2/F placeholders remain unexecuted and
-are not the 48-trial practical measurement plan.
+For current evaluation use the [task catalog and preparation guide](evaluation-task-catalog.md).
+In the recorded practical evaluation, each model session received only its
+selected task and workspace. The 72 P/K2/F placeholders belonged to a separate
+preparation report. The practical measurement plan covered 48 trials.
 
 For one-shot delivery, provide the selected task unchanged and request its
 required artifacts and a concise statement of executed checks and limitations.

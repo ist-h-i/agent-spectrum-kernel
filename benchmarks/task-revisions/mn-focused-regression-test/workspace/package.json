@@ -1,0 +1,9 @@
+{
+  "name": "mn-focused-regression-test-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/session-key.test.mjs"
+  }
+}

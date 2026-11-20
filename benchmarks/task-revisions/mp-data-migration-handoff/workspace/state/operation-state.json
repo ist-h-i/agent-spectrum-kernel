@@ -1,0 +1,19 @@
+{
+  "phase": "backfill_paused",
+  "last_completed_batch": 41,
+  "next_batch": 42,
+  "durable_cursor": 840000,
+  "write_traffic": {
+    "dual_write": 60,
+    "legacy_only": 40
+  },
+  "read_traffic": {
+    "new_reader": 25,
+    "legacy_fallback": 75
+  },
+  "pause_reason_ids": [
+    "batch-42-checksum-mismatch",
+    "batch-42-unresolved-rows"
+  ],
+  "updated_at": "2026-08-15T09:20:00Z"
+}

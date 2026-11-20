@@ -1,0 +1,38 @@
+{
+  "provenance": "fictional deterministic local observations; no external CI run or frequency claim",
+  "node_major": 24,
+  "cache_entries": [
+    {
+      "cache_id": "cache-A",
+      "node_major": 24,
+      "lock_digest": "lock-A",
+      "artifact_version": 1
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "run-01",
+      "lock_digest": "lock-A",
+      "required_artifact_version": 1,
+      "restore_cache": null
+    },
+    {
+      "run_id": "run-02",
+      "lock_digest": "lock-A",
+      "required_artifact_version": 1,
+      "restore_cache": "cache-A"
+    },
+    {
+      "run_id": "run-03",
+      "lock_digest": "lock-B",
+      "required_artifact_version": 2,
+      "restore_cache": null
+    },
+    {
+      "run_id": "run-04",
+      "lock_digest": "lock-B",
+      "required_artifact_version": 2,
+      "restore_cache": "cache-A"
+    }
+  ]
+}

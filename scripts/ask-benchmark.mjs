@@ -87,7 +87,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, admissionDecision: null, admissionReviewAuthority: null, admissionReviewAuthoritySourceDigest: null, admissionReviewArchive: null, executionAdmissionFixture: null, executionAdmissionEvidence: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, aggregateAuthorityRoot: null, classificationRecordPaths: [], classificationRecordSourceDigests: [], lineageRecordPaths: [], lineageRecordSourceDigests: [], comparisonView: null, suite: null, taskClass: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, admissionDecision: null, admissionReviewAuthority: null, admissionReviewAuthoritySourceDigest: null, admissionReviewArchive: null, executionAdmissionFixture: null, executionAdmissionEvidence: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, aggregateAuthorityRoot: null, classificationRecordPaths: [], classificationRecordSourceDigests: [], lineageRecordPaths: [], lineageRecordSourceDigests: [], comparisonView: null, suite: null, taskClass: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: null };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -159,6 +159,10 @@ function parseArgs(argv) {
     else if (flag === "--help" || flag === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${flag}`);
   }
+  if (args.configPath === null && ["prepare", "run", "score"].includes(args.command)) {
+    throw new Error(`${args.command} requires an explicit --config <config.json>. Choose current tasks with ask evaluate task-list.`);
+  }
+  args.configPath ??= DEFAULT_CONFIG_PATH;
   return args;
 }
 
@@ -166,9 +170,6 @@ function help() {
   console.log(`Usage: node scripts/ask-benchmark.mjs <command> [options]
 
 Commands:
-  list-primary-inputs [--output <absent-report.json>]
-  prepare-primary-inputs --output <absent-directory>
-  verify-primary-inputs --input <prepared-directory> [--output <absent-report.json>]
   validate [--config <config.json>]
   validate-portfolio-catalog [--catalog <catalog.json>] [--similarity <similarity.json>]
   validate-portfolio-policy [--policy-manifest <manifest.json>] [--admission-policy <policy.json>] [--scoring-policy <policy.json>] [--lineage-policy <policy.json>]
@@ -205,9 +206,9 @@ Commands:
   report-engineering-aggregate-result-v2 --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --output <aggregate-result-v2.json>
   verify-engineering-aggregate-result-v2 --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --aggregate-authority-root <directory> --classification-record <relative-path> --classification-record-source-digest <sha256:digest> [--classification-record <relative-path> --classification-record-source-digest <sha256:digest> ...] [--lineage-record <relative-path> --lineage-record-source-digest <sha256:digest> ...] --comparison-view <view> --suite <suite> --task-class <task-class> --input <aggregate-result-v2.json>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
-  prepare [--config <config.json>] --output <empty-directory> --seed <value>
-  run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
-  score [--config <config.json>] --run-dir <completed-directory> --output <normalized-result.json>
+  prepare --config <config.json> --output <empty-directory> --seed <value>
+  run --config <config.json> --run-dir <prepared-directory> --agent-bin <codex-path>
+  score --config <config.json> --run-dir <completed-directory> --output <normalized-result.json>
 `);
 }
 
@@ -1278,19 +1279,7 @@ function verifyLegacyCalibrationMigrationCommand(args) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) try {
   const args = parseArgs(process.argv.slice(2));
-  if (["list-primary-inputs", "prepare-primary-inputs", "verify-primary-inputs"].includes(args.command)) {
-    const { inspectPrimaryPublicInputs, preparePrimaryPublicInputs, verifyPrimaryPublicInputs } = await import("./ask-primary-evaluation-prepare.mjs");
-    if (args.command === "prepare-primary-inputs" && !args.output) throw new Error("prepare-primary-inputs requires --output absent-directory");
-    if (args.command === "verify-primary-inputs" && !args.input) throw new Error("verify-primary-inputs requires --input prepared-directory");
-    if (args.command === "verify-primary-inputs" && args.output && (args.output === args.input || args.output.startsWith(`${args.input}/`))) throw new Error("verification report must be outside prepared input");
-    const report = args.command === "list-primary-inputs" ? inspectPrimaryPublicInputs()
-      : args.command === "prepare-primary-inputs" ? preparePrimaryPublicInputs(args.output) : verifyPrimaryPublicInputs(args.input);
-    const raw = `${JSON.stringify(report, null, 2)}\n`;
-    if (args.output && args.command !== "prepare-primary-inputs" && realpathSync(dirname(args.output)) !== dirname(args.output)) throw new Error("canonical report parent required");
-    if (args.output && args.command !== "prepare-primary-inputs") writeFileSync(args.output, raw, { flag: "wx", mode: 0o600 });
-    console.log(raw.trimEnd());
-    if (args.command !== "list-primary-inputs" && report.fixtures.some(row => !["valid", "prepared"].includes(row.public_input_status))) process.exitCode = 2;
-  } else if (args.command === "validate") {
+  if (args.command === "validate") {
     validateProtocol(args.configPath);
     validatePortfolioPolicyArtifacts();
     validatePortfolioDesignAdmissionArtifacts();

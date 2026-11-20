@@ -1,0 +1,13 @@
+{
+  "name": "local-ownership-review",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "trace": "node scripts/trace-access.mjs",
+    "validate:review": "node scripts/validate-review.mjs"
+  }
+}

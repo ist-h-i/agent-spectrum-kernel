@@ -1,47 +1,48 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "mn-client-compatibility-fix",
-  "version": "task-revision-1",
-  "rubric_sha256": "ef3ee29b21ad165db5887e29570d995227d41a461900b6eee5a5de93ceb8e956",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 842,
+          "sha256": "d0494bc5b02deb0386bccb7166a95073c55e68c488f5a8102bf3c8a950a94192"
+        },
+        {
+          "path": "workspace/docs/client-support.md",
+          "bytes": 632,
+          "sha256": "39a117913827b19df615dc89f4af4a74f84f10d95e27fb92103aaf8efc49d87c"
+        },
+        {
+          "path": "workspace/docs/preferences.md",
+          "bytes": 623,
+          "sha256": "4688c1eb8e4e910c7e34cda0a07eda1d56592c34fdb342fe34893cdd19765550"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 146,
+          "sha256": "3d1760b64967b2e6a2b8f66a73eaaccd74b8db66e4a7c58a84054261f512eee8"
+        },
+        {
+          "path": "workspace/src/preferences.mjs",
+          "bytes": 120,
+          "sha256": "9643f527b7de36d41628146127e79f7fc87cbec6ebd0ef3cfc2720f87eda8d28"
+        },
+        {
+          "path": "workspace/test/preferences.test.mjs",
+          "bytes": 850,
+          "sha256": "5d6a5e253e825e0317518226a8cc9b43c6b2f69ef5583be8b34143f3e2832f50"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:7dfaf7418f1655c6076416a8d35166d2b41d21bd0722acc7b5822f51d349d774",
   "editable": [
     "workspace/src/preferences.mjs",
     "workspace/test/preferences.test.mjs"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 1406,
-      "sha256": "966d4691ad3d66fc76712b77bd9dafd98b76168c611d992d49f7845680a7fb09",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/docs/client-support.md",
-      "sha256": "39a117913827b19df615dc89f4af4a74f84f10d95e27fb92103aaf8efc49d87c",
-      "bytes": 632,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/docs/preferences.md",
-      "sha256": "4688c1eb8e4e910c7e34cda0a07eda1d56592c34fdb342fe34893cdd19765550",
-      "bytes": 623,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "3d1760b64967b2e6a2b8f66a73eaaccd74b8db66e4a7c58a84054261f512eee8",
-      "bytes": 146,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/preferences.mjs",
-      "sha256": "9643f527b7de36d41628146127e79f7fc87cbec6ebd0ef3cfc2720f87eda8d28",
-      "bytes": 120,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/preferences.test.mjs",
-      "sha256": "5d6a5e253e825e0317518226a8cc9b43c6b2f69ef5583be8b34143f3e2832f50",
-      "bytes": 850,
-      "source": "inherited"
-    }
   ]
 }

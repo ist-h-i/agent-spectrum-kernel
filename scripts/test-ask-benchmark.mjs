@@ -12,6 +12,7 @@ const root = resolve(import.meta.dirname, "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(tmpdir(), "ask-benchmark-test-"));
 const advancedWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-b2-test-"));
+const checkpointBConfig = resolve(root, "benchmarks/checkpoint-b.config.json");
 const advancedConfig = resolve(root, "benchmarks/checkpoint-b2.config.json");
 const checkpointCConfig = resolve(root, "benchmarks/checkpoint-c.config.json");
 const portfolioConfig = resolve(root, "benchmarks/adaptive-portfolio.config.json");
@@ -34,6 +35,24 @@ function groupBy(values, keyFor) {
     groups.set(key, [...(groups.get(key) ?? []), value]);
   }
   return groups;
+}
+
+for (const command of ["list-primary-inputs", "prepare-primary-inputs", "verify-primary-inputs"]) {
+  const output = resolve(work, "retired-primary-input");
+  const args = command === "verify-primary-inputs" ? ["--input", work, "--output", output] : ["--output", output];
+  assert.match(run([command, ...args], 1).stderr, new RegExp(`Unknown command: ${command}`));
+  assert.ok(!existsSync(output));
+}
+
+const automaticCheckpoint = resolve(work, "automatic-checkpoint");
+const missingBenchmarkConfig = [
+  ["prepare", "--output", automaticCheckpoint, "--seed", "fixture-seed"],
+  ["run", "--run-dir", work],
+  ["score", "--run-dir", work, "--output", automaticCheckpoint],
+];
+for (const args of missingBenchmarkConfig) {
+  assert.match(run(args, 1).stderr, /requires an explicit --config/);
+  assert.ok(!existsSync(automaticCheckpoint));
 }
 
 run(["validate"]);
@@ -269,7 +288,7 @@ try {
   rmSync(validVariantConfigPath, { force: true });
 }
 
-run(["prepare", "--output", work, "--seed", "fixture-seed"]);
+run(["prepare", "--config", checkpointBConfig, "--output", work, "--seed", "fixture-seed"]);
 run(["prepare", "--config", advancedConfig, "--output", advancedWork, "--seed", "advanced-fixture-seed"]);
 
 const manifest = JSON.parse(readFileSync(resolve(work, "run.json"), "utf8"));
@@ -400,18 +419,17 @@ for (const entry of manifest.cases) {
 }
 
 const resultPath = resolve(work, "normalized.json");
-run(["score", "--run-dir", work, "--output", resultPath]);
+run(["score", "--config", checkpointBConfig, "--run-dir", work, "--output", resultPath]);
 const normalized = JSON.parse(readFileSync(resultPath, "utf8"));
 assert.equal(normalized.runs.length, 6);
 assert.ok(normalized.runs.every((entry) => entry.human_effort.senior_review_minutes === null));
 assert.ok(normalized.runs.every((entry) => !Object.hasOwn(entry, "raw_output")));
 assert.ok(normalized.comparison.workflow_recommendations.every((entry) => ["expand", "retain", "simplify", "stop"].includes(entry.recommendation)));
 
-// The existing benchmark CI entry also qualifies the model-free primary input
-// commands. Keep this registration here so shared workflow edits are unnecessary.
-const { NODE_TEST_CONTEXT: _testContext, ...publicInputTestEnv } = process.env;
-const publicInputTests = spawnSync(process.execPath, ["--test", ...[
-  "test-ask-primary-public-inputs.mjs", "test-ask-primary-fixture-recipe.mjs",
+// Keep the registered comparison and scoring checks in the benchmark CI entry.
+const { NODE_TEST_CONTEXT: _testContext, ...comparisonTestEnv } = process.env;
+const comparisonTests = spawnSync(process.execPath, ["--test", ...[
+  "test-ask-primary-fixture-recipe.mjs",
   "test-ask-primary-evaluation-batch.mjs", "test-ask-primary-principles-v2-connection.mjs",
   "test-ask-benchmark-pf-performance-measurement.mjs", "test-ask-benchmark-pf-performance-source.mjs",
   "test-ask-benchmark-pf-data-schema-source.mjs", "test-ask-benchmark-pf-library-source.mjs",
@@ -419,9 +437,9 @@ const publicInputTests = spawnSync(process.execPath, ["--test", ...[
   "test-ask-benchmark-hi-external-approval-source.mjs", "test-ask-benchmark-hi-financial-source.mjs",
   "test-ask-benchmark-hi-migration-source.mjs",
 ].map(name => resolve(root, "scripts", name))], {
-  cwd: root, encoding: "utf8", env: publicInputTestEnv, maxBuffer: 10 * 1024 * 1024,
+  cwd: root, encoding: "utf8", env: comparisonTestEnv, maxBuffer: 10 * 1024 * 1024,
 });
-assert.equal(publicInputTests.status, 0, publicInputTests.stderr || publicInputTests.stdout);
-console.log(publicInputTests.stdout.trimEnd());
+assert.equal(comparisonTests.status, 0, comparisonTests.stderr || comparisonTests.stdout);
+console.log(comparisonTests.stdout.trimEnd());
 
 console.log("ASK benchmark tests passed");

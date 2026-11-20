@@ -1,94 +1,87 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "mp-iac-rollback-design",
-  "version": "task-revision-1",
-  "rubric_sha256": "c8383edb38267816e266b1f826503512efce3578970a26a8885244a75c250098",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1288,
+          "sha256": "654fdeccb418c737927d1becb856d3c5ee42b2398ac51bd63446ca9eda636fdd"
+        },
+        {
+          "path": "workspace/change-plan.schema.json",
+          "bytes": 7787,
+          "sha256": "13376543a891b1774e9c78234c866ffb640ec82666cf9129b893ae4f346e69e8"
+        },
+        {
+          "path": "workspace/docs/change-request.md",
+          "bytes": 946,
+          "sha256": "24458fee92c2ed7fa5bfe95f56af6911f1b8639ff10b8ac110c00395c6916c00"
+        },
+        {
+          "path": "workspace/docs/knowledge-policy.md",
+          "bytes": 663,
+          "sha256": "89a5a96997bbafca5d6c13de68ac4c4f05ca376a8abfcdb06cca41fa3fdc485b"
+        },
+        {
+          "path": "workspace/docs/rollback-policy.md",
+          "bytes": 757,
+          "sha256": "050283401cd2f99f120cc41ced0fc3a33195e1e5d9daae1acb4588264d866d3d"
+        },
+        {
+          "path": "workspace/infra/alias.tf",
+          "bytes": 215,
+          "sha256": "6d9ebfd9960efe5c773b4c6e01423041a269c7145c2b02239727281c6f3108a6"
+        },
+        {
+          "path": "workspace/infra/iam.tf",
+          "bytes": 361,
+          "sha256": "225e670871ac615237ede92602f96400bf9e84b2dbbc44493e88b6aa1e5498ba"
+        },
+        {
+          "path": "workspace/operations/commands.json",
+          "bytes": 1098,
+          "sha256": "e8807a8289288edb4881104b4cd773b0e1f34ebab685e201481be5126bbe2db3"
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "bytes": 268,
+          "sha256": "913b787bd230691adf255631664e80b87e6a1ae1478fb1f1e4f73ec7a17abac5"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 249,
+          "sha256": "a2f69220942a021487ab441d25d013d427320103a85f2845221758e381ec9377"
+        },
+        {
+          "path": "workspace/plans/candidate-plan.json",
+          "bytes": 478,
+          "sha256": "7426b6c93a916ba2c3ed8007a2e124d02066d76ec83d2278b2f5630709d63187"
+        },
+        {
+          "path": "workspace/plans/pre-apply-records.json",
+          "bytes": 3411,
+          "sha256": "4855dc727a8bd188df064d2018fbd691f9658bcfe50e577c6bc00d3252f298be"
+        },
+        {
+          "path": "workspace/scripts/validate-change-plan.mjs",
+          "bytes": 9205,
+          "sha256": "bf84b18c9cba64381fd42914b4ca53c14bbeee35159412e65686c6e90069562c"
+        },
+        {
+          "path": "workspace/state/current-state.json",
+          "bytes": 653,
+          "sha256": "d99381fdd62a427b159f336dfd420668e365d3734efa2d2180b5deba0c143089"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:442b3f8cd9ec92b54cdbe04f8e3518b26ec4a30eca63535796ef631917e187c6",
   "editable": [
     "workspace/change-plan.json"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 2221,
-      "sha256": "59147865c07d3b24b827e660207c8a4932585538fce7cbb507b8ceea90eb620a",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/change-plan.schema.json",
-      "bytes": 7787,
-      "sha256": "13376543a891b1774e9c78234c866ffb640ec82666cf9129b893ae4f346e69e8",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/docs/change-request.md",
-      "sha256": "24458fee92c2ed7fa5bfe95f56af6911f1b8639ff10b8ac110c00395c6916c00",
-      "bytes": 946,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/docs/knowledge-policy.md",
-      "sha256": "89a5a96997bbafca5d6c13de68ac4c4f05ca376a8abfcdb06cca41fa3fdc485b",
-      "bytes": 663,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/docs/rollback-policy.md",
-      "sha256": "050283401cd2f99f120cc41ced0fc3a33195e1e5d9daae1acb4588264d866d3d",
-      "bytes": 757,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/infra/alias.tf",
-      "sha256": "6d9ebfd9960efe5c773b4c6e01423041a269c7145c2b02239727281c6f3108a6",
-      "bytes": 215,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/infra/iam.tf",
-      "sha256": "225e670871ac615237ede92602f96400bf9e84b2dbbc44493e88b6aa1e5498ba",
-      "bytes": 361,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/operations/commands.json",
-      "sha256": "e8807a8289288edb4881104b4cd773b0e1f34ebab685e201481be5126bbe2db3",
-      "bytes": 1098,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package-lock.json",
-      "sha256": "913b787bd230691adf255631664e80b87e6a1ae1478fb1f1e4f73ec7a17abac5",
-      "bytes": 268,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "a2f69220942a021487ab441d25d013d427320103a85f2845221758e381ec9377",
-      "bytes": 249,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/plans/candidate-plan.json",
-      "sha256": "ae22f7b6f66f252b12530a951592d398be08c56c5702e12bd926f95bffb8f916",
-      "bytes": 697,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/plans/pre-apply-records.json",
-      "bytes": 1731,
-      "sha256": "86b697e09eadad810ac28f1b3ebb6ce6cbf036b63db1ee671774ab3934ff6c76",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/scripts/validate-change-plan.mjs",
-      "bytes": 9205,
-      "sha256": "bf84b18c9cba64381fd42914b4ca53c14bbeee35159412e65686c6e90069562c",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/state/current-state.json",
-      "sha256": "153f59ae462f3a68017ee8cad14548ae83407fd654a220c6733e6b1631621e18",
-      "bytes": 583,
-      "source": "inherited"
-    }
   ]
 }

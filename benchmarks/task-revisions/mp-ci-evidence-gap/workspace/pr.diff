@@ -1,0 +1,49 @@
+diff --git a/src/quote-order.mjs b/src/quote-order.mjs
+new file mode 100644
+index 0000000..93f098b
+--- /dev/null
++++ b/src/quote-order.mjs
+@@ -0,0 +1,13 @@
++const REVIEW_LIMIT_CENTS = 50_000;
++
++export function quoteOrder({ quantity, unitPriceCents }) {
++  if (!Number.isInteger(quantity)) throw new TypeError("quantity must be an integer");
++  if (quantity <= 0) throw new RangeError("quantity must be positive");
++  if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0) throw new RangeError("unitPriceCents must be a non-negative integer");
++
++  return {
++    quantity,
++    totalCents: quantity * unitPriceCents,
++    requiresManualReview: quantity > 100 || unitPriceCents >= REVIEW_LIMIT_CENTS,
++  };
++}
+diff --git a/src/checkout.mjs b/src/checkout.mjs
+new file mode 100644
+index 0000000..199809d
+--- /dev/null
++++ b/src/checkout.mjs
+@@ -0,0 +1,6 @@
++import { quoteOrder } from "./quote-order.mjs";
++
++export function checkoutDisposition(order) {
++  const quote = quoteOrder(order);
++  return { ...quote, disposition: quote.requiresManualReview ? "hold-for-review" : "ready-to-submit" };
++}
+diff --git a/test/checkout/quote-order-contract.test.mjs b/test/checkout/quote-order-contract.test.mjs
+new file mode 100644
+index 0000000..3bb1ec0
+--- /dev/null
++++ b/test/checkout/quote-order-contract.test.mjs
+@@ -0,0 +1,12 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { checkoutDisposition } from "../../src/checkout.mjs";
++
++test("checkout uses the entire quoted order for the review boundary", () => {
++  const ordinary = checkoutDisposition({ quantity: 4, unitPriceCents: 12_499 });
++  const atLimit = checkoutDisposition({ quantity: 4, unitPriceCents: 12_500 });
++  assert.equal(ordinary.totalCents, 49_996);
++  assert.equal(ordinary.disposition, "ready-to-submit");
++  assert.equal(atLimit.totalCents, 50_000);
++  assert.equal(atLimit.disposition, "hold-for-review");
++});

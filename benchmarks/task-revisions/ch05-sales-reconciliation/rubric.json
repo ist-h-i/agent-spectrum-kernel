@@ -39,7 +39,7 @@
     {
       "id": "timepoint-regression",
       "points": 2,
-      "observation": "提出テストが独立した期待額をもち、正しい別実装を受け入れ、早期算入と旧版の後日改変の双方を検出する（S05・S06）。",
+      "observation": "提出テストが業務契約から独立に期待値を定め、正しい結果を受け入れ、精算結果の回帰を検出する（S05・S06）。",
       "skills": [
         "test-first-verification"
       ],

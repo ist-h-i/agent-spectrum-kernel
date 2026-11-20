@@ -1,0 +1,21 @@
+{
+  "workloads": [
+    {
+      "name": "sparse",
+      "events": 16000,
+      "requests": 2400,
+      "tenants": 64
+    },
+    {
+      "name": "dense",
+      "events": 16000,
+      "requests": 2400,
+      "tenants": 1
+    }
+  ],
+  "warmups": 2,
+  "samples": 5,
+  "minimum_baseline_ms": 12,
+  "maximum_dispersion_ratio": 12,
+  "maximum_candidate_median_ratio": 0.4
+}

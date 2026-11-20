@@ -1,0 +1,78 @@
+{
+  "kind": "evaluation_input_manifest_v2",
+  "id": "ch08-growth-workspace",
+  "version": "ui-functional-v2.2",
+  "modes": {
+    "default": {
+      "working_directory": ".",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "brief/data-contract.md",
+          "bytes": 11658,
+          "sha256": "9bf75da47d160d83ea1c469f02b9ff6c15c3aeb4ab1c27181fb4f3ee40e6dcb9"
+        },
+        {
+          "path": "brief/rubric.json",
+          "bytes": 45061,
+          "sha256": "16d59a5cf7a6c3b579711a58282472429475a7ad8776d2f15eca8363e5754150"
+        },
+        {
+          "path": "brief/scenarios.json",
+          "bytes": 12783,
+          "sha256": "f48872ca3660d0639362d2f334acf5a1fbdda49bd6c29d26fbcf653f5986996c"
+        },
+        {
+          "path": "brief/spec.md",
+          "bytes": 6221,
+          "sha256": "3d10685e5a54c1781f5e93612df7830879eaf67d39d2d2312c991c9a3faf04e8"
+        },
+        {
+          "path": "fixtures/assessment-valid.json",
+          "bytes": 1431,
+          "sha256": "e35bac875a8c8a02d3b9814451625d6b51d6dddfb171632930eef04cc8f6f59b"
+        },
+        {
+          "path": "fixtures/assessment-wrong-evidence.json",
+          "bytes": 1431,
+          "sha256": "78e4b1707221dcfad8bebfeb675bb279cea97c4487752ac8cb13cef6164fd049"
+        },
+        {
+          "path": "fixtures/backup-dangling.json",
+          "bytes": 14748,
+          "sha256": "e978c2588331ef14f92aef414b8a8a7204daf80b7e7e69bdaeea5522c446d08e"
+        },
+        {
+          "path": "fixtures/career-valid.json",
+          "bytes": 1261,
+          "sha256": "2dc3989916ff2f7f105533b83c1b35c88ebc516992e1b47210074d7865ce167c"
+        },
+        {
+          "path": "fixtures/plan-over-limit.json",
+          "bytes": 1406,
+          "sha256": "c15801b08ae6e63379e7cc7d779a757d7f26e0af3bc5adde54d3068b5c7f277b"
+        },
+        {
+          "path": "fixtures/plan-valid.json",
+          "bytes": 1406,
+          "sha256": "00d261038e0c2ff5c226e0fdd9c1949969699d520dc1bd6a84f002c1c35505a2"
+        },
+        {
+          "path": "fixtures/plan-wrong-request.json",
+          "bytes": 1410,
+          "sha256": "1ae31eb4e522c116ec2b3f75b48c75e65e68435ac61362dcba0e28926b99c476"
+        },
+        {
+          "path": "fixtures/seed.json",
+          "bytes": 14743,
+          "sha256": "16b313e45fa4d9204857a4586b02ac723c2ea3682d9430a344261aec2b66b17e"
+        },
+        {
+          "path": "task.md",
+          "bytes": 4417,
+          "sha256": "53b81b9ab3dc7b8065310b588386bd1678b0e8c26ce1fd71928395e4f790fda1"
+        }
+      ]
+    }
+  }
+}

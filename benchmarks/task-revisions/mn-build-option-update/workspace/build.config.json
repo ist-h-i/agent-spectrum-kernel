@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "debug": {
+      "target": "node20",
+      "minify": false,
+      "sourceMap": true
+    },
+    "release": {
+      "target": "node20",
+      "minify": true,
+      "sourceMap": true
+    }
+  }
+}

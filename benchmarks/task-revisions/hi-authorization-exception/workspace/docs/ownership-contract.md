@@ -1,0 +1,11 @@
+# Ownership policy and review interface
+
+The fictional service stores tenant-owned records. `mayAccess(actor,resource,action,exceptions,now)` returns a boolean for read/write operations on ordinary JSON records. An owner may access only if both `owner_id` and `tenant_id` match. A service actor may read system resources within its own tenant; this exception does not permit writes or non-system resources. A support actor may read an exact resource under an approved exception: `actor_id`, `resource_id`, target `tenant_id` and `action` must match, and `expires_at` must be strictly greater than `now`. This support exception can cover a target outside the actor's home tenant. Other accesses are denied. A read receipt does not authorize a write.
+
+The exception array is trusted authority supplied by the caller in this local model. Actor role alone is not an approval record. The supplied cases define the review boundary; unspecified actor types, fabricated scopes and nonexistent inputs cannot support proven findings.
+
+Review `src/authorization.mjs` against `base/authorization.mjs`, `pr.diff`, caller inputs and this policy. No implementation edit is requested. Each finding records one supplied case whose proposed result violates the policy, its observed before/after booleans, required boolean, severity and evidence locations. Use high severity for an unauthorized grant and medium for a denied legitimate exception. Evidence must locate the relevant source or changed statement; case and policy references may supplement it. The decision must follow the evidenced findings: a PR with contract violations requires changes.
+
+`review.json` follows the closed `review.schema.json`. A `passed` verification declaration requires all three listed commands to have completed successfully. Shape validation does not assess the decision or findings. Native subset tests and the full public trace are evidence inputs, not a substitute for the review.
+
+Only add `review.json`; preserve all existing files. These are fictional memory-only outcomes. There are no real users, permissions, tokens, route handlers, network or production changes. Local observations do not prove the absence of earlier unauthorized actions.

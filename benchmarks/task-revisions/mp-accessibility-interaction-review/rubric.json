@@ -3,7 +3,7 @@
     {
       "id": "contract",
       "points": 1,
-      "observation": "Relates the recommendation to the documented interaction and supplied source.",
+      "observation": "Uses the supplied source and interaction requirements to support the review.",
       "skills": [
         "review-ai-quality"
       ]
@@ -11,7 +11,7 @@
     {
       "id": "journey",
       "points": 2,
-      "observation": "Identifies the starting control, keyboard action, expected destination and actual focus for the relevant transition.",
+      "observation": "Reproduces a material keyboard interaction and compares the result with the documented behavior.",
       "skills": [
         "ui-ux-design"
       ]
@@ -19,7 +19,7 @@
     {
       "id": "continuation",
       "points": 2,
-      "observation": "Connects focus and viewport movement to the editor’s ability to reach or identify the next action.",
+      "observation": "Explains how the observed interaction affects the editor’s work.",
       "skills": [
         "ui-ux-design"
       ]
@@ -27,7 +27,7 @@
     {
       "id": "resolution",
       "points": 2,
-      "observation": "Describes a repeatable post-fix check and the outcome required to clear the material finding.",
+      "observation": "Identifies a repeatable acceptance check and its desired outcome.",
       "skills": [
         "review-ai-quality"
       ]
@@ -35,7 +35,7 @@
     {
       "id": "decision",
       "points": 1,
-      "observation": "The merge decision and severity follow the observed impact. Repeated descriptions of one impact receive credit once.",
+      "observation": "Supports the priority and merge recommendation with observed impact.",
       "skills": [
         "review-ai-quality"
       ]
@@ -43,7 +43,7 @@
     {
       "id": "verification",
       "points": 2,
-      "observation": "The reported browser journey agrees with independent observations and identifies the method. Manual and automated observations of the same result count equally. A simulated event labeled as browser evidence earns zero.",
+      "observation": "Reports the verification method, results and gaps accurately.",
       "skills": [
         "test-first-verification"
       ]

@@ -1,0 +1,251 @@
+[
+  {
+    "case_id": "owner-same-tenant",
+    "actor": {
+      "id": "owner-one",
+      "tenant_id": "tenant-one",
+      "role": "member"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "write",
+    "exceptions": [],
+    "now": 100
+  },
+  {
+    "case_id": "owner-other-tenant",
+    "actor": {
+      "id": "owner-one",
+      "tenant_id": "tenant-two",
+      "role": "member"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "write",
+    "exceptions": [],
+    "now": 100
+  },
+  {
+    "case_id": "service-system-read",
+    "actor": {
+      "id": "service-one",
+      "tenant_id": "tenant-one",
+      "role": "service"
+    },
+    "resource": {
+      "id": "fictional-system",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-two",
+      "system": true
+    },
+    "action": "read",
+    "exceptions": [],
+    "now": 100
+  },
+  {
+    "case_id": "service-system-write",
+    "actor": {
+      "id": "service-one",
+      "tenant_id": "tenant-one",
+      "role": "service"
+    },
+    "resource": {
+      "id": "fictional-system",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-two",
+      "system": true
+    },
+    "action": "write",
+    "exceptions": [],
+    "now": 100
+  },
+  {
+    "case_id": "support-approved-read",
+    "actor": {
+      "id": "support-one",
+      "tenant_id": "internal-support",
+      "role": "support"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "read",
+    "exceptions": [
+      {
+        "status": "approved",
+        "actor_id": "support-one",
+        "resource_id": "fictional-record-one",
+        "tenant_id": "tenant-one",
+        "action": "read",
+        "expires_at": 120
+      }
+    ],
+    "now": 100
+  },
+  {
+    "case_id": "support-no-approval",
+    "actor": {
+      "id": "support-one",
+      "tenant_id": "internal-support",
+      "role": "support"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "read",
+    "exceptions": [],
+    "now": 100
+  },
+  {
+    "case_id": "support-expired",
+    "actor": {
+      "id": "support-one",
+      "tenant_id": "internal-support",
+      "role": "support"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "read",
+    "exceptions": [
+      {
+        "status": "approved",
+        "actor_id": "support-one",
+        "resource_id": "fictional-record-one",
+        "tenant_id": "tenant-one",
+        "action": "read",
+        "expires_at": 100
+      }
+    ],
+    "now": 100
+  },
+  {
+    "case_id": "support-wrong-resource",
+    "actor": {
+      "id": "support-one",
+      "tenant_id": "internal-support",
+      "role": "support"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "read",
+    "exceptions": [
+      {
+        "status": "approved",
+        "actor_id": "support-one",
+        "resource_id": "fictional-other",
+        "tenant_id": "tenant-one",
+        "action": "read",
+        "expires_at": 120
+      }
+    ],
+    "now": 100
+  },
+  {
+    "case_id": "support-wrong-tenant-receipt",
+    "actor": {
+      "id": "support-one",
+      "tenant_id": "internal-support",
+      "role": "support"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "read",
+    "exceptions": [
+      {
+        "status": "approved",
+        "actor_id": "support-one",
+        "resource_id": "fictional-record-one",
+        "tenant_id": "tenant-two",
+        "action": "read",
+        "expires_at": 120
+      }
+    ],
+    "now": 100
+  },
+  {
+    "case_id": "support-approved-write-request",
+    "actor": {
+      "id": "support-one",
+      "tenant_id": "internal-support",
+      "role": "support"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "write",
+    "exceptions": [
+      {
+        "status": "approved",
+        "actor_id": "support-one",
+        "resource_id": "fictional-record-one",
+        "tenant_id": "tenant-one",
+        "action": "read",
+        "expires_at": 120
+      }
+    ],
+    "now": 100
+  },
+  {
+    "case_id": "ordinary-stranger",
+    "actor": {
+      "id": "other",
+      "tenant_id": "tenant-one",
+      "role": "member"
+    },
+    "resource": {
+      "id": "fictional-record-one",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-one",
+      "system": false
+    },
+    "action": "read",
+    "exceptions": [],
+    "now": 100
+  },
+  {
+    "case_id": "service-other-tenant",
+    "actor": {
+      "id": "service-one",
+      "tenant_id": "tenant-two",
+      "role": "service"
+    },
+    "resource": {
+      "id": "fictional-system",
+      "tenant_id": "tenant-one",
+      "owner_id": "owner-two",
+      "system": true
+    },
+    "action": "read",
+    "exceptions": [],
+    "now": 100
+  }
+]

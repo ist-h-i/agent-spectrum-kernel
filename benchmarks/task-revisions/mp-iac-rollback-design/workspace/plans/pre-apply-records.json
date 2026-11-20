@@ -2,7 +2,7 @@
   "description": "Hypothetical later pre-apply captures. The original candidate and present approval remain in their original records.",
   "records": [
     {
-      "id": "rollout-a",
+      "id": "pre-apply-01",
       "saved_plan": {
         "target": "aws_lambda_alias.api_live",
         "changes": [
@@ -29,7 +29,65 @@
       }
     },
     {
-      "id": "rollout-b",
+      "id": "pre-apply-02",
+      "saved_plan": {
+        "target": "aws_lambda_alias.api_live",
+        "changes": [
+          {
+            "scope": "alias-canary",
+            "primary": "41",
+            "secondary": {
+              "42": 0.1
+            }
+          }
+        ],
+        "state_lineage": "prod-api-us-east-1",
+        "state_serial": 318
+      },
+      "plan_digest": "sha256:9e04d8c9a4be5d6c12a9856243debb8c65f3af108dfd1a4cbe88a4b1e85d5225",
+      "approval": {
+        "role": "platform-change-approver",
+        "approved_digest": "sha256:14195c32893045746c112aa27dd04ff9906e2357caaa0780f7d63c32936f6fc4"
+      },
+      "at_write": {
+        "lineage": "prod-api-us-east-1",
+        "serial": 318,
+        "target": "aws_lambda_alias.api_live"
+      }
+    },
+    {
+      "id": "pre-apply-03",
+      "saved_plan": {
+        "target": "aws_lambda_alias.api_live",
+        "changes": [
+          {
+            "scope": "alias-canary",
+            "primary": "41",
+            "secondary": {
+              "42": 0.1
+            }
+          },
+          {
+            "scope": "iam-runtime-policy",
+            "revision": "8"
+          }
+        ],
+        "state_lineage": "prod-api-us-east-1",
+        "state_serial": 318
+      },
+      "plan_digest": "sha256:ca9dac6c4c014585bafd5293b49af49ccfc974799e345cb775a89485786fc3f3",
+      "approval": {
+        "role": "platform-change-approver",
+        "approved_digest": "sha256:ca9dac6c4c014585bafd5293b49af49ccfc974799e345cb775a89485786fc3f3"
+      },
+      "at_write": {
+        "lineage": "prod-api-us-east-1",
+        "serial": 318,
+        "target": "aws_lambda_alias.api_live"
+      }
+    },
+    {
+      "id": "pre-apply-04",
       "saved_plan": {
         "target": "aws_lambda_alias.api_live",
         "changes": [

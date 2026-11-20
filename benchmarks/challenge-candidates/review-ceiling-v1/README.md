@@ -23,6 +23,4 @@ Prepare the reviewer input from the repository root with `node scripts/practical
 
 ## Registered staged execution
 
-Select this problem from the [evaluation task catalog](../../../docs/evaluation-task-catalog.md). The [staged evaluation guide](../../../docs/practical-challenge-evaluation.md) covers initial and resume approval and the external semantic scoring handoff. The registered runner has synthetic integration evidence, and `ready_for_measurement` remains false. See [pilot calibration](https://github.com/ist-h-i/agent-spectrum-kernel/blob/445eec92545e694becf04278b96da867134c1758/benchmarks/challenge-candidates/review-ceiling-v1/calibration-report.md) for the prior two trials and their limitations.
-
-現役版は `review-public-v2` です。`calibration-report.md` と `calibration-summary.json` の2回の記録は旧問題 `review-public-v1` に対応します。新版の採点や難度を表す値には使用しません。
+Select this problem from the [evaluation task catalog](../../../docs/evaluation-task-catalog.md). The [staged evaluation guide](../../../docs/practical-challenge-evaluation.md) covers initial and resume approval and assessment. The current `review-public-v3` registration uses an operator-only reassessment update and has no measured solver trials.
