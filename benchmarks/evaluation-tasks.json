@@ -1295,6 +1295,41 @@
           }
         }
       }
+    },
+    {
+      "id": "implementation-workspace-upgrade",
+      "catalog_id": "ASK-034",
+      "labels": [
+        "persistence",
+        "compatibility",
+        "concurrency",
+        "recovery",
+        "data-integrity",
+        "technical-debt"
+      ],
+      "domain": "field_operations",
+      "difficulty": "expert",
+      "difficulty_basis": "author_estimate",
+      "task_types": [
+        "implementation",
+        "investigation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/implementation-workspace-upgrade",
+        "version": "task-revision-1",
+        "editable": [
+          "workspace/src/delivery.mjs",
+          "workspace/src/reconcile.mjs",
+          "workspace/src/workspace.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
     }
   ]
 }

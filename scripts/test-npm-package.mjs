@@ -55,6 +55,7 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     const challenges=JSON.parse(okay(invoke(['evaluate','task-list'])));
     assert.equal(challenges.length, new Set(challenges.map(task=>task.catalog_id)).size);
     assert.ok(challenges.some(task=>task.id==='implementation-timeline-restore' && task.catalog_id==='ASK-033'));
+    assert.ok(challenges.some(task=>task.id==='implementation-workspace-upgrade' && task.catalog_id==='ASK-034'));
     assert.ok(challenges.some(c=>c.id==='rc01-shared-review-platform'));
     assert.ok(challenges.some(c=>c.id==='ch08-growth-workspace'));
     const selected=JSON.parse(okay(invoke(['evaluate','task-prepare','--id','mn-build-option-update','--root',join(root,'one-task')])));
