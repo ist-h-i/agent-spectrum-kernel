@@ -1,7 +1,7 @@
 {
   "id": "hi-versioned-migration-safety",
   "version": "task-revision-1",
-  "rubric_sha256": "baccb1cb9158a330bb38b1aca590a41ec26d3c9f196d1564f7b862b21374d842",
+  "rubric_sha256": "c364c10ed387c9d2c235dcaa69c1637a502a9db1f140bc62662d1d6b81d97928",
   "editable": [
     "workspace/migration-plan.json"
   ],

@@ -44,11 +44,11 @@
           },
           {
             "path": "score.mjs",
-            "digest": "sha256:8a4d031b3735fef82dde4d9ad78afe58baf2e4bb9b249f726acf9e11c4845f5c"
+            "digest": "sha256:9be03afca50a210719f7f79a29554d9b51475ca8156f113d51575701c4e7e8e6"
           },
           {
             "path": "README.md",
-            "digest": "sha256:f2ea3e3d9bedfe2005d727a815e09a74a7671df91cec6cb7ca6405daee512317"
+            "digest": "sha256:9cb3d1bd59f827a823605c974bcfcb18fe81bb45399bb4c03de5d823ff293841"
           }
         ]
       },

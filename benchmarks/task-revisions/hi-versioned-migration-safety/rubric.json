@@ -38,7 +38,8 @@
       "observation": "The trace links the plan’s judgments to reader values, checkpoint facts, missing evidence and the distinct authorizations and revalidation needed before an effect.",
       "skills": [
         "risk-gate"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

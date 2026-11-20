@@ -99,3 +99,15 @@ test('unexecuted staged preparation cannot receive product or reassessment credi
   save({subject, items:[]});
   assert.equal(scoreEvaluationSubmission(root, recordPath).groups.submission.points, null);
 });
+
+
+test('additional claims outside a closed workspace schema require the submitted final record', t => {
+  for (const [id, axis] of [['pf-observability-redaction','signal-evidence'],['hi-versioned-migration-safety','recovery-proof']]) {
+    const {root, recordPath, save} = trial(t, id);
+    const {subject} = inspectEvaluationSubmission(root);
+    save({subject, items:[{criterion_id:axis, points:1, reason:'Assessor observation.'}]});
+    assert.throws(() => scoreEvaluationSubmission(root, recordPath), /submitted final answer/u);
+    save({subject, items:[]});
+    assert.equal(scoreEvaluationSubmission(root, recordPath).results.find(item => item.criterion_id === axis).status, 'unobserved');
+  }
+});

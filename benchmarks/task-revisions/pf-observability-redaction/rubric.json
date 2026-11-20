@@ -38,7 +38,8 @@
       "observation": "Submitted original-versus-repaired observations identify retained diagnostics and malformed inputs and can be traced to the same event records.",
       "skills": [
         "test-first-verification"
-      ]
+      ],
+      "requires_delivery": true
     }
   ]
 }

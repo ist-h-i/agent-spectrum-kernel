@@ -1,7 +1,7 @@
 {
   "id": "pf-observability-redaction",
   "version": "task-revision-1",
-  "rubric_sha256": "352d45b743ee7658422118cd6247392aa44fb46605780f198c207ad06eb29209",
+  "rubric_sha256": "3b039156dc0e3b618d96c4841de0dde2cc0ab4f1c75123af8177aee7e53124f4",
   "editable": [
     "workspace/config/projection-policy.json",
     "workspace/review.json"

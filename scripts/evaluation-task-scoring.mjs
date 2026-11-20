@@ -72,8 +72,13 @@ export function inspectEvaluationSubmission(root) {
     deliveryDigest = fileSetDigest(inventory(delivery));
   }
   const staged = task.input.kind === 'staged';
-  const handoffDigest = staged && existsSync(join(directory, 'score-handoff.json'))
-    ? canonicalDigest(inspectPracticalChallengeScoreHandoff(directory)) : null;
+  let handoffDigest = null;
+  if (staged && existsSync(join(directory, 'score-handoff.json'))) {
+    const packet = inspectPracticalChallengeScoreHandoff(directory);
+    assert.equal(packet.fixture_id, task.id, 'handoff task differs from selection');
+    assert.equal(packet.manifest_digest, preparation.staged_run?.manifest_digest, 'handoff differs from the selected staged run');
+    handoffDigest = canonicalDigest(packet);
+  }
   const subject = { task_id: task.id, input_digest: task.input.digest, assessment_digest: task.assessment.digest,
     submission_digest: fileSetDigest(files), delivery_digest: deliveryDigest, ...(staged ? {stage_handoff_digest: handoffDigest} : {}) };
   return { subject, file_count: files.size, fixed_input_changes: task.input.kind === 'primary' ? fixedChanges(task, workspace, files) : null,
