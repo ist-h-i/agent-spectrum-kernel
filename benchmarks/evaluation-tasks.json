@@ -2,7 +2,7 @@
   "kind": "evaluation_task_registrations_v2",
   "assets": {
     "github_repository_id": 1442549076,
-    "revision": "c9f261882bb72c7f4b2519f79408c47dd900a8d4"
+    "revision": "53d1a971eba6155f796a4a19f7592b985ffaf1c9"
   },
   "labels": [
     "accessibility",
