@@ -10,6 +10,10 @@ const types = new Set(['review', 'design', 'investigation', 'implementation', 'd
 const difficulties = new Set(['easy', 'easy_medium', 'medium', 'medium_hard', 'hard', 'expert', 'unassessed']);
 const digestPattern = /^sha256:[a-f0-9]{64}$/u;
 const revisionPattern = /^[a-f0-9]{40}$/u;
+const studyFields = new Set(['id', 'report', 'report_digest', 'source_revision', 'protected_revision', 'model', 'reasoning_effort', 'runtime', 'limitations']);
+const resultFields = new Set(['input_version', 'input_digest', 'assessment_digest', 'maximum_points', 'score_group', 'conditions', 'caveat']);
+const conditionFields = new Set(['condition', 'scores', 'skill']);
+const scoreGroups = new Set(['task', 'challenge', 'product', 'submission']);
 const read = path => readFileSync(join(source, path));
 const json = path => parseJsonRejectDuplicateKeys(read(path).toString('utf8'), path);
 const reference = path => ({ path, digest: 'sha256:' + createHash('sha256').update(read(path)).digest('hex') });
@@ -91,14 +95,22 @@ function studyResultsByTask(studies, tasks) {
   const byTask = new Map(tasks.map(task => [task.id, []]));
   assert.equal(new Set(studies.map(study => study.id)).size, studies.length, 'duplicate model study ID');
   for (const { results, ...study } of studies) {
+    assert.ok(Object.keys(study).every(key => studyFields.has(key)), 'unexpected model study field');
     assert.ok([study.id, study.report, study.model, study.reasoning_effort, study.runtime].every(value => typeof value === 'string' && value.trim())
       && study.limitations?.length && study.limitations.every(note => typeof note === 'string' && note.trim()), 'model study provenance required');
     assert.match(study.report_digest, digestPattern);
     assert.match(study.source_revision, revisionPattern);
     assert.match(study.protected_revision, revisionPattern);
-    assert.ok(results.length && new Set(results.map(result => result.task_id)).size === results.length, 'invalid study task inventory');
+    assert.ok(Array.isArray(results) && results.length, 'empty study task inventory');
+    const taskGroups = new Set();
     for (const { task_id, ...result } of results) {
+      assert.ok(Object.keys(result).every(key => resultFields.has(key)), 'unexpected model result field');
       assert.ok(byTask.has(task_id) && result.input_version?.trim(), 'model result must identify the task and edition');
+      const group = result.score_group ?? 'task';
+      assert.ok(scoreGroups.has(group), 'unknown model score group');
+      const key = `${task_id}/${group}`;
+      assert.ok(!taskGroups.has(key), `duplicate study task and score group: ${key}`);
+      taskGroups.add(key);
       assert.match(result.input_digest, digestPattern);
       assert.match(result.assessment_digest, digestPattern);
       assert.ok(Number.isSafeInteger(result.maximum_points) && result.maximum_points > 0, 'model result needs a positive raw score maximum');
@@ -106,6 +118,7 @@ function studyResultsByTask(studies, tasks) {
         'duplicate or missing study conditions');
       const conditions = result.conditions.map(condition => {
         const { scores } = condition;
+        assert.ok(Object.keys(condition).every(key => conditionFields.has(key)), 'unexpected model condition field');
         assert.ok(condition.condition?.trim() && Array.isArray(scores) && scores.length
           && scores.every(score => score === null || (result.score_group === 'challenge' ? Number.isFinite(score) : Number.isSafeInteger(score))
             && score >= 0 && score <= result.maximum_points),
@@ -138,6 +151,22 @@ function parseScoreRange(value) {
   return { minimum, maximum };
 }
 
+function medianPercent(ordered, maximum) {
+  // Keep both central scores in exact decimal units until the final percentage conversion.
+  const middle = [ordered[Math.floor((ordered.length - 1) / 2)], ordered[Math.floor(ordered.length / 2)]];
+  const parts = middle.map(value => {
+    const [mantissa, power = '0'] = String(value).split('e');
+    const [whole, fraction = ''] = mantissa.split('.');
+    return { units: BigInt(whole + fraction), power: Number(power) - fraction.length };
+  });
+  const power = Math.min(parts[0].power, parts[1].power);
+  const sum = parts.reduce((total, part) => total + part.units * 10n ** BigInt(part.power - power), 0n);
+  // Scaling the integer division retains at least 20 significant digits for non-terminating ratios.
+  const places = String(maximum).length + 20;
+  const digits = sum * 50n * 10n ** BigInt(places) / BigInt(maximum);
+  return Number(`${digits}e${power - places}`);
+}
+
 function selectMeasurements(observations, { model, effort, condition, range }) {
   const matches = [];
   for (const study of observations) {
@@ -147,9 +176,7 @@ function selectMeasurements(observations, { model, effort, condition, range }) {
     for (const series of study.conditions) {
       if (!series.scored_count || (condition !== undefined && series.condition !== condition)) continue;
       const ordered = series.scores.filter(score => score !== null).sort((a, b) => a - b);
-      const half = Math.floor(ordered.length / 2);
-      const median = ordered.length % 2 ? ordered[half] : (ordered[half - 1] + ordered[half]) / 2;
-      const percent = median * 100 / study.maximum_points;
+      const percent = medianPercent(ordered, study.maximum_points);
       if (range && (percent < range.minimum || percent > range.maximum)) continue;
       conditions.push({ ...series, median_percent: percent });
     }

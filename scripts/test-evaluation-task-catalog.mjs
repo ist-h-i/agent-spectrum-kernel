@@ -18,9 +18,9 @@ test('one selection entry lists the current primary, business and staged tasks',
   const ids = tasks.map(task => task.id);
   const registration = readEvaluationTaskRegistrations();
   assert.equal(new Set(ids).size, ids.length);
-  assert.ok(ids.length >= 33);
+  assert.ok(ids.length >= 34);
   assert.deepEqual(ids, registration.tasks.map(task => task.id));
-  assert.ok(tasks.filter(task => task.input.kind === 'primary').length >= 25);
+  assert.ok(tasks.filter(task => task.input.kind === 'primary').length >= 26);
   assert.deepEqual(tasks.filter(task => task.input.kind !== 'primary').map(task => task.id), ['ch01-inventory-reservation-logistics',
     'ch02-report-operations', 'ch03-price-rollout', 'ch04-document-access',
     'ch05-sales-reconciliation', 'ch06-build-operations', 'rc01-shared-review-platform', 'ch08-growth-workspace']);
@@ -31,6 +31,7 @@ test('one selection entry lists the current primary, business and staged tasks',
     ['ASK-003', 'hi-financial-state-integrity', 'expert'],
     ['ASK-023', 'pf-performance-regression', 'hard'],
     ['ASK-033', 'implementation-timeline-restore', 'expert'],
+    ['ASK-034', 'implementation-workspace-upgrade', 'expert'],
   ]) {
     assert.equal(byNumber.get(number)?.id, slug);
     assert.equal(byNumber.get(number)?.difficulty, estimate);
@@ -124,6 +125,18 @@ test('measured scores stay bound to the tested input, scoring definition and pro
   };
   assert.equal(observe().edition, 'current');
   assert.deepEqual(observe().conditions[0], { condition: 'control', scores: [0, null, 6], trial_count: 3, scored_count: 2 });
+  const results = registration.model_studies[0].results;
+  results.push({ ...result, score_group: 'task' });
+  assert.throws(observe, /duplicate study task and score group/u);
+  results.pop();
+  for (const [key, value] of [['model', 'different-model'], ['reasoning_effort', 'max'], ['id', 'another-study'], ['protected_revision', 'a'.repeat(40)]]) {
+    result[key] = value;
+    assert.throws(observe, /unexpected model result field/u);
+    delete result[key];
+  }
+  result.conditions[0].median_percent = 100;
+  assert.throws(observe, /unexpected model condition field/u);
+  delete result.conditions[0].median_percent;
   result.maximum_points = 100;
   result.conditions[0].scores = [50];
   assert.throws(observe, /maximum must match the registered rubric group/u);
@@ -156,18 +169,27 @@ test('measured scores stay bound to the tested input, scoring definition and pro
   study.protected_revision = registration.assets.revision;
   study.results = [{task_id: challenge.id, input_version: challenge.input.version, input_digest: challenge.input.digest,
     assessment_digest: challenge.assessment.digest, score_group: 'challenge', maximum_points: 100,
-    conditions: [{condition: 'control', scores: [50.25]}]}];
+    conditions: [{condition: 'control', scores: [50.25]}, {condition: 'paired-decimals', scores: [0.6, 1.2]}]}];
   registration.model_studies = [study];
   assert.equal(observe().edition, 'current');
   const product = { ...study.results[0], score_group: 'product', maximum_points: 6, conditions: [{ condition: 'control', scores: [3] }] };
-  registration.model_studies.push({ ...study, id: 'supplemental', results: [product] });
+  const submission = { ...product, score_group: 'submission', maximum_points: 4, conditions: [{ condition: 'control', scores: [1] }] };
+  study.results.push(product, submission);
   write();
-  for (const [range, expected] of [['50-50', 'product'], ['50.25-50.25', 'challenge']]) {
+  for (const [range, expected] of [['50-50', 'product'], ['50.25-50.25', 'challenge'], ['25-25', 'submission']]) {
     const [match] = listEvaluationTasks({ scoreRange: range });
     assert.deepEqual(match.difficulty_observations.map(row => row.score_group), [expected]);
+    assert.equal(match.difficulty_observations[0].id, study.id);
   }
+  const paired = scoreRange => listEvaluationTasks({ condition: 'paired-decimals', scoreRange });
+  assert.equal(paired('0.9-0.9')[0].difficulty_observations[0].conditions[0].median_percent, 0.9);
+  assert.deepEqual(paired('0-0.8999999999999999'), []);
+  assert.deepEqual(paired('0.9000000000000001-100'), []);
+  study.results.push({ ...submission });
+  assert.throws(observe, /duplicate study task and score group/u);
+  study.results = [study.results[0]];
   study.results[0].score_group = 'product';
-  study.results[0].conditions[0].scores = [50];
+  study.results[0].conditions = [{ condition: 'control', scores: [50] }];
   assert.throws(observe, /maximum must match the registered rubric group/u);
 });
 
