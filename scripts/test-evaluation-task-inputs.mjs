@@ -59,20 +59,26 @@ test('staged preparation rejects extra or substituted initial inputs', t => {
 test('private preparation copies only pinned inputs and protects them on disk', t => {
   const path = scratch(t), source = join(path, 'source'), output = join(path, 'run');
   mkdirSync(join(source, 'public'), { recursive: true });
-  const bare = JSON.stringify({ files: [{ path: 'TASK.md', sha256: hex('synthetic task') }] });
+  const bare = JSON.stringify({ files: [{ path: 'TASK.md', sha256: hex('synthetic task') },
+    { path: 'acceptance.md', sha256: hex('synthetic criteria') }] });
   const input = { kind: 'private', manifest: 'public-manifest.json', digest: digest(bare),
     task_path: 'public/TASK.md', prompt_path: 'prompt.txt', prompt_digest: digest('synthetic prompt') };
-  const task = { id: 'synthetic-logistics', input };
+  const assessment = { path: 'public/acceptance.md', digest: digest('synthetic criteria') };
+  const task = { id: 'synthetic-logistics', input, assessment };
   writeFileSync(join(source, input.manifest), bare);
   writeFileSync(join(source, input.task_path), 'synthetic task');
+  writeFileSync(join(source, assessment.path), 'synthetic criteria');
   writeFileSync(join(source, input.prompt_path), 'different prompt');
   writeFileSync(join(source, 'owner-only.txt'), 'excluded');
   assert.throws(() => prepareEvaluationTaskInput(task, output), /logistics source/u);
   assert.throws(() => prepareEvaluationTaskInput(task, output, { logisticsSource: source }), /digest changed/u);
   assert.ok(!existsSync(output));
   writeFileSync(join(source, input.prompt_path), 'synthetic prompt');
+  assert.throws(() => prepareEvaluationTaskInput({ ...task, assessment: { ...assessment, digest: digest('other criteria') } },
+    output, { logisticsSource: source }), /acceptance criteria/u);
+  assert.ok(!existsSync(output));
   const report = prepareEvaluationTaskInput(task, output, { logisticsSource: source });
-  assert.equal(report.file_count, 2);
+  assert.equal(report.file_count, 3);
   assert.equal(readFileSync(report.prompt_file, 'utf8'), 'synthetic prompt');
   assert.ok(!existsSync(join(report.workspace, 'owner-only.txt')));
   assert.ok(!existsSync(join(report.workspace, input.manifest)));

@@ -344,7 +344,7 @@
         "review-code-health",
         "review-architecture-impact"
       ],
-      "observation": "原因・影響・修正条件がコードや挙動の証拠につながり、正常な仕様を誤検出しない。"
+      "observation": "原因・影響・修正条件がコードや挙動の証拠につながる。"
     },
     "UI/UX and interrupted user journeys": {
       "skills": [
@@ -358,6 +358,13 @@
         "release-readiness-gate"
       ],
       "observation": "試験導入の可否を重大な指摘と復旧条件に基づいて判断する。"
+    },
+    "Evidence, counterexamples and uncertainty": {
+      "skills": [
+        "review-ai-quality",
+        "evidence-ledger"
+      ],
+      "observation": "正常な仕様への誤警告を避け、観測できた事実と未確認の内容を区別する。"
     }
   },
   "ch08-growth-workspace": {

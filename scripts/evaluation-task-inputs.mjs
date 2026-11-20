@@ -112,11 +112,14 @@ function readBusinessInput(id, input, root, mode) {
   return { files: readInputs(root, inventory.files), workingDirectory, promptPath };
 }
 
-function readPrivateInput(input, root) {
+function readPrivateInput(input, root, assessment) {
   const manifest = pinnedManifest(join(root, relativeInputPath(input.manifest)), input.digest);
   inventoryPaths(manifest.files);
   const entries = manifest.files.map(row => ({ ...row, path: `public/${row.path}` }));
   assert.ok(entries.some(row => row.path === relativeInputPath(input.task_path)), 'private evaluation task file missing');
+  const criteria = entries.find(row => row.path === relativeInputPath(assessment.path));
+  assert.ok(criteria && `sha256:${criteria.sha256}` === assessment.digest,
+    'private acceptance criteria do not match the input manifest');
   const promptPath = relativeInputPath(input.prompt_path);
   assert.ok(!entries.some(row => row.path === promptPath), 'duplicate private prompt path');
   const prompt = pinnedFile(join(root, promptPath), input.prompt_digest, 'private evaluation prompt');
@@ -126,7 +129,7 @@ function readPrivateInput(input, root) {
 }
 
 // Validate the entire selected inventory before creating a fresh solver workspace.
-export function prepareEvaluationTaskInput({ id, input }, output, { deliveryMode, logisticsSource } = {}) {
+export function prepareEvaluationTaskInput({ id, input, assessment }, output, { deliveryMode, logisticsSource } = {}) {
   assert.ok(['business', 'staged', 'private'].includes(input.kind), 'unsupported evaluation input kind');
   assert.ok(deliveryMode === undefined || input.kind === 'business', 'delivery mode is only available for business inputs');
   assert.ok(logisticsSource === undefined || input.kind === 'private', 'logistics source is only available for the private input');
@@ -139,7 +142,7 @@ export function prepareEvaluationTaskInput({ id, input }, output, { deliveryMode
   const selectedMode = input.kind === 'business' ? deliveryMode ?? 'one_shot' : undefined;
   let inventory;
   if (input.kind === 'business') inventory = readBusinessInput(id, input, root, selectedMode);
-  else if (input.kind === 'private') inventory = readPrivateInput(input, root);
+  else if (input.kind === 'private') inventory = readPrivateInput(input, root, assessment);
   else inventory = { files: readStagedInput({ ...input, id, root }), workingDirectory: '.' };
 
   mkdirSync(target, { mode: 0o700 });

@@ -57,6 +57,7 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     const selected=JSON.parse(okay(invoke(['evaluate','task-prepare','--id','mn-build-option-update','--root',join(root,'one-task')])));
     assert.equal(selected.task_id,'mn-build-option-update');
     assert.ok(existsSync(selected.task_file));
+    assert.ok(existsSync(join(selected.working_directory,'build.config.json')));
     assert.ok(!existsSync(join(workspace,'source','benchmarks','challenge-candidates','ceiling-v4-continuity')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','workspace','task.md')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','evaluator','score.mjs')));

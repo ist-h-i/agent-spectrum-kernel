@@ -249,12 +249,12 @@ each file must fit the common 16 MiB bound. Existing RC01 registrations/runs
 retain their existing behavior. Neither stage executes without model-call
 authorization; synthetic injected sessions are explicitly labeled synthetic.
 
-The three evaluator files are published authoring assets under CH08's
-`evaluator/`; copy them to the external isolated evaluator directory for a run.
+The three files for the current CH08 evaluator are under `evaluator-v2/`.
+Copy them to the external isolated evaluator directory for a run.
 Public `brief/rubric.json` is byte-identical to the evaluator rubric. There are
 no hidden functional requirements. An independent assessor must exercise the
-actual browser interactions and bind decisions to evidence. Functional /70 and
-UX /30 are separate fields in the imported result. Only a fully observed result
+actual browser interactions and bind decisions to evidence. Functional /40 and
+UX /60 are separate fields in the imported result. Only a fully observed result
 has a combined /100; missing weights stay missing. Observed release blockers
 remain separate from numerical points. The calculator never executes a solver,
 a browser or a scoring model and cannot verify semantic truth by itself.

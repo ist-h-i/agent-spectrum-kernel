@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { readJsonFileStrict,canonicalDigest } from './content-addressed-store.mjs';
 import { createPracticalEvaluationCommandRuntime } from './instruction-loop-command-runtime.mjs';
 import { advancePracticalEvaluation,inspectPracticalEvaluation } from './practical-evaluation-runner.mjs';
-import {preparePracticalChallenge,inspectPracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff} from './practical-challenge-evaluation.mjs';
+import {listPracticalChallenges,preparePracticalChallenge,inspectPracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff} from './practical-challenge-evaluation.mjs';
 import {importChallengeSemanticAssessment} from './practical-challenge-worker.mjs';
 import {listEvaluationTasks} from './evaluation-task-catalog.mjs';
 import {prepareEvaluationTaskInput} from './evaluation-task-inputs.mjs';
@@ -29,7 +29,8 @@ function prepareSelectedTask(options) {
     const config = readJsonFileStrict(resolve(configPath));
     assert.ok(config.id === undefined || config.id === task.id, 'staged config task ID differs from --id');
     assert.ok(config.root === undefined || resolve(config.root) === root, 'staged config root differs from --root');
-    const staged_run = preparePracticalChallenge({ ...config, id: task.id, root });
+    const staged_run = preparePracticalChallenge({ ...config, id: task.id, root,
+      expectedRegistrationDigest: input.registration_digest });
     const workspace = join(root, 'workspace');
     prepared = { workspace, working_directory: workspace, task_file: join(workspace, input.task_path),
       input_manifest_digest: input.digest, staged_run };
@@ -41,13 +42,13 @@ function prepareSelectedTask(options) {
     assert.equal(verified.contract_digests['input-manifest.json'], input.digest);
     assert.equal(verified.contract_digests['requirement-record.json'], assessment.digest);
     const workspace = join(root, 'inputs', task.id);
-    prepared = { workspace, working_directory: workspace, task_file: join(workspace, 'task.md'),
+    prepared = { workspace, working_directory: join(workspace, 'workspace'), task_file: join(workspace, 'task.md'),
       file_count: verified.public_files.length, input_manifest_digest: input.digest };
   } else {
     const sourceInput = { ...input };
     if (input.root) sourceInput.root = join(source, input.root);
     if (input.kind === 'staged') sourceInput.manifest = join(source, input.manifest);
-    prepared = prepareEvaluationTaskInput({ id: task.id, input: sourceInput }, root, { deliveryMode, logisticsSource });
+    prepared = prepareEvaluationTaskInput({ id: task.id, input: sourceInput, assessment }, root, { deliveryMode, logisticsSource });
   }
   const report = { task_id: task.id, input, assessment, model_calls: 0, ...prepared };
   writeFileSync(join(root, 'evaluation-preparation.json'), JSON.stringify(report, null, 2) + '\n',
@@ -62,7 +63,7 @@ try{
     if(key==='--allow-model-calls')o[key]=true;
     else{const value=args.shift();assert.ok(value&&!value.startsWith('--'),`missing value for ${key}`);o[key]=value;}
   }
-  if(command==='task-list'||command==='challenge-list'){
+  if(command==='task-list'){
     assert.ok(Object.keys(o).every(key=>['--difficulty','--type','--skill'].includes(key)),'unsupported task-list options');
     console.log(JSON.stringify(listEvaluationTasks({difficulty:o['--difficulty'],type:o['--type'],skill:o['--skill']}),null,2));
   }
@@ -70,6 +71,11 @@ try{
     assert.ok(Object.keys(o).every(key=>['--id','--root','--delivery-mode','--logistics-source','--config'].includes(key)),
       'unsupported task-prepare options');
     console.log(JSON.stringify(prepareSelectedTask(o),null,2));
+  }
+  else if(command==='challenge-list'){
+    // Compatibility for callers that consume staged registration JSON.
+    assert.equal(Object.keys(o).length,0);
+    console.log(JSON.stringify(listPracticalChallenges(),null,2));
   }
   else if(command.startsWith('challenge-')){
     const allowed={ 'challenge-prepare':['--config'], 'challenge-status':['--root'], 'challenge-start':['--root','--confirm','--allow-model-calls'], 'challenge-resume':['--root','--confirm','--allow-model-calls'], 'challenge-score-handoff':['--root','--evaluator-root'], 'challenge-import-score':['--root','--assessment'] };

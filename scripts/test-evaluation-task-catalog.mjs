@@ -27,6 +27,8 @@ test('one selection entry lists the current primary, business and staged tasks',
   assert.ok(matches[0].task_types.includes('implementation'));
   assert.ok(matches[0].observations.some(item => item.skills.includes('controlled-implementation') && item.observation));
   assert.ok(cli('task-list', '--difficulty', 'unassessed').some(task => task.id === 'ch02-report-operations'));
+  assert.ok(cli('task-list', '--type', 'test').some(task => task.id === 'ch08-growth-workspace'));
+  assert.ok(tasks.find(task => task.id === 'ch02-report-operations').assessment.sources.some(source => source.path.endsWith('/contract.md')));
   assert.throws(() => cli('task-list', '--skill', 'not-a-skill'), /unknown skill/u);
 });
 
@@ -42,6 +44,7 @@ test('every listed public task prepares independently through the selection CLI'
       assert.equal(report.assessment.digest, task.assessment.digest);
       assert.ok(existsSync(report.task_file), task.id);
       assert.ok(existsSync(report.prompt_file ?? report.task_file), task.id);
+      if (task.input.kind === 'primary') assert.ok(existsSync(join(report.working_directory, 'package.json')), task.id);
       assert.ok(!existsSync(join(report.workspace, 'OPERATIONAL-UPDATE.md')), task.id);
       assert.ok(!existsSync(join(report.workspace, 'evaluation-preparation.json')), task.id);
     }

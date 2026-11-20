@@ -61,8 +61,10 @@ function businessEntries() {
   const catalog = json('benchmarks/challenge-candidates/business-five-v3-decisions/catalog.json');
   return catalog.tasks.map(row => {
     const manifestPath = join(businessRoot, row.input_manifest);
+    const taskRoot = join(businessRoot, dirname(row.task_path));
     const sources = [
-      join(businessRoot, row.decision_path), join(businessRoot, dirname(row.task_path), 'acceptance.md'),
+      join(taskRoot, 'acceptance.md'), join(taskRoot, 'contract.md'), join(taskRoot, 'nonfunctional.md'),
+      join(businessRoot, row.decision_path),
       join(businessRoot, 'public/common/operation-and-observation.md'),
     ].map(reference);
     const manifest = json(manifestPath);
@@ -89,7 +91,7 @@ function businessEntries() {
 }
 
 function stagedEntries(registrations) {
-  return registrations.map(row => {
+  return registrations.map(({ selection, ...row }) => {
     const isReview = row.series === 'review-ceiling-v1';
     const taskPath = 'task.md';
     const criteria = isReview ? reviewProtocol : join(row.workspace, 'brief/rubric.json');
@@ -97,13 +99,13 @@ function stagedEntries(registrations) {
       ? [...read(criteria).toString('utf8').matchAll(/^\| ([^|]+) \| [0-9]+ \|/gmu)].map(match => match[1].trim())
       : json(criteria).requirements.map(item => item.id);
     return {
-      id: row.id, title: title(join(row.workspace, taskPath)), domain: row.selection.domain,
-      ...withDifficulty(row.selection.difficulty, 'author_estimate'),
-      task_types: row.selection.task_types,
+      id: row.id, title: title(join(row.workspace, taskPath)), domain: selection.domain,
+      ...withDifficulty(selection.difficulty, 'author_estimate'),
+      task_types: selection.task_types,
       input: {
         kind: 'staged', root: row.workspace, manifest: row.input_manifest.path,
         digest: row.input_manifest.digest, task_path: taskPath, version: row.input_version,
-        reassessment_digest: row.stages[1].update.digest,
+        registration_digest: canonicalDigest(row), reassessment_digest: row.stages[1].update.digest,
       },
       assessment: {
         kind: row.evaluator.kind, public_criteria: reference(criteria), digest: canonicalDigest(row.evaluator.files),
@@ -157,4 +159,3 @@ export function listEvaluationTasks({ difficulty, type, skill } = {}) {
     && (type === undefined || task.task_types.includes(type))
     && (skill === undefined || task.observations.some(item => item.skills.includes(skill))));
 }
-

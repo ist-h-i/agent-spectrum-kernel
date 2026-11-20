@@ -23,7 +23,7 @@ const DEVELOPER_ONLY = new Set(['scripts/validate-repo.mjs',
   'scripts/update-codex-compact-fixtures.mjs']);
 const toPosix = p => p.split(sep).join('/');
 const within = (root, path) => { const rel = relative(root, path); return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel); };
-const forbidden = p => /^benchmarks\/challenge-candidates\/review-ceiling-v1\/calibration-(?:report\.md|summary\.json)$/u.test(p) || /^(?:dist|\.npm-dist-[^/]+)(?:\/|$)/u.test(p) || p.split('/').some(part => ['.git', 'node_modules', '.env', '.npmrc'].includes(part)) || /^scripts\/(?:test-|test-fixtures\/)/u.test(p) || /^(?:benchmarks\/(?:results|review-archives)\/|\.github\/)/u.test(p);
+const forbidden = p => /^benchmarks\/challenge-candidates\/review-ceiling-v1\/calibration-(?:report\.md|summary\.json)$/u.test(p) || /^(?:dist|\.npm-dist-[^/]+)(?:\/|$)/u.test(p) || p.split('/').some(part => ['.git', 'node_modules', '.env', '.npmrc', '.DS_Store'].includes(part)) || /^scripts\/(?:test-|test-fixtures\/)/u.test(p) || /^(?:benchmarks\/(?:results|review-archives)\/|\.github\/)/u.test(p);
 
 export function runtimePackageFiles(root = ROOT) {
   root = resolve(root);
