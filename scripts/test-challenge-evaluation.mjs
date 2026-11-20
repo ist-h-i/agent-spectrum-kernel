@@ -31,11 +31,25 @@ function setup(t){
  const run=(stage='initial',session=fake)=>startPracticalChallenge(root,ready.manifest_digest,{allowModelCalls:true,stage,session});
  return {base,root,config,ready,calls,fake,run};
 }
-test('catalog is separate from unchanged primary24 and discoverable through standard CLI',()=>{
+test('staged registrations retain their primary boundary and the old list follows the unified CLI',()=>{
  const rows=listPracticalChallenges();assert.equal(rows.length,2);assert.deepEqual(rows.map(c=>c.id),[id,'ch08-growth-workspace']);
  assert.equal(rows[0].primary_catalog_member,false);
  assert.equal(Object.keys(PRIMARY_FIXTURE_REGISTRY).length,24);
- const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs','challenge-list'],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout)[0].id,id);
+ const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs','challenge-list'],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);
+ const listed=JSON.parse(r.stdout);assert.equal(listed.length,32);assert.ok(listed.some(row=>row.id===id));
+});
+test('unified task preparation can bind a staged run without a model call', t => {
+ const {base,config}=setup(t),root=join(base,'selected'),settings=join(base,'config.json');
+ writeFileSync(settings,JSON.stringify({...config,root}));
+ const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs','task-prepare',
+  '--id',id,'--root',root,'--config',settings],{encoding:'utf8'});
+ assert.equal(r.status,0,r.stderr);
+ const prepared=JSON.parse(r.stdout);
+ assert.equal(prepared.model_calls,0);
+ assert.equal(prepared.staged_run.status,'prepared');
+ assert.equal(prepared.staged_run.manifest_digest,inspectPracticalChallenge(root).manifest_digest);
+ assert.equal(existsSync(join(root,'workspace','OPERATIONAL-UPDATE.md')),false);
+ assert.equal(existsSync(join(root,'evaluation-preparation.json')),true);
 });
 test('prepare freezes 151 public files; update and evaluator are not solver inputs',t=>{
  const f=setup(t);assert.equal(f.ready.status,'prepared');assert.equal(f.calls.length,0);

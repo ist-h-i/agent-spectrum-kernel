@@ -132,6 +132,8 @@ node scripts/test-release-install-recovery.mjs
 | 個人改善CLI | Prompt候補から比較・確認・人の判断へつなぐ入口と合成試験 | 任意Skillの自律改善、Mac設定への自動適用、実運用の成功 |
 | 24課題評価 | 公開入力・契約・portfolio登録24件。明示`catalog24`によるP / K2 / Fの72枠準備、CLIでの選択、v2採点資産接続、v8有限操作観測の保存採点対応と合成試験 | 全24課題のnative受入の完成、認証済みの性能実測、実モデルでの比較結果 |
 
+評価課題は [評価課題の一覧・実行準備](docs/evaluation-task-catalog.md) から、難易度・課題タイプ・スキルで選べます。
+
 24課題の基盤に加え、PR409/410の採点資産接続と操作試行観測もmainへ統合済みです。[v2採点資産の接続](docs/primary-24-private-v2.md) と [v8有限操作観測の範囲](docs/primary-24-unsafe-action-v8.md) は実装と合成試験の証拠を示し、実native受入・性能実測・ASKの優位性とは区別しています。課題別の根拠と残件は [組立・採点検証状況](docs/primary-24-task-assembly.md)、公開入力と未実行枠の扱いは [公開入力点検](docs/primary-24-public-inputs.md) を参照してください。
 
 実装の存在、合成試験、実モデルの測定、実務での効果はそれぞれ別の証拠です。[リリース判定資料](docs/release-package-2026-10.md) も対象revisionと日付を持つ記録であり、その後の開発を自動的に完成扱いにはしません。

@@ -203,10 +203,11 @@ function publicSummary(fixtures) {
     semantic_grading_status: "not_evaluated", fixtures, limitations: ["Public closure validation does not establish semantic quality, private evaluator admission, or ASK effectiveness.",
       "Public-only preparation selects no comparison/grading authority. A fixed catalog task selection and independently admitted resources are required; missing or ungraded tasks retain null quality."] };
 }
-export function inspectPrimaryPublicInputs({ root = resolve(SOURCE) } = {}) {
+export function inspectPrimaryPublicInputs({ root = resolve(SOURCE), fixtureIds } = {}) {
   canonicalDirectory(root);
   const { raw, rows } = publicCatalog(root), configured = json(join(root, "benchmarks/adaptive-portfolio.config.json")).fixtures;
-  const report = publicSummary(rows.map(row => {
+  const selected = new Set(selectPrimaryFixtureIds(fixtureIds));
+  const report = publicSummary(rows.filter(row => selected.has(row.fixture_id)).map(row => {
     const base = join(root, "benchmarks/fixtures/checkpoint-b2", row.fixture_id);
     const checked = checkPublicInput(row.fixture_id, base, base, null, root);
     return { fixture_id: row.fixture_id, suite: row.suite, task_class: row.task_class, public_intent: row.public_intent,
@@ -216,12 +217,12 @@ export function inspectPrimaryPublicInputs({ root = resolve(SOURCE) } = {}) {
   }));
   return { ...report, catalog_digest: comparisonHash(raw) };
 }
-export function preparePrimaryPublicInputs(output, { root = resolve(SOURCE) } = {}) {
+export function preparePrimaryPublicInputs(output, { root = resolve(SOURCE), fixtureIds } = {}) {
   canonicalDirectory(root); canonicalDirectory(dirname(output));
   assert.ok(isAbsolute(output) && resolve(output) === output, "canonical output required");
   assert.ok(!output.startsWith(`${root}/`) && !root.startsWith(`${output}/`) && output !== root, "output/source overlap");
   assert.ok(!existsSync(output), "public preparation output exists; never reuse");
-  const report = inspectPrimaryPublicInputs({ root });
+  const report = inspectPrimaryPublicInputs({ root, fixtureIds });
   mkdirSync(output, { mode: 0o700 });
   for (const name of ["inputs", "records"]) mkdirSync(join(output, name), { mode: 0o700 });
   const catalog = publicCatalog(root); assert.equal(comparisonHash(catalog.raw), report.catalog_digest, "catalog changed during preparation");
@@ -250,14 +251,14 @@ export function preparePrimaryPublicInputs(output, { root = resolve(SOURCE) } = 
   writeFileSync(join(output, "preparation.digest"), comparisonHash(read(join(output, "preparation.json"))), { flag: "wx", mode: 0o600 });
   return prepared;
 }
-export function verifyPrimaryPublicInputs(output) {
+export function verifyPrimaryPublicInputs(output, { fixtureIds } = {}) {
   canonicalDirectory(output);
   const raw = read(join(output, "preparation.json"));
   assert.equal(comparisonHash(raw), read(join(output, "preparation.digest")).toString(), "preparation changed");
   const prepared = parseJsonRejectDuplicateKeys(raw.toString("utf8"));
   assert.equal(prepared.kind, PUBLIC_KIND);
   assert.equal(comparisonHash(read(join(output, "catalog.json"))), prepared.catalog_digest, "prepared catalog changed");
-  assert.deepEqual(prepared.fixtures.map(row => row.fixture_id), PRIMARY_FIXTURE_REGISTRY.map(row => row[0]));
+  assert.deepEqual(prepared.fixtures.map(row => row.fixture_id), selectPrimaryFixtureIds(fixtureIds));
   return publicSummary(prepared.fixtures.map(row => {
     const records = join(output, "records", row.fixture_id);
     const checked = row.public_input_status === "prepared"

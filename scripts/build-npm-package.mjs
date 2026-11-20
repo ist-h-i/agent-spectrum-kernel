@@ -43,7 +43,9 @@ export function runtimePackageFiles(root = ROOT) {
   for (const path of ['LICENSE', 'AGENTS.md', 'CUSTOM_INSTRUCTIONS.md', 'manifest.json',
     'skills', 'adapters', 'schemas', 'products', 'docs/ai',
     'benchmarks/fixtures', 'benchmarks/contracts', 'benchmarks/schemas',
-    'benchmarks/challenge-candidates',
+    'benchmarks/challenge-candidates/business-five-v3-decisions',
+    'benchmarks/challenge-candidates/review-ceiling-v1',
+    'benchmarks/challenge-candidates/ui-reconstruction-v1',
     'docs/fixtures/asset-registry', 'docs/fixtures/adapter-runtime-profiles.json', 'docs/npm-distribution.md', 'docs/npm-distribution-ja.md', 'docs/npm-loop-spec-example.mjs',
     ...RUNTIME_ENTRIES]) { assert.ok(existsSync(join(root,path)), `required package root missing: ${path}`); add(path); }
   while (queue.length) {

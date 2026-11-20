@@ -1,27 +1,13 @@
-// Canonical primary task data shared by catalog and recipe without workflow imports.
-export const PRIMARY_FIXTURE_REGISTRY = Object.freeze([
-  ["hi-authorization-exception", "high_impact", "pr_review", "security_authorization", "hard", 5],
-  ["hi-external-action-approval", "high_impact", "operation_boundary", "iac_operations", "hard", 3],
-  ["hi-financial-state-integrity", "high_impact", "investigation_implementation", "backend_financial", "hard", 5],
-  ["hi-versioned-migration-safety", "high_impact", "migration_design", "data_schema", "hard", 5],
-  ["mn-build-option-update", "mechanism_negative", "configuration", "ci_build", "medium", 3],
-  ["mn-client-compatibility-fix", "mechanism_negative", "local_implementation", "client_mobile", "medium", 3],
-  ["mn-doc-config-correction", "mechanism_negative", "documentation", "docs_config", "easy", 3],
-  ["mn-focused-regression-test", "mechanism_negative", "verification_only", "testing", "medium", 3],
-  ["mn-frontend-default-fix", "mechanism_negative", "local_bug_fix", "frontend", "medium", 3],
-  ["mn-schema-field-alignment", "mechanism_negative", "small_feature", "data_schema", "easy_medium", 3],
-  ["mp-accessibility-interaction-review", "mechanism_positive", "pr_review", "accessibility", "medium_hard", 3],
-  ["mp-ci-evidence-gap", "mechanism_positive", "review_verification", "ci_build", "medium_hard", 3],
-  ["mp-data-migration-handoff", "mechanism_positive", "handoff_resume", "data_schema", "hard", 3],
-  ["mp-frontend-state-review", "mechanism_positive", "pr_review", "frontend", "hard", 3],
-  ["mp-iac-rollback-design", "mechanism_positive", "design_gate", "iac_cloud", "hard", 3],
-  ["mp-performance-investigation", "mechanism_positive", "investigation", "performance", "hard", 5],
-  ["pf-api-pagination-behavior", "practice_frequency", "implementation_verification", "backend_api", "medium", 3],
-  ["pf-ci-cache-flake", "practice_frequency", "investigation", "ci_build", "medium_hard", 5],
-  ["pf-data-schema-evolution", "practice_frequency", "implementation_verification", "data_schema", "medium", 3],
-  ["pf-frontend-async-state", "practice_frequency", "investigation_implementation", "frontend", "medium_hard", 5],
-  ["pf-library-compat-upgrade", "practice_frequency", "dependency_migration", "cross_platform", "hard", 3],
-  ["pf-observability-redaction", "practice_frequency", "implementation_review", "observability_security", "medium_hard", 3],
-  ["pf-performance-regression", "practice_frequency", "investigation_implementation", "performance", "hard", 5],
-  ["pf-review-error-contract", "practice_frequency", "pr_review", "backend_api", "medium_hard", 3],
-]);
+// The published portfolio owns task metadata. This digest retains the fixed
+// admission boundary previously enforced by a second list of the same rows.
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
+const catalog = JSON.parse(readFileSync(new URL('../benchmarks/portfolio-catalog.json', import.meta.url)));
+const rows = catalog.fixtures.filter(row => row.fixture_role === 'primary')
+  .map(row => [row.fixture_id, row.suite, row.task_class, row.domain, row.difficulty, row.repetitions]);
+assert.equal(createHash('sha256').update(JSON.stringify(rows)).digest('hex'),
+  '07953cbc9c24e373bd2f7fe54bd2df9b501de4b1d48d7156b3bb2bb582bd91f4',
+  'fixed primary admission metadata changed');
+export const PRIMARY_FIXTURE_REGISTRY = Object.freeze(rows.map(Object.freeze));

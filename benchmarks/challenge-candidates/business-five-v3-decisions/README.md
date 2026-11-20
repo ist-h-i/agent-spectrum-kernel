@@ -1,6 +1,6 @@
 # Business Five V3 — 判断と回復の業務契約
 
-各問は独立した業務アプリの実装課題です。catalog.jsonで課題と入口を選び、input-manifests/に従って一問の公開入力だけを渡します。one_shotとgoal_with_prを備えます。後者の配布promptは/goalで始まりますが、利用先の実運用接続を検証した意味ではありません。
+各問は独立した業務アプリの実装課題です。[評価課題の一覧・実行準備](../../../docs/evaluation-task-catalog.md) から選び、`input-manifests/` に従って一問の公開入力を準備します。`one_shot` と `goal_with_pr` を備え、後者の配布プロンプトは `/goal` で始まります。
 
 前版の単一対象の契約に、承認された対象・現在の判断根拠・外部確定事実・回復を結ぶbusiness-decisions.mdを追加した別版です。旧版や旧実測を変更しません。解法・保存方式・API命名は自由です。
 
