@@ -87,6 +87,10 @@ test('the allowed JSON example retains its fences and location in the guide', t 
   assert.deepEqual(inspectEvaluationSubmission(root).fixed_input_changes, []);
   writeFileSync(guide, before.replace(block,'') + block);
   assert.deepEqual(inspectEvaluationSubmission(root).fixed_input_changes, [{path:'workspace/docs/worker-retries.md',change:'modified'}]);
+  for (const earlyClosingFence of ['````', '  ```']) {
+    writeFileSync(guide, before.replace('\n```\n', `\n${earlyClosingFence}\nNew instructions.\n\x60\x60\x60\n`));
+    assert.deepEqual(inspectEvaluationSubmission(root).fixed_input_changes, [{path:'workspace/docs/worker-retries.md',change:'modified'}]);
+  }
 });
 
 

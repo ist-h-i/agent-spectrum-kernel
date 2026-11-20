@@ -38,7 +38,7 @@ function fixedChanges(task, workspace, current) {
     if (bytes.equals(actual)) continue;
     if (allowed.has(`${path}#json-block`)) {
       const outside = content => {
-        const block = /(^```json[^\S\n]*\r?\n)([\s\S]*?)(^```[^\S\n]*(?=\n|$))/gmu;
+        const block = /(^```json[ \t]*\r?\n)([\s\S]*?)(^ {0,3}`{3,}[ \t]*\r?$)/gmu;
         return [...content.matchAll(block)].length === 1 ? content.replace(block, '$1<example>\n$3') : null;
       };
       const before = outside(bytes.toString('utf8'));
