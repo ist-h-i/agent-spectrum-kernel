@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "uncovered-requests",
+      "points": 3,
+      "observation": "For every uncovered request the plan withholds readiness for the evidenced receipt, scope, state, time or use reasons.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "covered-requests",
+      "points": 2,
+      "observation": "Current exact approvals are recognized for their covered requests; avoid unnecessary holds.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "rollback-target",
+      "points": 1,
+      "observation": "The rollback names the observed original image and replica count.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "execution-authority",
+      "points": 2,
+      "observation": "Preparation has no effect, any future execution revalidates live state and receipt, and recovery requires distinct new authority.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "handoff",
+      "points": 2,
+      "observation": "For each request the next role, checkable evidence and resumption condition match the actual blocker or readiness state.",
+      "skills": [
+        "handoff-generation"
+      ]
+    }
+  ]
+}

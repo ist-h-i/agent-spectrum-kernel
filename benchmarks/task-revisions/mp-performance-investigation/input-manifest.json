@@ -1,0 +1,106 @@
+{
+  "id": "mp-performance-investigation",
+  "version": "task-revision-1",
+  "rubric_sha256": "12f3e1228fee4bbd298fa0ee732c5eb2b5cf441e4548f9df50d90f9d66ffa605",
+  "editable": [
+    "workspace/investigation.json"
+  ],
+  "files": [
+    {
+      "path": "task.md",
+      "bytes": 1967,
+      "sha256": "10c25f069bc586012c19891b6530c6a6b96364d0ed915b5814ab1cde33c20bb5",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/docs/investigation-contract.md",
+      "sha256": "8a3e33734a99a938ca7d9877cdba7a2aea6b5042973535f68bc7b036a0b34730",
+      "bytes": 1153,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/investigation.schema.json",
+      "sha256": "4ca6fd8849afbb6911e0b3ec4eb93fcb3a046b6d8b18bafe99c967ec77137682",
+      "bytes": 3413,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/observability/cache-samples.csv",
+      "sha256": "7297c1571180430aea2960bb3ba8cd0036129186b32ca47912910d46edcb9dea",
+      "bytes": 437,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/observability/release-events.json",
+      "sha256": "cb5a2089e125a916aa8aa54b20aac7229bca4b7c919a483923336dcbb3be92ab",
+      "bytes": 329,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/observability/request-windows.csv",
+      "sha256": "ad7bf355676756e65f2dcf083342f19c2fd9154d0ee4197afa2d22f1a34dd586",
+      "bytes": 318,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/observability/runtime-profile.json",
+      "sha256": "c1d9fcfb5e07be1e3ca9fb99a82ca2013c441a7e533663f35f14001994a20e9f",
+      "bytes": 486,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/package-lock.json",
+      "sha256": "97fc14e0c5101f36d9f2a2d8bab661f6035a048673095e85e24bb01174cdf249",
+      "bytes": 288,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/package.json",
+      "sha256": "44957dce8f4188fce24c7a9821749452aab47dcc729ea42b37dded0f267aa1a8",
+      "bytes": 461,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/scripts/replay-summary.mjs",
+      "sha256": "1b5857ac8ec3850c949f3b43c8bf10b1683ed8aeb51759a551a155326c2c9e7d",
+      "bytes": 180,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/scripts/validate-investigation.mjs",
+      "sha256": "b76cc7ae34b82efcf598cbaf368b1d1ca07aa7a90d411826b6ce18fcedc576f9",
+      "bytes": 5783,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/cache-key.mjs",
+      "sha256": "9aceecf523cedd945f813818912fea2fa3a3599b8620caf0c45f058bd52eabc4",
+      "bytes": 300,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/summary-replay.mjs",
+      "sha256": "4ab87839f3de6f809e53b485c6b19e0d82ea90ec3d5b3dc3b9da0890a10b4813",
+      "bytes": 726,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/summary-service.mjs",
+      "sha256": "fdc8a4c6d57e67a01f1a91c7f9d5bc0c51d120562dbb02b29fc18400c45e4e62",
+      "bytes": 344,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/test/integration/summary-replay.test.mjs",
+      "sha256": "be4e26456aab01bf0d74430a551e0bc2d9ff6142c843af9ae6d690347ec7f1d7",
+      "bytes": 445,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/test/unit/cache-key.test.mjs",
+      "sha256": "6d00d1c70f6c595c6e3dcb7dd09ad8438c2802a3aa2ef8b32995c12a19853ce7",
+      "bytes": 452,
+      "source": "inherited"
+    }
+  ]
+}

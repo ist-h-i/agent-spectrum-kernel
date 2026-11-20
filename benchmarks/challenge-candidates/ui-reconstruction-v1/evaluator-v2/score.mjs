@@ -18,7 +18,7 @@ function evidence(rows){
  for(const row of rows){keys(row,['artifact','observation']);nonempty(row.artifact);nonempty(row.observation);}
 }
 function validateRubric(r){
- assert.equal(r.kind,'ch08_semantic_rubric_v2');assert.equal(r.version,'2.0.0');assert.equal(r.maximum,100);
+ assert.equal(r.kind,'ch08_semantic_rubric_v2');assert.ok(['2.0.0','2.1.0'].includes(r.version),'unsupported rubric version');assert.equal(r.maximum,100);
  assert.deepEqual(r.categories,{functional:40,ux:60});
  assert.ok(Array.isArray(r.requirements)&&r.requirements.length===18,'18 requirements required');
  const fWeights=[8,8,10,5,10,10,5,6,4,4].map(n=>n*40/70),uWeights=[8,10,6,6,7,8,8,7],uCounts=[4,5,5,4,5,6,5,6];
@@ -41,9 +41,32 @@ function validateRubric(r){
  for(const value of Object.values(r.release_blocker_rules))nonempty(value);
  return na;
 }
+// Submission evidence has its own denominator and cannot alter a product outcome.
+function submissionResult(rubric, rows) {
+ const rules = rubric.submission_checks;
+ assert.deepEqual(rules.map(rule => [rule.id, rule.points]), [['review-match', 2], ['verification-record', 2]]);
+ assert.ok(Array.isArray(rows) && rows.length === rules.length, 'both submission checks required');
+ const decisions = new Map(rows.map(row => [row.id, row]));
+ const checks = rules.map(rule => {
+  const row = decisions.get(rule.id);
+  assert.ok(row && ['pass', 'partial', 'fail', 'unknown'].includes(row.status), 'unknown or missing submission check');
+  if (row.status === 'unknown') {
+   keys(row, ['id', 'status', 'missing', 'next_check']); nonempty(row.missing); nonempty(row.next_check);
+   return { ...row, maximum: rule.points, earned: null };
+  }
+  const fields = ['id', 'status', 'answer_ref', 'independent_ref', 'observation'];
+  if (row.status === 'partial') { fields.push('limitation'); nonempty(row.limitation); }
+  keys(row, fields); nonempty(row.answer_ref); nonempty(row.independent_ref); nonempty(row.observation);
+  return { ...row, maximum: rule.points, earned: { pass: rule.points, partial: rule.points / 2, fail: 0 }[row.status] };
+ });
+ const missing_weight = checks.filter(row => row.earned === null).reduce((sum, row) => sum + row.maximum, 0);
+ const known_points = checks.reduce((sum, row) => sum + (row.earned ?? 0), 0);
+ return { maximum: 4, known_points, missing_weight, score: missing_weight ? null : known_points, checks };
+}
 export function score(rubric,assessment){
  const na=validateRubric(rubric);
- keys(assessment,['kind','meta','requirements','release_blockers']);assert.equal(assessment.kind,'ch08_assessor_decisions_v2');
+ const revised = rubric.version === '2.1.0';
+ keys(assessment,['kind','meta','requirements','release_blockers', ...(revised ? ['submission_checks'] : [])]);assert.equal(assessment.kind,'ch08_assessor_decisions_v2');
  keys(assessment.meta,['candidate_id','assessment_mode','rubric_version']);nonempty(assessment.meta.candidate_id);assert.ok(['prospective','retrospective'].includes(assessment.meta.assessment_mode));assert.equal(assessment.meta.rubric_version,rubric.version,'rubric version mismatch');
  assert.ok(Array.isArray(assessment.requirements));assert.equal(assessment.requirements.length,rubric.requirements.length,'all rubric items required');
  const decisions=new Map();for(const row of assessment.requirements){keys(row,['id','checks']);assert.ok(!decisions.has(row.id),'duplicate requirement');decisions.set(row.id,row);}
@@ -74,7 +97,7 @@ export function score(rubric,assessment){
  }
  const known_points=atMaximum(requirements.reduce((s,r)=>s+r.points,0),rubric.maximum),missing_weight=requirements.reduce((s,r)=>s+r.missing_weight,0);
  const blocked=assessment.release_blockers.some(r=>r.status==='observed'),unknownBlocker=assessment.release_blockers.some(r=>r.status==='unknown');
- return outputDecimal({kind:'ch08_score_v2',rubric_version:rubric.version,rubric_digest:rubricDigest(rubric),meta:{...assessment.meta},known_points,missing_weight,quality_score:missing_weight?null:known_points,categories,requirements,release_blockers:assessment.release_blockers,
+ return outputDecimal({kind:'ch08_score_v2',rubric_version:rubric.version,rubric_digest:rubricDigest(rubric),meta:{...assessment.meta},...(revised ? {submission:submissionResult(rubric,assessment.submission_checks)} : {}),known_points,missing_weight,quality_score:missing_weight?null:known_points,categories,requirements,release_blockers:assessment.release_blockers,
   release_status:blocked?'blocked':unknownBlocker?'unknown':'no_observed_blockers',blocker_gate_passed:blocked?false:unknownBlocker||missing_weight?null:true,semantic_truth_verified_by_calculator:false});
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){

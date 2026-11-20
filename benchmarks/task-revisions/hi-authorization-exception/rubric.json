@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "missed-violations",
+      "points": 3,
+      "observation": "The review identifies distinct policy violations in supplied caller cases and states the correct required result for each.",
+      "skills": [
+        "review-domain-impact"
+      ]
+    },
+    {
+      "id": "preserved-use",
+      "points": 2,
+      "observation": "The cited normal caller uses remain consistent with the ownership policy, including the legitimate uses the correction must preserve.",
+      "skills": [
+        "review-domain-impact"
+      ]
+    },
+    {
+      "id": "false-alarms",
+      "points": 2,
+      "observation": "Reported violations are real policy differences. Reporting a legitimate access as a defect lowers this independent item; repeated causes are counted once.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    },
+    {
+      "id": "impact-evidence",
+      "points": 2,
+      "observation": "Source evidence, actor and use, before/after result, severity and correction condition justify the reported effects.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    },
+    {
+      "id": "decision",
+      "points": 1,
+      "observation": "The merge decision is supported by the evidenced policy consequences and distinct causes.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    }
+  ]
+}

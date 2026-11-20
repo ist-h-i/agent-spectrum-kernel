@@ -124,8 +124,7 @@ packet or its referenced assets with the public problem.
 The existing reporting-policy-v3 grader remains unchanged: its supported three
 binary 10-point review contracts cannot substitute for RC01's 100-point partial
 semantic rubric. No keyword matcher, new rubric or second scoring model is
-introduced here. Calibration details are in the source package's
-`calibration-summary.json` and `calibration-report.md`.
+introduced here. The two historical RC01 pilot scores belong to `review-public-v1`. The current `review-public-v2` registration has no measured solver trials. The per-item review and reassessment comparisons are described in the [evaluation task guide](evaluation-task-catalog.md).
 
 ## Verification contract
 
@@ -251,7 +250,7 @@ authorization; synthetic injected sessions are explicitly labeled synthetic.
 
 The three files for the current CH08 evaluator are under `evaluator-v2/`.
 Copy them to the external isolated evaluator directory for a run.
-Public `brief/rubric.json` is byte-identical to the evaluator rubric. There are
+For `ui-functional-v2.1`, public `brief/rubric.json` is byte-identical to the registered 2.1.0 evaluator rubric. There are
 no hidden functional requirements. An independent assessor must exercise the
 actual browser interactions and bind decisions to evidence. Functional /40 and
 UX /60 are separate fields in the imported result. Only a fully observed result

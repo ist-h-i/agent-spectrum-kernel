@@ -1,0 +1,71 @@
+{
+  "id": "pf-data-schema-evolution",
+  "version": "task-revision-1",
+  "rubric_sha256": "a66b206a9d46547e4c23064b9cc5a25b6f60b823ffc55810899eb48aad48b714",
+  "editable": [
+    "workspace/migrations/v1-v2.plan.json",
+    "workspace/schemas/customer-v2.schema.json"
+  ],
+  "files": [
+    {
+      "path": "task.md",
+      "bytes": 2502,
+      "sha256": "48cf8349777f21bf6d04c79a2530c49785621bc9307d48fdd15ecf525633196a",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/data/legacy-customers.json",
+      "sha256": "298d9873a63a3f17e606a07ff896a399e515d5ba93cbb89b54cd7bc0898402ac",
+      "bytes": 258,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/migrations/v1-v2.plan.json",
+      "sha256": "9793113c54789c1d9c854521909f6bee9d094a34ea81fdeb0192381eb0b990da",
+      "bytes": 167,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/package.json",
+      "sha256": "032ca46f0b73388a59c8773f531ba7374cdc49e8d14a9e85d307688dd081f832",
+      "bytes": 223,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/schemas/customer-v1.schema.json",
+      "sha256": "76670a9124ad3181ec9c517bc112e632fd2b1b9a0a6e8c7c20bac31b92357dd4",
+      "bytes": 516,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/schemas/customer-v2.schema.json",
+      "sha256": "9c23d4ff962e41d1c8bb8cc4a5cd5646c9fe61a724d304b382f41b7821125e9c",
+      "bytes": 434,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/spec/evolution-contract.md",
+      "sha256": "a1eb5adb21d054b74999d117927ecde61e723a402001dad0775ffc922df80d74",
+      "bytes": 2034,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/readers.mjs",
+      "sha256": "c051968124ab7a6538c89ffcedb1b87fe579f75b52918a568544d504181c0671",
+      "bytes": 301,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/schema-contract.mjs",
+      "sha256": "08df8a61eaa1ed6ad2fccc5d14311cd7013108fcf25db99863cba3d431953b9a",
+      "bytes": 2923,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/test/schema-evolution.test.mjs",
+      "sha256": "abeab224657b551f588934da805a5dacc15346156028971cb9fbead110c65bb1",
+      "bytes": 3210,
+      "source": "inherited"
+    }
+  ]
+}

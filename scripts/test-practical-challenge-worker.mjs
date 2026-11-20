@@ -143,7 +143,7 @@ test('CH08 v2 fractional scores import and inspect with exact decimal upper boun
  t.mock.module('./practical-challenge-evaluation.mjs',{namedExports:{...challenge,inspectPracticalChallenge:status,inspectPracticalChallengeScoreHandoff:()=>read(join(root,'score-handoff.json'))}});
  const worker=await import('./practical-challenge-worker.mjs?ch08-v2-grade-test');
  const rubric=read(join(evaluator,'rubric.json')),evidence=[{artifact:'synthetic-state',observation:'Synthetic verified state'}];
- const assessment={kind:'ch08_assessor_decisions_v2',meta:{candidate_id:'synthetic-v2',assessment_mode:'prospective',rubric_version:'2.0.0'},requirements:rubric.requirements.map(r=>({id:r.id,checks:r.checks.map(c=>({id:c.id,status:'pass',evidence}))})),release_blockers:Object.keys(rubric.release_blocker_rules).map(id=>({id,status:'clear',evidence}))};
+ const assessment={kind:'ch08_assessor_decisions_v2',meta:{candidate_id:'synthetic-v2',assessment_mode:'prospective',rubric_version:rubric.version},submission_checks:rubric.submission_checks.map(({id})=>({id,status:'pass',answer_ref:'REASSESSMENT.md',independent_ref:'synthetic-operation',observation:'Synthetic comparison only'})),requirements:rubric.requirements.map(r=>({id:r.id,checks:r.checks.map(c=>({id:c.id,status:'pass',evidence}))})),release_blockers:Object.keys(rubric.release_blocker_rules).map(id=>({id,status:'clear',evidence}))};
  assessment.requirements[0].checks[0].status='fail';
  assessment.requirements.find(r=>r.id==='U06').checks[0]={id:'U06.1',status:'unknown',missing:'Synthetic missing operation',next_check:'Observe operation'};
  const input={kind:'practical_challenge_assessment_input_v1',manifest_digest:canonicalDigest(m),handoff_digest:canonicalDigest(handoff),assessment};
@@ -172,7 +172,7 @@ test('CH08 v2 completed fractional score imports and inspects without solver rep
  t.mock.module('./practical-challenge-evaluation.mjs',{namedExports:{...challenge,inspectPracticalChallenge:status,inspectPracticalChallengeScoreHandoff:()=>read(join(root,'score-handoff.json'))}});
  const worker=await import('./practical-challenge-worker.mjs?ch08-v2-complete-grade-test');
  const rubric=read(join(evaluator,'rubric.json')),evidence=[{artifact:'synthetic-state',observation:'Synthetic verified state'}];
- const assessment={kind:'ch08_assessor_decisions_v2',meta:{candidate_id:'synthetic-v2',assessment_mode:'prospective',rubric_version:'2.0.0'},requirements:rubric.requirements.map(r=>({id:r.id,checks:r.checks.map(c=>({id:c.id,status:'pass',evidence}))})),release_blockers:Object.keys(rubric.release_blocker_rules).map(id=>({id,status:'clear',evidence}))};
+ const assessment={kind:'ch08_assessor_decisions_v2',meta:{candidate_id:'synthetic-v2',assessment_mode:'prospective',rubric_version:rubric.version},submission_checks:rubric.submission_checks.map(({id})=>({id,status:'pass',answer_ref:'REASSESSMENT.md',independent_ref:'synthetic-operation',observation:'Synthetic comparison only'})),requirements:rubric.requirements.map(r=>({id:r.id,checks:r.checks.map(c=>({id:c.id,status:'pass',evidence}))})),release_blockers:Object.keys(rubric.release_blocker_rules).map(id=>({id,status:'clear',evidence}))};
  assessment.requirements[0].checks[0].status='fail';
  const input={kind:'practical_challenge_assessment_input_v1',manifest_digest:canonicalDigest(m),handoff_digest:canonicalDigest(handoff),assessment};
  const result=await worker.importChallengeSemanticAssessment(root,input);assert.equal(result.result.quality_score,98.857143);

@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "progress",
+      "points": 2,
+      "observation": "The successor can locate the last completed batch, pending batch, durable cursor and active read/write traffic from the handoff.",
+      "skills": [
+        "handoff-generation"
+      ]
+    },
+    {
+      "id": "check-states",
+      "points": 2,
+      "observation": "Recorded verification states distinguish failures, pending checks and passes and trace to the supplied evidence.",
+      "skills": [
+        "evidence-ledger"
+      ]
+    },
+    {
+      "id": "next-action",
+      "points": 2,
+      "observation": "The handoff identifies a feasible present action, its authorized operator, mode, inputs and unresolved work.",
+      "skills": [
+        "handoff-generation"
+      ]
+    },
+    {
+      "id": "resume-gate",
+      "points": 3,
+      "observation": "A successor can apply the independent technical and owner-approval gates to either one-sided update, hold writes when a gate is missing and identify when they can resume. Invented proof invalidates this criterion.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "containment",
+      "points": 1,
+      "observation": "Identifies supported containment and the data, audit trail and cursor that must survive a stop.",
+      "skills": [
+        "risk-gate"
+      ]
+    }
+  ]
+}

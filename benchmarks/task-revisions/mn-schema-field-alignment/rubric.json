@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "round-trip",
+      "points": 3,
+      "observation": "The fixed exporter’s current payload passes the fixed importer with each field value intact.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "optional-default",
+      "points": 1,
+      "observation": "Omitting the optional field through the public importer produces the documented default, while an explicit value is preserved.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "reject-invalid",
+      "points": 3,
+      "observation": "Through the same importer, obsolete spellings, extra fields, missing or invalid required values and invalid optional values raise the specified error type.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "api-boundary",
+      "points": 1,
+      "observation": "The fix stays within schema and permitted tests and retains the producer and consumer interfaces.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "verification",
+      "points": 2,
+      "observation": "Actual public-API checks and the report distinguish a valid round trip from rejection and identify the observed error type.",
+      "skills": [
+        "test-first-verification"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "balances",
+      "points": 2,
+      "observation": "Fresh transfers preserve total integer units and unrelated accounts; the final balances remain correct across replay and rejection.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "response",
+      "points": 2,
+      "observation": "The returned statuses, reasons, result shape and required state identity distinguish exact replay, conflicts and defined validation rejections.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "history",
+      "points": 2,
+      "observation": "Only committed unique transfers append to the request registry and audit, with correct sequence and before/after data. Earlier entries survive.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "previous-inputs",
+      "points": 2,
+      "observation": "The caller’s earlier state, request and history remain unchanged after later calls, including rejected ones.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "submitted-check",
+      "points": 2,
+      "observation": "The reported input sequence, before-values and actual observations reproduce and distinguish a change that corrupts an earlier state despite matching final balances. A missing execution record is unobserved.",
+      "skills": [
+        "test-first-verification"
+      ]
+    }
+  ]
+}

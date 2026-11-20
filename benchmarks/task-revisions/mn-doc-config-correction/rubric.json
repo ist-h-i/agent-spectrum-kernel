@@ -1,0 +1,36 @@
+{
+  "criteria": [
+    {
+      "id": "example",
+      "points": 5,
+      "observation": "Readers can extract one valid JSON example whose parsed values match the original service defaults, independent of key order or spacing.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "prose-boundary",
+      "points": 1,
+      "observation": "Text outside the example is unchanged.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "source-boundary",
+      "points": 2,
+      "observation": "The authoritative configuration, tests and other fixed files match the distributed input.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "test-result",
+      "points": 2,
+      "observation": "The report agrees with the original documentation check on the submitted guide against the original defaults. Record an unexecuted check as unobserved.",
+      "skills": [
+        "test-first-verification"
+      ]
+    }
+  ]
+}

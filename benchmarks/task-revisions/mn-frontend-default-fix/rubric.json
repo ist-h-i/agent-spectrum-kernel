@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "saved-choices",
+      "points": 3,
+      "observation": "The fixed adapter reports each explicitly saved boolean as that checkbox’s initial checked value.",
+      "skills": [
+        "ui-ux-design"
+      ]
+    },
+    {
+      "id": "fallbacks",
+      "points": 2,
+      "observation": "Absent or invalid fields use their own documented defaults, including when the other field is explicitly set.",
+      "skills": [
+        "ui-ux-design"
+      ]
+    },
+    {
+      "id": "independent-state",
+      "points": 2,
+      "observation": "Initialization returns fresh state with the documented fields and preserves saved input, previous results and shared defaults.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "update-reset",
+      "points": 2,
+      "observation": "A subsequent update and reset preserve other settings and the original checkbox contract.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "observations",
+      "points": 1,
+      "observation": "The submitted report matches an actual check through initialization, display projection and later operations, within the adapter’s observable scope.",
+      "skills": [
+        "test-first-verification"
+      ]
+    }
+  ]
+}

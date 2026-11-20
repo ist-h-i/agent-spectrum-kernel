@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "mixed-readers",
+      "points": 2,
+      "observation": "Reader and writer choices keep currently active versions compatible with the mixed records, supported by observed reader values.",
+      "skills": [
+        "grill-with-docs"
+      ]
+    },
+    {
+      "id": "latest-writes",
+      "points": 2,
+      "observation": "The transition preserves newer legacy and dual writes through verified backfill and retirement.",
+      "skills": [
+        "grill-with-docs"
+      ]
+    },
+    {
+      "id": "cutover",
+      "points": 2,
+      "observation": "Every checkpoint gates cutover on evidence of current complete values and drained legacy writers without adding unsupported holds.",
+      "skills": [
+        "release-readiness-gate"
+      ]
+    },
+    {
+      "id": "recovery",
+      "points": 2,
+      "observation": "Recovery decisions use the existing schema, snapshot and later writes to preserve current values. Missing write evidence remains unresolved.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "recovery-proof",
+      "points": 2,
+      "observation": "The trace links the plan’s judgments to reader values, checkpoint facts, missing evidence and the distinct authorizations and revalidation needed before an effect.",
+      "skills": [
+        "risk-gate"
+      ]
+    }
+  ]
+}

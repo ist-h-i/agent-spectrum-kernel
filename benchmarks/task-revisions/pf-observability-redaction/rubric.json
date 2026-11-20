@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "proposal-findings",
+      "points": 3,
+      "observation": "The review groups evidenced changes in the original proposal by concrete impact and gives a supported severity and decision.",
+      "skills": [
+        "review-adversarial-risk"
+      ]
+    },
+    {
+      "id": "false-alarms",
+      "points": 1,
+      "observation": "The reported paths exclude unchanged safe signals. Repetition or a warning on an allowed field earns no extra credit.",
+      "skills": [
+        "review-adversarial-risk"
+      ]
+    },
+    {
+      "id": "data-minimization",
+      "points": 2,
+      "observation": "The repaired output excludes every raw sensitive field on the supplied and comparable synthetic events. Full masking and omission are equivalent.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "points": 2,
+      "observation": "The repaired output retains valid diagnostic/correlation fields, order and the malformed-signal list on the same events.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "signal-evidence",
+      "points": 2,
+      "observation": "Submitted original-versus-repaired observations identify retained diagnostics and malformed inputs and can be traced to the same event records.",
+      "skills": [
+        "test-first-verification"
+      ]
+    }
+  ]
+}

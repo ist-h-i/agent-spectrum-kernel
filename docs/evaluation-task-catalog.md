@@ -23,7 +23,7 @@ node scripts/practical-evaluation-cli.mjs task-prepare --id ch02-report-operatio
 node scripts/practical-evaluation-cli.mjs task-prepare --id ch06-build-operations --root /absolute/new-ch06 --delivery-mode goal_with_pr
 ```
 
-CH02〜CH06の既定は `one_shot` です。両モードとも共通仕様への相対参照が解決できるように準備します。実行の承認、モデル呼び出し、採点はそれぞれ既存の手順に従います。採点定義は通常課題の公表要件・評価器参照、業務課題の受入仕様、段階課題の固定評価器参照に対応します。業務課題では、受入仕様が参照する個別の仕様書も入力目録のハッシュで結び付けます。
+CH02〜CH06の既定は `one_shot` です。両モードとも共通仕様への相対参照が解決できるように準備します。実行の承認、モデル呼び出し、採点はそれぞれ既存の手順に従います。採点定義は通常課題の新版の問題文・項目別配点と評価者用の固定版、業務課題の受入仕様、段階課題の固定評価器参照に対応します。業務課題では、受入仕様が参照する個別の仕様書も入力目録のハッシュで結び付けます。
 
 ### 在庫・予約・物流
 
@@ -44,7 +44,25 @@ node scripts/practical-evaluation-cli.mjs task-prepare --id ch01-inventory-reser
 
 引数 `--id` と `--root` だけで初回の固定入力を用意できます。既存の段階実行器の準備まで行う場合は、実行環境を記載した `--config` を同じコマンドに渡します。設定ファイルと以後の承認・実行手順は [段階実行ガイド](practical-challenge-evaluation.md) を参照してください。
 
-保存済みの試行や旧版を再現する場合は、その試行が固定したソースと入力・採点定義を揃えます。会計台帳移行や旧予約・配送の資材は [移行前のV4固定版](https://github.com/ist-h-i/agent-spectrum-kernel/tree/e27575504f306772a13d568c3fcfa986060d6d37/benchmarks/challenge-candidates/ceiling-v4-continuity) から参照できます。通常24問を一括で検証する作業には [公開入力の一括点検](primary-24-public-inputs.md) を使えます。
+保存済みの試行や旧版を再現する場合は、その試行が固定したソースと入力・採点定義を揃えます。会計台帳移行や旧予約・配送の資材は [移行前のV4固定版](https://github.com/ist-h-i/agent-spectrum-kernel/tree/e27575504f306772a13d568c3fcfa986060d6d37/benchmarks/challenge-candidates/ceiling-v4-continuity) から参照できます。改訂前に固定した通常24問の入力を一括で検証する作業には [公開入力の一括点検](primary-24-public-inputs.md) を使えます。
+
+## 改訂版を採点する
+
+通常24問では、回答者が受け取る `task.md` の末尾に10点の内訳を表示します。`task-prepare` が初期入力を照合します。提出後は、評価者が次のコマンドで提出物を識別し、どの固定ファイルに変更があったかを確認します。回答者にハッシュの転記を求める手順はありません。
+
+```sh
+node scripts/practical-evaluation-cli.mjs task-inspect --root /absolute/new-evaluation
+node scripts/practical-evaluation-cli.mjs task-score --root /absolute/new-evaluation --record /absolute/assessor/record.json
+```
+
+1. `task-list` の `assessment.calibration` が示すリポジトリ・コミット・ディレクトリを、アクセスできる評価者が開きます。一つのコミットから共通の補助ファイルも取得してください。校正用の答案と評価手順は評価者の作業領域に置きます。
+2. `task-inspect` の `subject` は課題ID、入力・採点基準の版、提出ファイルの一覧と内容から求めたダイジェストを含みます。評価者は、この提出物に対して行った操作、保存状態、提出者のテストが検出した差など、各項目が求める証拠を保存します。固定入力の差分は変更範囲の判断に使い、設定・テストを変えて得た結果を元の条件での成功に数えないでください。
+3. 評価者用JSONの `subject` に先ほどの値を入れ、`items` に項目ごとの `criterion_id`、`points`、`reason`、`evidence` を記録します。`evidence` は採点記録からの相対パス `path` とファイルの `digest`（`sha256:` と16進64桁）の組です。評価できなかった項目は `points: null` と理由を記録します。`critical_violations` には業務への実害 `impact` と根拠 `evidence` を記録できます。
+4. `task-score` は提出内容・版・証拠ファイルを照合し、評価者の判断を集計します。根拠を確認して0点とした項目と未観測の項目を分けて表示します。未観測を含むグループでは確定分だけを `confirmed_points` に表示し、合計 `points` は `null` にします。
+
+在庫・予約・物流、CH02〜06、RC01、CH08の改訂項目は診断用です。製品の動作と提出者のレビュー・検証を別々に集計します。CH08の機能40点・UI/UX60点とRC01の100点には従来どおり段階実行器の採点経路を使用してください。第1段階の提出物を固定してから、第2段階の情報を渡します。
+
+比較には `task_id`、`input.digest`、`assessment.digest` が一致する試行を使います。モデル・推論設定・対象外のスキルも固定します。実際に試行したときは、項目別結果と未観測数、採点できた件数とそのうちの満点件数を記録してください。時間・トークンは別に記録します。改訂前の答案と点数は、その試行のコミットから参照できます。
 
 ## 検証契約
 

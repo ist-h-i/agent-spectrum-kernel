@@ -1,0 +1,49 @@
+{
+  "criteria": [
+    {
+      "id": "store-compatibility",
+      "points": 2,
+      "observation": "両店を独立に操作し、表現できる北店だけが現価格を保って旧新併用になり、南店の拒否理由を確認できる（M02・M07）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "item-resolution",
+      "points": 2,
+      "observation": "営業更新を保つ明細と開始直前価格に戻せる明細が同じ終了操作で各々適切に処理される（M05・M07）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "accepted-sale",
+      "points": 2,
+      "observation": "差戻し・施策終了・残件確定の後も、各売上の受理時価格・版をたどれる（M02・M05）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "operator-choice",
+      "points": 2,
+      "observation": "運用者が画面で未解決の明細と理由・現在版を識別し、現価格を維持する判断を完了する（M08）。",
+      "skills": [
+        "ui-ux-design"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "expected-outcomes",
+      "points": 2,
+      "observation": "手順が店舗、商品、受理済み売上それぞれの外から照合できる期待値を独立に定めている（M02・M07）。",
+      "skills": [
+        "spec-driven-development"
+      ],
+      "group": "submission"
+    }
+  ]
+}

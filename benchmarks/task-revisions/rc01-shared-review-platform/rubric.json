@@ -1,0 +1,40 @@
+{
+  "criteria": [
+    {
+      "id": "causal-coverage",
+      "points": 3,
+      "observation": "重大な条件についてデータの生産者から旧・新の利用側までたどり、判断・結果の変化と見落とした原因を個別に示す。",
+      "skills": [
+        "review-architecture-impact"
+      ],
+      "group": "submission"
+    },
+    {
+      "id": "release-false-alarms",
+      "points": 2,
+      "observation": "重複の実害、後回しにできる負債、許容された選択を識別し、同じ原因・影響の言い換えをまとめる。正常箇所を出荷停止とした誤警告を別記する。",
+      "skills": [
+        "review-code-health"
+      ],
+      "group": "submission"
+    },
+    {
+      "id": "release-scope",
+      "points": 2,
+      "observation": "観測事実と試験導入の対象・容量から、導入または延期の条件と確認方法を特定する。",
+      "skills": [
+        "release-readiness-gate"
+      ],
+      "group": "submission"
+    },
+    {
+      "id": "reassessment-links",
+      "points": 3,
+      "observation": "固定した初回指摘を識別し、追加情報によって変わった・維持した判断の理由を両方たどる。未観測領域には次の確認を示す。",
+      "skills": [
+        "release-readiness-gate"
+      ],
+      "group": "submission"
+    }
+  ]
+}

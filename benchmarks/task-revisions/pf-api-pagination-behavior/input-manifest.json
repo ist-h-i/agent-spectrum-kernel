@@ -1,0 +1,53 @@
+{
+  "id": "pf-api-pagination-behavior",
+  "version": "task-revision-1",
+  "rubric_sha256": "527197138aa49f11ef47097c21603973ef479f6d2dbdee942e7014da309ad9e3",
+  "editable": [
+    "workspace/src/pagination.mjs",
+    "workspace/test/pagination.test.mjs"
+  ],
+  "files": [
+    {
+      "path": "task.md",
+      "bytes": 2585,
+      "sha256": "d28ae50af92fadbdab2f4a64d8aaf8257e5de5fda8cfa9db2a4297fc26af16da",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/package.json",
+      "sha256": "a6440425662b1dd6d849e2f7e30863ba82dec6851ba9a0faa00de9051b7b9882",
+      "bytes": 144,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/spec/pagination-contract.md",
+      "sha256": "b1b8f5488704c2d04f2342a3c0c6b67dc68915955612f3a85fbb4418797ed88c",
+      "bytes": 1371,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/api-pages.mjs",
+      "sha256": "e99adf811f97c23ab75c1f86599868c7b4189121e8f2ac946bed36e776fa04e8",
+      "bytes": 797,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/catalog-consumer.mjs",
+      "sha256": "ba4bd46de51b31f00137f306972f636ecd82045d2f903f431d702a339883c50b",
+      "bytes": 188,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/pagination.mjs",
+      "sha256": "7837edaf7f16af0b4591d53212c244371fc18d0a13545eaacafc466273a14acd",
+      "bytes": 843,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/test/pagination.test.mjs",
+      "sha256": "59703e5b4723c4d62d424141f425dbca585474c85a84bd0f7518d4cd83e58355",
+      "bytes": 3219,
+      "source": "inherited"
+    }
+  ]
+}

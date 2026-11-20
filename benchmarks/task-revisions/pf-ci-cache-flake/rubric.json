@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "replay",
+      "points": 2,
+      "observation": "Reported option tuples and observed rows can be reproduced for the cited experiment and run IDs.",
+      "skills": [
+        "evidence-ledger"
+      ]
+    },
+    {
+      "id": "causal-comparison",
+      "points": 3,
+      "observation": "Fixed inputs, changed factors and a linked intervention distinguish the supported cause from an alternative. A justified unresolved inference receives credit for what the comparison establishes.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "build-prediction",
+      "points": 2,
+      "observation": "For the proposed strategy the predicted per-run build outcomes and success count agree with a replay.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "reuse-prediction",
+      "points": 2,
+      "observation": "The predicted retained and unused caches agree with the same replay, including useful cache hits.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "limits",
+      "points": 1,
+      "observation": "Local observations, modeled predictions and unobserved service behavior or frequency are identified accurately.",
+      "skills": [
+        "evidence-ledger"
+      ]
+    }
+  ]
+}

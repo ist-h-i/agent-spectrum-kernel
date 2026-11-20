@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "ci-coverage",
+      "points": 2,
+      "observation": "Compares the commands that ran in the supplied job with the required suites and identifies which behavior each covers.",
+      "skills": [
+        "review-automated-gate"
+      ]
+    },
+    {
+      "id": "evidence-origin",
+      "points": 2,
+      "observation": "Distinguishes an omitted check from a failed run and accurately attributes CI, local and unobserved outcomes.",
+      "skills": [
+        "review-automated-gate"
+      ]
+    },
+    {
+      "id": "order-impact",
+      "points": 3,
+      "observation": "Follows an affected input through quote calculation to the resulting order decision using supporting evidence.",
+      "skills": [
+        "review-domain-impact"
+      ]
+    },
+    {
+      "id": "merge-decision",
+      "points": 1,
+      "observation": "The recommendation follows the material contract and evidence. Unrelated warnings add no credit.",
+      "skills": [
+        "review-final-merge-gate"
+      ]
+    },
+    {
+      "id": "clearance",
+      "points": 2,
+      "observation": "Gives an observable repair or verification result that would change the decision, covering both order behavior and the required gate.",
+      "skills": [
+        "review-final-merge-gate"
+      ]
+    }
+  ]
+}

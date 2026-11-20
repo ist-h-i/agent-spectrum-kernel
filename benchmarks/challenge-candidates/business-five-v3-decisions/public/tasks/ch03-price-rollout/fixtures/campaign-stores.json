@@ -1,0 +1,284 @@
+{
+  "clock": "2026-11-01T10:00:00Z",
+  "actors": [
+    {
+      "id": "legacyClerk-north",
+      "tenant": "north",
+      "role": "legacyClerk"
+    },
+    {
+      "id": "priceManager-north",
+      "tenant": "north",
+      "role": "priceManager"
+    },
+    {
+      "id": "migrationOperator-north",
+      "tenant": "north",
+      "role": "migrationOperator"
+    },
+    {
+      "id": "auditor-north",
+      "tenant": "north",
+      "role": "auditor"
+    },
+    {
+      "id": "legacyClerk-south",
+      "tenant": "south",
+      "role": "legacyClerk"
+    },
+    {
+      "id": "priceManager-south",
+      "tenant": "south",
+      "role": "priceManager"
+    },
+    {
+      "id": "migrationOperator-south",
+      "tenant": "south",
+      "role": "migrationOperator"
+    },
+    {
+      "id": "auditor-south",
+      "tenant": "south",
+      "role": "auditor"
+    },
+    {
+      "id": "priceApprover-north",
+      "tenant": "north",
+      "role": "priceApprover"
+    },
+    {
+      "id": "priceApprover-south",
+      "tenant": "south",
+      "role": "priceApprover"
+    },
+    {
+      "id": "businessOperator-north",
+      "tenant": "north",
+      "role": "businessOperator"
+    },
+    {
+      "id": "businessOperator-south",
+      "tenant": "south",
+      "role": "businessOperator"
+    }
+  ],
+  "grants": [
+    {
+      "actor": "legacyClerk-north",
+      "tenant": "north",
+      "operations": [
+        "readV1",
+        "writeV1",
+        "recordSale",
+        "readSale"
+      ]
+    },
+    {
+      "actor": "priceManager-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "writeV2",
+        "queue",
+        "remove",
+        "proposeCampaign",
+        "amendCampaign",
+        "readCampaign"
+      ]
+    },
+    {
+      "actor": "migrationOperator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "registerWriter",
+        "backfill",
+        "activate",
+        "rollback",
+        "invalidateWriter",
+        "drainQueue",
+        "startCampaign",
+        "endCampaign",
+        "retainCurrentPrice",
+        "writeV2",
+        "readCampaign",
+        "auditCampaign"
+      ]
+    },
+    {
+      "actor": "auditor-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "audit",
+        "readCampaign",
+        "readSale",
+        "auditCampaign"
+      ]
+    },
+    {
+      "actor": "legacyClerk-south",
+      "tenant": "south",
+      "operations": [
+        "readV1",
+        "writeV1",
+        "recordSale",
+        "readSale"
+      ]
+    },
+    {
+      "actor": "priceManager-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "writeV2",
+        "queue",
+        "remove",
+        "proposeCampaign",
+        "amendCampaign",
+        "readCampaign"
+      ]
+    },
+    {
+      "actor": "migrationOperator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "registerWriter",
+        "backfill",
+        "activate",
+        "rollback",
+        "invalidateWriter",
+        "drainQueue",
+        "startCampaign",
+        "endCampaign",
+        "retainCurrentPrice",
+        "writeV2",
+        "readCampaign",
+        "auditCampaign"
+      ]
+    },
+    {
+      "actor": "auditor-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "audit",
+        "readCampaign",
+        "readSale",
+        "auditCampaign"
+      ]
+    },
+    {
+      "actor": "priceApprover-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "approveCampaign",
+        "readCampaign",
+        "readSale",
+        "auditCampaign"
+      ]
+    },
+    {
+      "actor": "priceApprover-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "approveCampaign",
+        "readCampaign",
+        "readSale",
+        "auditCampaign"
+      ]
+    },
+    {
+      "actor": "businessOperator-north",
+      "tenant": "north",
+      "operations": [
+        "read",
+        "proposeCampaign",
+        "amendCampaign",
+        "startCampaign",
+        "endCampaign",
+        "retainCurrentPrice",
+        "recordSale",
+        "readCampaign",
+        "readSale",
+        "auditCampaign",
+        "writeV2"
+      ]
+    },
+    {
+      "actor": "businessOperator-south",
+      "tenant": "south",
+      "operations": [
+        "read",
+        "proposeCampaign",
+        "amendCampaign",
+        "startCampaign",
+        "endCampaign",
+        "retainCurrentPrice",
+        "recordSale",
+        "readCampaign",
+        "readSale",
+        "auditCampaign",
+        "writeV2"
+      ]
+    }
+  ],
+  "data": {
+    "stores": [
+      {
+        "id": "north",
+        "phase": "v2",
+        "epoch": "ep-north",
+        "version": "sv-north"
+      },
+      {
+        "id": "south",
+        "phase": "v2",
+        "epoch": "ep-south",
+        "version": "sv-south"
+      }
+    ],
+    "products": [
+      {
+        "store": "north",
+        "id": "A",
+        "incarnation": "i-A",
+        "format": 2,
+        "currency": "JPY",
+        "minor": "100",
+        "tax": "included",
+        "version": "v-A",
+        "deleted": false
+      },
+      {
+        "store": "north",
+        "id": "B",
+        "incarnation": "i-B",
+        "format": 2,
+        "currency": "JPY",
+        "minor": "200",
+        "tax": "included",
+        "version": "v-B",
+        "deleted": false
+      },
+      {
+        "store": "south",
+        "id": "C",
+        "incarnation": "i-C",
+        "format": 2,
+        "currency": "JPY",
+        "minor": "300",
+        "tax": "excluded",
+        "version": "v-C",
+        "deleted": false
+      }
+    ],
+    "pendingUpdates": [],
+    "writers": [],
+    "campaigns": [],
+    "sales": []
+  }
+}
