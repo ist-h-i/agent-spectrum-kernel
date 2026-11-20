@@ -1,0 +1,385 @@
+{
+  "hi-authorization-exception": {
+    "authorization-findings": {
+      "skills": [
+        "review-domain-impact",
+        "review-ai-quality"
+      ],
+      "observation": "許可と拒否の結果が所有権の契約に照らして正しいかを、差分と呼び出し例から説明できる。"
+    }
+  },
+  "hi-external-action-approval": {
+    "specific-action-plan": {
+      "skills": [
+        "risk-gate"
+      ],
+      "observation": "操作・対象・現在状態を承認記録と照合し、実施可能な条件と再確認を示す。"
+    }
+  },
+  "hi-financial-state-integrity": {
+    "financial-state-correctness": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "新規・再送・拒否を経た残高と監査履歴が台帳契約に合う。"
+    }
+  },
+  "hi-versioned-migration-safety": {
+    "versioned-migration-plan": {
+      "skills": [
+        "grill-with-docs",
+        "risk-gate"
+      ],
+      "observation": "新旧の読者が最新値を保てる順序と、後続更新を失わず復旧できる条件を資料から示す。"
+    }
+  },
+  "mn-build-option-update": {
+    "configuration-contract": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "設定変更によってリリース用の出力要件を満たす。"
+    },
+    "change-boundary": {
+      "skills": [
+        "scope-control"
+      ],
+      "observation": "デバッグ構成と無関係なビルド設定を保つ。"
+    }
+  },
+  "mn-client-compatibility-fix": {
+    "client-compatibility-correctness": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "現行・旧環境で、明示的な設定値と欠落時の既定値を正しく返す。"
+    },
+    "verification-evidence": {
+      "skills": [
+        "test-first-verification"
+      ],
+      "observation": "既存環境と旧環境を模した検証の実行結果を示す。"
+    }
+  },
+  "mn-doc-config-correction": {
+    "documentation-correctness": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "手順書のJSON例が設定の正本と一致する。"
+    },
+    "request-scope-discipline": {
+      "skills": [
+        "scope-control"
+      ],
+      "observation": "設定や検証を変えず、修正対象の文書例だけを更新する。"
+    }
+  },
+  "mn-focused-regression-test": {
+    "regression-behavior-coverage": {
+      "skills": [
+        "test-first-verification"
+      ],
+      "observation": "追加テストが公開のキー生成契約の回帰を捕捉する。"
+    },
+    "production-behavior-preservation": {
+      "skills": [
+        "scope-control"
+      ],
+      "observation": "テストの変更だけで実装の動作を保持する。"
+    }
+  },
+  "mn-frontend-default-fix": {
+    "display-default-correctness": {
+      "skills": [
+        "ui-ux-design",
+        "controlled-implementation"
+      ],
+      "observation": "再読み込み時の表示用チェック状態が保存値と既定値を正しく反映する。"
+    }
+  },
+  "mn-schema-field-alignment": {
+    "schema-field-correctness": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "現行の出力を固定の利用側で読み込め、無効な入力を拒否できる。"
+    }
+  },
+  "mp-accessibility-interaction-review": {
+    "interaction-defect-finding": {
+      "skills": [
+        "ui-ux-design",
+        "review-output-quality"
+      ],
+      "observation": "キー操作、フォーカスと見える位置を利用者の作業に結びつけて指摘する。"
+    },
+    "evidence-and-review-precision": {
+      "skills": [
+        "review-ai-quality"
+      ],
+      "observation": "指摘に根拠と影響を付け、正常な操作を誤って問題としない。"
+    }
+  },
+  "mp-ci-evidence-gap": {
+    "ci-evidence-completeness": {
+      "skills": [
+        "review-automated-gate"
+      ],
+      "observation": "CI記録から未検証の動作を特定する。"
+    },
+    "decision-correctness": {
+      "skills": [
+        "review-final-merge-gate"
+      ],
+      "observation": "未確認と実装の問題を区別し、根拠に沿ってマージ可否を判断する。"
+    }
+  },
+  "mp-data-migration-handoff": {
+    "continuation-readiness": {
+      "skills": [
+        "handoff-generation"
+      ],
+      "observation": "次の担当者が再開位置、次の行動と条件を特定できる。"
+    },
+    "resume-gate-truthfulness": {
+      "skills": [
+        "risk-gate",
+        "evidence-ledger"
+      ],
+      "observation": "書き込みを再開できるかを検証・承認の記録から判断する。"
+    }
+  },
+  "mp-frontend-state-review": {
+    "state-consistency-finding": {
+      "skills": [
+        "ui-ux-design",
+        "review-ai-quality"
+      ],
+      "observation": "利用者の操作後に一覧の選択と詳細表示がどう食い違うかを説明する。"
+    }
+  },
+  "mp-iac-rollback-design": {
+    "approval-gate-truthfulness": {
+      "skills": [
+        "risk-gate"
+      ],
+      "observation": "準備と適用の権限を判断根拠に結びつける。"
+    },
+    "rollback-truthfulness": {
+      "skills": [
+        "grill-design"
+      ],
+      "observation": "復旧時に戻す状態、保持する資料、前提と観測を明示する。"
+    }
+  },
+  "mp-performance-investigation": {
+    "competing-hypothesis-falsification": {
+      "skills": [
+        "doubt-driven-development"
+      ],
+      "observation": "候補の原因を見分ける観測や反証を残す。"
+    },
+    "causal-confidence-calibration": {
+      "skills": [
+        "evidence-ledger"
+      ],
+      "observation": "本番観測とローカル再生の証拠を分け、原因の確度を説明する。"
+    }
+  },
+  "pf-api-pagination-behavior": {
+    "pagination-behavior-correctness": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "取得順、明細、要求の終了・失敗がカタログ収集の契約に合う。"
+    }
+  },
+  "pf-ci-cache-flake": {
+    "cache-causal-assessment": {
+      "skills": [
+        "doubt-driven-development",
+        "evidence-ledger"
+      ],
+      "observation": "再現時に変えた条件とログからキャッシュ不調の原因を説明する。"
+    }
+  },
+  "pf-data-schema-evolution": {
+    "schema-evolution-correctness": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "読み取り、変換、再実行、復元が既存データの契約を守る。"
+    }
+  },
+  "pf-frontend-async-state": {
+    "async-state-correctness": {
+      "skills": [
+        "ui-ux-design",
+        "controlled-implementation"
+      ],
+      "observation": "応答順が前後しても待機・結果・エラー表示が現在の検索と一致する。"
+    }
+  },
+  "pf-library-compat-upgrade": {
+    "library-upgrade-correctness": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "新版への切替後も既存の出力形式を保ち、旧版へ切り戻せる。"
+    }
+  },
+  "pf-observability-redaction": {
+    "observability-correctness": {
+      "skills": [
+        "controlled-implementation",
+        "review-ai-quality"
+      ],
+      "observation": "元の提案への指摘と、修正後の機微情報の除外・診断情報の維持を観測する。"
+    }
+  },
+  "pf-performance-regression": {
+    "performance-correctness": {
+      "skills": [
+        "controlled-implementation",
+        "evidence-ledger"
+      ],
+      "observation": "検索結果の同値性と、提出版に対応する二つのローカル負荷の測定を確かめる。"
+    }
+  },
+  "pf-review-error-contract": {
+    "error-contract-findings": {
+      "skills": [
+        "review-ai-quality",
+        "review-domain-impact"
+      ],
+      "observation": "APIの差分が既存の利用側の表示や再試行に与える影響を説明する。"
+    }
+  },
+  "ch01-inventory-reservation-logistics": {
+    "UX03": {
+      "skills": [
+        "ui-ux-design"
+      ],
+      "observation": "主要な業務操作で、利用者が対象と状態を把握して作業を進められる。"
+    }
+  },
+  "ch02-report-operations": {
+    "J05": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "結果不明からの照合・再試行後に配信事実が整合する。"
+    },
+    "J08": {
+      "skills": [
+        "ui-ux-design"
+      ],
+      "observation": "担当者が画面から状態・理由・次の操作を確認できる。"
+    }
+  },
+  "ch03-price-rollout": {
+    "M07": {
+      "skills": [
+        "controlled-implementation",
+        "review-domain-impact"
+      ],
+      "observation": "店舗切替の差戻しと施策終了が、既存の営業事実を保つ。"
+    },
+    "M08": {
+      "skills": [
+        "ui-ux-design"
+      ],
+      "observation": "担当者が未解決の対象を見分け、画面から判断できる。"
+    }
+  },
+  "ch04-document-access": {
+    "A05": {
+      "skills": [
+        "controlled-implementation",
+        "review-domain-impact"
+      ],
+      "observation": "現在の実効権限と既に成立した配信事実に従い、新規配信を扱う。"
+    },
+    "A08": {
+      "skills": [
+        "ui-ux-design"
+      ],
+      "observation": "利用者が権限内で処理状況と次の作業を確認する。"
+    }
+  },
+  "ch05-sales-reconciliation": {
+    "S05": {
+      "skills": [
+        "controlled-implementation",
+        "review-domain-impact"
+      ],
+      "observation": "保存・復元後も返金拘束や確定した業務記録が矛盾しない。"
+    },
+    "S08": {
+      "skills": [
+        "ui-ux-design"
+      ],
+      "observation": "担当者が締め・返金・精算の根拠を画面で照合できる。"
+    }
+  },
+  "ch06-build-operations": {
+    "B03": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "公開結果が承認済みの成果物と一致する。"
+    },
+    "B06": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "コンパイラ入力が同じ条件で、成果物を再利用して追加のコンパイルを避ける。"
+    }
+  },
+  "rc01-shared-review-platform": {
+    "Correct causal findings across system boundaries": {
+      "skills": [
+        "review-ai-quality",
+        "review-code-health",
+        "review-architecture-impact"
+      ],
+      "observation": "原因・影響・修正条件がコードや挙動の証拠につながる。"
+    },
+    "UI/UX and interrupted user journeys": {
+      "skills": [
+        "ui-ux-design",
+        "review-output-quality"
+      ],
+      "observation": "中断された操作やアクセシビリティの問題を利用者の結果に結びつける。"
+    },
+    "Prioritization and viable remediation": {
+      "skills": [
+        "release-readiness-gate"
+      ],
+      "observation": "試験導入の可否を重大な指摘と復旧条件に基づいて判断する。"
+    },
+    "Evidence, counterexamples and uncertainty": {
+      "skills": [
+        "review-ai-quality",
+        "evidence-ledger"
+      ],
+      "observation": "正常な仕様への誤警告を避け、観測できた事実と未確認の内容を区別する。"
+    }
+  },
+  "ch08-growth-workspace": {
+    "U06": {
+      "skills": [
+        "ui-ux-design",
+        "review-output-quality"
+      ],
+      "observation": "キーボード操作、フォーカス、画面の状態を実際の作業の流れで確かめる。"
+    },
+    "F03": {
+      "skills": [
+        "controlled-implementation"
+      ],
+      "observation": "計画案の検証と採用が、利用者が選んだ内容どおりに反映される。"
+    }
+  }
+}

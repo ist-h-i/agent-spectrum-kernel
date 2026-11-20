@@ -8,8 +8,9 @@ import {readStableFile} from './ask-benchmark-stable-file.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {collectPracticalSessionUsage} from './practical-session-usage.mjs';
 import {executeCodexPracticalAdapter,validateCodexPracticalOptions} from './practical-codex-adapter.mjs';
+import {readEvaluationTaskRegistrations} from './evaluation-task-catalog.mjs';
+import {verifyStagedEvaluationTaskInput} from './evaluation-task-inputs.mjs';
 const SOURCE=resolve(import.meta.dirname,'..');
-const catalogPath=join(SOURCE,'benchmarks/practical-challenges.json');
 const save=(path,value)=>writeFileSync(path,JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
 const bytes=path=>readStableFile(path,'challenge frozen input',16*1024*1024).bytes;
 const pin=path=>({path,digest:hash(bytes(path))});
@@ -30,20 +31,23 @@ function tree(root,allowInternalLinks=false){
 }
 function verified(ref){assertNoSymlinkPathSegments(ref.path,'challenge asset');assert.equal(hash(bytes(ref.path)),ref.digest,'challenge asset drift');return bytes(ref.path);}
 function copyFiles(source,target,files){for(const f of files){safe(f.path);const content=verified({path:join(source,f.path),digest:f.digest});mkdirSync(dirname(join(target,f.path)),{recursive:true});writeFileSync(join(target,f.path),content,{flag:'wx',mode:0o644});}}
-export function listPracticalChallenges(){return readJsonFileStrict(catalogPath).challenges;}
+export function listPracticalChallenges(){
+ return readEvaluationTaskRegistrations().challenges.map(({selection,...registration})=>registration);
+}
 function registration(id){const c=listPracticalChallenges().find(x=>x.id===id);assert.ok(c,'unknown registered challenge');return c;}
 function verifyPublic(c){
- const manifest=JSON.parse(verified({path:join(SOURCE,c.input_manifest.path),digest:c.input_manifest.digest}));
- const expected=manifest.files.map(f=>({path:f.path,digest:'sha256:'+f.sha256})).sort((a,b)=>a.path<b.path?-1:1);
- assert.deepEqual(tree(join(SOURCE,c.workspace)),expected,'frozen public challenge inventory changed');return expected;
+ return verifyStagedEvaluationTaskInput({id:c.id,root:join(SOURCE,c.workspace),manifest:join(SOURCE,c.input_manifest.path),
+  digest:c.input_manifest.digest,task_path:'task.md'});
 }
 function bindEvaluator(c,root,output){
  root=realpathSync(root);assert.ok(outside(root,output)&&outside(root,SOURCE),'private evaluator must be external to checkout and run');
  return {root,files:c.evaluator.files.map(f=>{safe(f.path);verified({path:join(root,f.path),digest:f.digest});return f;})};
 }
-export function preparePracticalChallenge({id,root,options,updatePath,evaluatorRoot=null,instructionsRoot=null,instructionsSupplements=[],toolchainRoots,sessionRoots=[],evidenceKind='observed'}){
+export function preparePracticalChallenge({id,root,options,updatePath,evaluatorRoot=null,instructionsRoot=null,instructionsSupplements=[],toolchainRoots,sessionRoots=[],evidenceKind='observed',expectedRegistrationDigest}){
  assert.ok(['observed','synthetic'].includes(evidenceKind));
- const c=registration(id),files=verifyPublic(c);root=resolve(root);assertNoSymlinkPathSegments(root,'challenge run',{allowMissingLeaf:true});
+ const c=registration(id),registrationDigest=canonicalDigest(c);
+ if(expectedRegistrationDigest!==undefined)assert.equal(registrationDigest,expectedRegistrationDigest,'selected stage registration changed');
+ const files=verifyPublic(c);root=resolve(root);assertNoSymlinkPathSegments(root,'challenge run',{allowMissingLeaf:true});
  assert.ok(outside(root,SOURCE),'run must be outside source checkout');assert.ok(!existsSync(root),'fresh run required');
  validateCodexPracticalOptions(options);assert.equal(realpathSync(options.executable),options.executable,'canonical executable required');assert.equal(options.task_file,'task.md');
  assert.ok(Array.isArray(toolchainRoots)&&toolchainRoots.length>0);
@@ -68,8 +72,8 @@ export function preparePracticalChallenge({id,root,options,updatePath,evaluatorR
  }
  for(const path of sessionRoots){assert.equal(realpathSync(path),path);assert.ok(outside(path,root),'session observations must remain outside solver workspace');}
 
- const sourcePins=['practical-challenge-evaluation.mjs','practical-session-usage.mjs','practical-codex-adapter.mjs','codex-exec-runner.mjs','ask-user-comparison.mjs','content-addressed-store.mjs','instruction-environment.mjs','ask-benchmark-stable-file.mjs'].map(n=>pin(join(SOURCE,'scripts',n)));
- const manifest={kind:'practical_staged_challenge_run_v1',root,registration:c,registration_digest:canonicalDigest(c),options,
+ const sourcePins=['practical-challenge-evaluation.mjs','practical-session-usage.mjs','practical-codex-adapter.mjs','codex-exec-runner.mjs','ask-user-comparison.mjs','content-addressed-store.mjs','instruction-environment.mjs','ask-benchmark-stable-file.mjs','evaluation-task-catalog.mjs','evaluation-task-inputs.mjs','ask-benchmark-atomic-publication.mjs'].map(n=>pin(join(SOURCE,'scripts',n)));
+ const manifest={kind:'practical_staged_challenge_run_v1',root,registration:c,registration_digest:registrationDigest,options,
   executable:executablePin(options.executable),source_pins:sourcePins,files,update,evaluator,instructions,instruction_supplements:instructionsSupplements,toolchain_roots:toolchainRoots,session_roots:sessionRoots,
   evidence_kind:evidenceKind,network_policy:'enabled; external access prohibited by task contract, not claimed as network isolation',comparison_limits:['Linked root/descendant response records are observed where available; complete usage and billed cost remain unknown.','Instruction overlay, toolchain and network contract must be held equal across compared runs.','This is separate challenge scoring, not primary24 admission.']};
  mkdirSync(root,{mode:0o700});mkdirSync(join(root,'workspace'),{mode:0o700});copyFiles(join(SOURCE,c.workspace),join(root,'workspace'),files);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,7 @@ const run=(exe,args,options={})=>spawnSync(exe,args,{encoding:'utf8',maxBuffer:8
 const okay=r=>{assert.equal(r.status,0,r.stderr||r.stdout);return r.stdout;};
 
 test('actual npm archive: linked CLI, Gitless persistent workspace and adoption', {timeout:120000},()=>{
-  const root=mkdtempSync(join(tmpdir(),'ask-package-test-'));
+  const root=realpathSync(mkdtempSync(join(tmpdir(),'ask-package-test-')));
   try {
     const built=buildNpmPackage(ROOT);
     assert.ok(built.entries.length>0);
@@ -50,9 +50,15 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     const applied=JSON.parse(okay(invoke(['setup','apply','--target',target,'--plan',plan,'--json'])));
     assert.equal(applied.status,'applied');
     assert.equal(managedSetupIdentities(target)[0].source_revision,created.source_revision);
-    const challenges=JSON.parse(okay(invoke(['evaluate','challenge-list'])));
+    const challenges=JSON.parse(okay(invoke(['evaluate','task-list'])));
+    assert.equal(challenges.length,32);
     assert.ok(challenges.some(c=>c.id==='rc01-shared-review-platform'));
     assert.ok(challenges.some(c=>c.id==='ch08-growth-workspace'));
+    const selected=JSON.parse(okay(invoke(['evaluate','task-prepare','--id','mn-build-option-update','--root',join(root,'one-task')])));
+    assert.equal(selected.task_id,'mn-build-option-update');
+    assert.ok(existsSync(selected.task_file));
+    assert.ok(existsSync(join(selected.working_directory,'build.config.json')));
+    assert.ok(!existsSync(join(workspace,'source','benchmarks','challenge-candidates','ceiling-v4-continuity')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','workspace','task.md')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','evaluator','score.mjs')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','review-ceiling-v1','workspace','task.md')));

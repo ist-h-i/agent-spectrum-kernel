@@ -132,7 +132,7 @@ test('app modification or added files after final stage invalidates semantic han
  rmSync(join(f.run,'workspace/app/late.js'));writeFileSync(join(f.run,'workspace/app/index.html'),'changed');assert.throws(()=>inspectPracticalChallengeScoreHandoff(f.run),/drift/);
 });
 test('npm runtime projection includes registration, public inputs and evaluator, never author reference HTML',()=>{
- const files=runtimePackageFiles(source);for(const path of ['benchmarks/practical-challenges.json',...inventory().map(f=>'benchmarks/challenge-candidates/ui-reconstruction-v1/workspace/'+f.path),'benchmarks/challenge-candidates/ui-reconstruction-v1/evaluator-v2/score.mjs'])assert.ok(files.includes(path),path);
+ const files=runtimePackageFiles(source);for(const path of ['benchmarks/evaluation-tasks.json',...inventory().map(f=>'benchmarks/challenge-candidates/ui-reconstruction-v1/workspace/'+f.path),'benchmarks/challenge-candidates/ui-reconstruction-v1/evaluator-v2/score.mjs'])assert.ok(files.includes(path),path);
  assert.equal(files.some(p=>/reference-private|成長マップ|library-helpers-private/.test(p)),false);
  assert.equal(existsSync(join(root,'workspace/app')),false);
 });

@@ -10,9 +10,8 @@ primary24や過去7問の結果・重み・採用状態は変更しない。
 
 ## 登録と配布
 
-標準CLI `node scripts/practical-evaluation-cli.mjs challenge-list` で発見し、
-[登録課題の共通手順](../../../docs/practical-challenge-evaluation.md)の
-`challenge-prepare` でモデルを呼ばず準備できる。idは
+標準CLI の `task-list` で選び、[評価課題の一覧・実行準備](../../../docs/evaluation-task-catalog.md) の
+`task-prepare` でモデルを呼ばず準備できる。idは
 `ch08-growth-workspace`、task_fileは `task.md`。mainソースとnpmのruntime
 配布に同じ登録・入力・採点bundleを含める。npm公開自体はこの登録作業の対象外。
 

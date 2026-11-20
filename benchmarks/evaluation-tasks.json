@@ -1,5 +1,5 @@
 {
-  "kind": "practical_challenge_catalog_v1",
+  "kind": "evaluation_task_registrations_v1",
   "challenges": [
     {
       "kind": "practical_challenge_registration_v1",
@@ -68,6 +68,15 @@
           }
         ],
         "limits": "One trial per effort; semantic assessor decisions, not a difficulty or comparative significance guarantee."
+      },
+      "selection": {
+        "domain": "release_review",
+        "task_types": [
+          "review",
+          "investigation"
+        ],
+        "difficulty": "hard",
+        "difficulty_source": "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
       }
     },
     {
@@ -133,7 +142,43 @@
         "status": "not_run",
         "ready_for_measurement": false,
         "limits": "Registered task and model-free contract checks only. No actual solver trial, correct UI reference implementation or difficulty calibration has been run. Historical seven-challenge acceptance is unchanged."
+      },
+      "selection": {
+        "domain": "ui_reconstruction",
+        "task_types": [
+          "design",
+          "implementation",
+          "test"
+        ],
+        "difficulty": "hard",
+        "difficulty_source": "benchmarks/challenge-candidates/ui-reconstruction-v1/README.md"
       }
+    }
+  ],
+  "external": [
+    {
+      "id": "ch01-inventory-reservation-logistics",
+      "title": "複数職務で使う在庫・予約・物流アプリ",
+      "domain": "inventory_reservation_logistics",
+      "github_repository_id": 1442456886,
+      "revision": "714ea785dbbdb89111808e9b55b9d5f907cac9cf",
+      "version": "comparison-business-2026-11-02.1",
+      "input_manifest": {
+        "path": "public-manifest.json",
+        "digest": "sha256:ec0e594227fa85e4e540eefd0165eefd95a973706d3cbf060eaf41bf4df33659"
+      },
+      "task_path": "public/TASK.md",
+      "prompt": {
+        "path": "prompt.txt",
+        "digest": "sha256:a8557439ccb018c814576f2a29570d91002b3424ad7252e9f26e5d3fd40c744b"
+      },
+      "acceptance": {
+        "path": "public/acceptance.md",
+        "digest": "sha256:62e759747ac167eb2a2b5ea5a1829b0e9abd8d32da1062847109b218759cfa69"
+      },
+      "acceptance_criterion_ids": [
+        "UX03"
+      ]
     }
   ]
 }

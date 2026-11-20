@@ -31,10 +31,13 @@ export function seal(write=false){
  const manifestPath=join(root,'input-manifests',id+'.json');
  if(write)writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
  else assert.deepEqual(JSON.parse(readFileSync(manifestPath)),manifest,'CH08 public input drift');
- const catalogPath=join(source,'benchmarks/practical-challenges.json'),catalog=JSON.parse(readFileSync(catalogPath));
+ const catalogPath=join(source,'benchmarks/evaluation-tasks.json'),catalog=JSON.parse(readFileSync(catalogPath));
  const registration=expectedRegistration(),index=catalog.challenges.findIndex(c=>c.id===id);
- if(write){if(index<0)catalog.challenges.push(registration);else catalog.challenges[index]=registration;writeFileSync(catalogPath,JSON.stringify(catalog,null,2)+'\n');}
- else {assert.ok(index>=0,'CH08 not registered');assert.deepEqual(catalog.challenges[index],registration,'CH08 registration drift');}
+ assert.ok(index>=0,'CH08 not registered');
+ const {selection,...current}=catalog.challenges[index];
+ assert.ok(selection,'CH08 selection metadata missing');
+ if(write){catalog.challenges[index]={...registration,selection};writeFileSync(catalogPath,JSON.stringify(catalog,null,2)+'\n');}
+ else assert.deepEqual(current,registration,'CH08 registration drift');
  return manifest.counts;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){console.log(JSON.stringify({status:'ok',...seal(process.argv.includes('--write'))}));}

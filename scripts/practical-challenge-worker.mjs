@@ -18,9 +18,9 @@ const safe=p=>assert.ok(typeof p==='string'&&p&&!p.startsWith('/')&&!p.includes(
 export function createPracticalChallengeCommandDefinition(settingsPath){
  settingsPath=resolve(settingsPath);
  const worker=join(import.meta.dirname,'practical-challenge-worker.mjs');
- const names=['practical-challenge-worker.mjs','practical-challenge-evaluation.mjs','practical-session-usage.mjs','practical-codex-adapter.mjs','practical-evaluation-worker.mjs','practical-quality-observation.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-artifact.mjs','instruction-projection-paths.mjs','codex-exec-runner.mjs','ask-user-comparison.mjs','content-addressed-store.mjs','instruction-environment.mjs','ask-benchmark-stable-file.mjs'];
+ const names=['practical-challenge-worker.mjs','practical-challenge-evaluation.mjs','practical-session-usage.mjs','practical-codex-adapter.mjs','practical-evaluation-worker.mjs','practical-quality-observation.mjs','instruction-loop-fixed-scoring.mjs','instruction-loop-artifact.mjs','instruction-projection-paths.mjs','codex-exec-runner.mjs','ask-user-comparison.mjs','content-addressed-store.mjs','instruction-environment.mjs','ask-benchmark-stable-file.mjs','evaluation-task-catalog.mjs','evaluation-task-inputs.mjs','ask-benchmark-atomic-publication.mjs'];
  const settingsPin=filePin(settingsPath);
- return {argv:[process.execPath,worker,settingsPath,settingsPin.digest,'execute'],inspect_argv:[process.execPath,worker,settingsPath,settingsPin.digest,'inspect'],refresh_inspection:true,pins:[settingsPin,...names.map(n=>filePin(join(import.meta.dirname,n))),filePin(join(import.meta.dirname,'../benchmarks/practical-challenges.json'))],model_calls:true};
+ return {argv:[process.execPath,worker,settingsPath,settingsPin.digest,'execute'],inspect_argv:[process.execPath,worker,settingsPath,settingsPin.digest,'inspect'],refresh_inspection:true,pins:[settingsPin,...names.map(n=>filePin(join(import.meta.dirname,n))),filePin(join(import.meta.dirname,'../benchmarks/evaluation-tasks.json'))],model_calls:true};
 }
 export function registeredChallengeFiles(id){
  const c=listPracticalChallenges().find(c=>c.id===id);assert.ok(c,'unknown registered challenge');

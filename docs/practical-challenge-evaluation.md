@@ -1,10 +1,8 @@
 # Registered staged challenge evaluation
 
-RC01 is registered in `benchmarks/practical-challenges.json`, separately from
-primary24. Its 151-file public input inventory and existing task bytes are
-unchanged. The registration pins the fixed reassessment update and the external
-semantic evaluator's three files. It does not admit RC01 into primary24 or
-change the primary selection, scoring, weights or runner.
+Find RC01 and CH08 through the [evaluation task catalog](evaluation-task-catalog.md).
+Their registrations pin the initial input inventory, the fixed reassessment update,
+and the three files needed for each task's semantic assessment.
 
 ## Standard entry point
 
@@ -12,8 +10,8 @@ Use `scripts/practical-evaluation-cli.mjs`. Existing `advance` and `status`
 commands are unchanged. The new commands manage one registered staged run:
 
 ```sh
-node scripts/practical-evaluation-cli.mjs challenge-list
-node scripts/practical-evaluation-cli.mjs challenge-prepare --config /absolute/config.json
+node scripts/practical-evaluation-cli.mjs task-list --type review
+node scripts/practical-evaluation-cli.mjs task-prepare --id rc01-shared-review-platform --root /absolute/new-run --config /absolute/config.json
 node scripts/practical-evaluation-cli.mjs challenge-status --root /absolute/new-run
 # Only after direct approval of the inspected exact configuration:
 node scripts/practical-evaluation-cli.mjs challenge-start --root /absolute/new-run --confirm sha256:MANIFEST_DIGEST --allow-model-calls
@@ -239,7 +237,7 @@ contains its complete public specification, data contract, 14 scenario families,
 56 checkpoints, and fixed synthetic JSON. No original user HTML, CSS or image is
 distributed. Actual AI APIs and external services are prohibited.
 
-Use the same `challenge-list`, `challenge-prepare`, exact-approval `challenge-start`,
+Use the same `task-list`, `task-prepare --id ch08-growth-workspace --root /absolute/new-run --config /absolute/config.json`, exact-approval `challenge-start`,
 `challenge-resume`, and semantic handoff/import commands with the CH08 ID. The
 initial stage creates a runnable `app/` and `DELIVERY.md`; the second stage adds
 only `REASSESSMENT.md` after read-only checks. Unlike the review-only RC01,
@@ -251,12 +249,12 @@ each file must fit the common 16 MiB bound. Existing RC01 registrations/runs
 retain their existing behavior. Neither stage executes without model-call
 authorization; synthetic injected sessions are explicitly labeled synthetic.
 
-The three evaluator files are published authoring assets under CH08's
-`evaluator/`; copy them to the external isolated evaluator directory for a run.
+The three files for the current CH08 evaluator are under `evaluator-v2/`.
+Copy them to the external isolated evaluator directory for a run.
 Public `brief/rubric.json` is byte-identical to the evaluator rubric. There are
 no hidden functional requirements. An independent assessor must exercise the
-actual browser interactions and bind decisions to evidence. Functional /70 and
-UX /30 are separate fields in the imported result. Only a fully observed result
+actual browser interactions and bind decisions to evidence. Functional /40 and
+UX /60 are separate fields in the imported result. Only a fully observed result
 has a combined /100; missing weights stay missing. Observed release blockers
 remain separate from numerical points. The calculator never executes a solver,
 a browser or a scoring model and cannot verify semantic truth by itself.
