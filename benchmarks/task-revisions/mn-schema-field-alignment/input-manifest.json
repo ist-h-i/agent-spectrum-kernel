@@ -1,0 +1,59 @@
+{
+  "id": "mn-schema-field-alignment",
+  "version": "task-revision-1",
+  "rubric_sha256": "a17e6507e8e5ba318c026fb04580b8a990504dd3e2534267d0383dd1ef8bac37",
+  "editable": [
+    "workspace/schemas/member.schema.json",
+    "workspace/test/member-record.test.mjs"
+  ],
+  "files": [
+    {
+      "path": "task.md",
+      "bytes": 1398,
+      "sha256": "381c86a4d839ddff74046f9cc993ac82d7bc019c138df1a911b614ede7a99d4b",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/package.json",
+      "sha256": "4efed0d52aedcfad81aa2ea9735c6e9eb69b2ebead0fea04344c4e4e111eb77c",
+      "bytes": 179,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/schemas/member.schema.json",
+      "sha256": "6f6b44f863c398453e7c4de8ee799d580651cda2655a444258c260fc71f60ce1",
+      "bytes": 359,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/spec/member-contract.md",
+      "sha256": "1bd41e23d822b0c0b18c9ec96e2eff69958f5fe321f9e5778cd8d17e7b6a182e",
+      "bytes": 918,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/spec/schema-alignment-plan.md",
+      "sha256": "0dc0a6fd2fa954172df56ffe36133a29c618de2349aa4b34be9a96f5ee651039",
+      "bytes": 663,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/member-export.mjs",
+      "sha256": "bee56827d7d03d2db64102b6607136b4655b2ceb1a9a0bb3111349f8acb41bb6",
+      "bytes": 147,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/member-import.mjs",
+      "sha256": "23229f637aa314e5d798baf42eb32dcba56251e8dcaf0c26b9d01969756f7816",
+      "bytes": 1185,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/test/member-record.test.mjs",
+      "sha256": "867b97667b163e18783b8309990101226576719c074fb4cb554942223944939c",
+      "bytes": 1639,
+      "source": "inherited"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "criteria": [
+    {
+      "id": "current-permission",
+      "points": 2,
+      "observation": "送信開始時に有効な閲覧権がすべて失効した対象の新規送信を止める（A05・A06）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "allowed-delivery",
+      "points": 2,
+      "observation": "別文書の正当な配信が完了し、別の有効な許可が残る場合も現在の権限どおり進められる（A05・A06）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "accepted-history",
+      "points": 2,
+      "observation": "監査担当は過去に受理した本文版と受理事実を照合できる。監査のみの画面には本文がない（A07）。",
+      "skills": [
+        "application-boundary-architecture"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "handover-display",
+      "points": 2,
+      "observation": "利用者を交代すると、当人が見られる範囲で対象・状態・次の操作を判断できる（A03・A08）。",
+      "skills": [
+        "ui-ux-design"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "decision-owners",
+      "points": 2,
+      "observation": "提出者が過去の承認・受理と現時点の判断の読み書き箇所を示し、本文送信・監査表示の観測と一致する（A01・A04・A07）。",
+      "skills": [
+        "application-boundary-architecture"
+      ],
+      "group": "submission"
+    }
+  ]
+}

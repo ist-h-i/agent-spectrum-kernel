@@ -1,0 +1,11 @@
+--- a/src/client-policy.mjs
++++ b/src/client-policy.mjs
+@@ -1,6 +1,7 @@
+ export function consumeError(response, request) {
+  const label = response.status === 404 ? 'missing' : response.status === 409 ? 'conflict' : response.status >= 500 ? 'service' : 'other';
+- const retry = request.method === 'GET' && response.body.error.retryable === true && request.attempt < request.maximumAttempts;
++ const eligibleRequest = request.method === 'GET' && request.attempt < request.maximumAttempts;
++ const retry = response.body.error.retryable === true && eligibleRequest;
+  const raw = response.headers['Retry-After'];
+  const seconds = raw === undefined ? null : Number(raw);
+  const delayMs = retry ? seconds !== null && Number.isInteger(seconds) && seconds >= 0 ? seconds * 1000 : 1000 : null;

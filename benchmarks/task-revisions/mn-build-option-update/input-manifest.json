@@ -1,0 +1,52 @@
+{
+  "id": "mn-build-option-update",
+  "version": "task-revision-1",
+  "rubric_sha256": "e87a898250be8a208794dad593550b3ba0601e5fa7df3558611810b6a93566f6",
+  "editable": [
+    "workspace/build.config.json"
+  ],
+  "files": [
+    {
+      "path": "task.md",
+      "bytes": 1225,
+      "sha256": "d0df081b14c90b4a6cd32dcc6955b0a7ee9257f6def3d5c39dc9d3c5ffae6125",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/build.config.json",
+      "sha256": "e680dc0a5efa8daaa3dd63c06ce12fd2c8c9d2f8a24246f5a96462cfe1b715f0",
+      "bytes": 214,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/ci/release-build.log",
+      "sha256": "897fa262a51db0844805841456332745592b3e45c8bbd5fb705c10a8c90269c9",
+      "bytes": 251,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/docs/build-options.md",
+      "sha256": "de6d6845989db985b659a58f8b31f7578635e7822e474863511086f408686953",
+      "bytes": 697,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/package.json",
+      "sha256": "50844c248aa736d57768a926544720b56914396bdc7b997f310897b4456aa5ed",
+      "bytes": 193,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/scripts/validate-build-config.mjs",
+      "sha256": "884155195e0ad532a29ab1dc6122b343fea1bc6f285d54a55edd09653d447c2a",
+      "bytes": 790,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/test/build-config.test.mjs",
+      "sha256": "641fcf626c4a06509058e3d4ee49cefcd7166182f75ee26a3ab3c8d87190f6ff",
+      "bytes": 520,
+      "source": "inherited"
+    }
+  ]
+}

@@ -8,8 +8,8 @@ import { advancePracticalEvaluation,inspectPracticalEvaluation } from './practic
 import {listPracticalChallenges,preparePracticalChallenge,inspectPracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff} from './practical-challenge-evaluation.mjs';
 import {importChallengeSemanticAssessment} from './practical-challenge-worker.mjs';
 import {listEvaluationTasks} from './evaluation-task-catalog.mjs';
+import {inspectEvaluationSubmission,scoreEvaluationSubmission} from './evaluation-task-scoring.mjs';
 import {prepareEvaluationTaskInput} from './evaluation-task-inputs.mjs';
-import {preparePrimaryPublicInputs,verifyPrimaryPublicInputs} from './ask-primary-evaluation-prepare.mjs';
 
 function prepareSelectedTask(options) {
   assert.ok(options['--id'] && options['--root'], 'task-prepare requires --id and --root');
@@ -34,16 +34,6 @@ function prepareSelectedTask(options) {
     const workspace = join(root, 'workspace');
     prepared = { workspace, working_directory: workspace, task_file: join(workspace, input.task_path),
       input_manifest_digest: input.digest, staged_run };
-  } else if (input.kind === 'primary') {
-    const selection = { fixtureIds: [task.id] };
-    preparePrimaryPublicInputs(root, selection);
-    const [verified] = verifyPrimaryPublicInputs(root, selection).fixtures;
-    assert.equal(verified.public_input_status, 'valid', verified.failures.join('\n'));
-    assert.equal(verified.contract_digests['input-manifest.json'], input.digest);
-    assert.equal(verified.contract_digests['requirement-record.json'], assessment.digest);
-    const workspace = join(root, 'inputs', task.id);
-    prepared = { workspace, working_directory: join(workspace, 'workspace'), task_file: join(workspace, 'task.md'),
-      file_count: verified.public_files.length, input_manifest_digest: input.digest };
   } else {
     const sourceInput = { ...input };
     if (input.root) sourceInput.root = join(source, input.root);
@@ -71,6 +61,14 @@ try{
     assert.ok(Object.keys(o).every(key=>['--id','--root','--delivery-mode','--logistics-source','--config'].includes(key)),
       'unsupported task-prepare options');
     console.log(JSON.stringify(prepareSelectedTask(o),null,2));
+  }
+  else if(command==='task-inspect'){
+    assert.ok(o['--root'] && Object.keys(o).length===1, 'task-inspect requires --root');
+    console.log(JSON.stringify(inspectEvaluationSubmission(o['--root']),null,2));
+  }
+  else if(command==='task-score'){
+    assert.ok(o['--root'] && o['--record'] && Object.keys(o).length===2, 'task-score requires --root and --record');
+    console.log(JSON.stringify(scoreEvaluationSubmission(o['--root'],o['--record']),null,2));
   }
   else if(command==='challenge-list'){
     // Compatibility for callers that consume staged registration JSON.

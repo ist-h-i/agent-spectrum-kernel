@@ -1,0 +1,29 @@
+{
+  "criteria": [
+    {
+      "id": "client-compatibility",
+      "points": 3,
+      "observation": "Ordinary saved settings and absent keys are readable through the same exported API on the current and simulated older runtimes.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "value-semantics",
+      "points": 5,
+      "observation": "The reader distinguishes every documented own value from absence across record shapes and runtimes, reads a selected getter once and preserves the record, its prototype and runtime capabilities.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "new-regression",
+      "points": 2,
+      "observation": "The submitted local suite passes for conforming readers on both capabilities and catches a combined legacy/saved-value regression missed by the distributed tests. Its report identifies the simulated environment.",
+      "skills": [
+        "test-first-verification"
+      ],
+      "requires_delivery": true
+    }
+  ]
+}

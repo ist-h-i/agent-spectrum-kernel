@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "response-findings",
+      "points": 2,
+      "observation": "Findings correctly identify distinct changed response-contract violations, with matching trace cases and source evidence.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    },
+    {
+      "id": "caller-impact",
+      "points": 2,
+      "observation": "The report ties each change to its affected caller and concrete display, retry or wait result.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    },
+    {
+      "id": "repair-owner",
+      "points": 2,
+      "observation": "The proposed correction sits with the owner of the broken contract and preserves evidenced valid callers, methods and retry limits.",
+      "skills": [
+        "review-architecture-impact"
+      ]
+    },
+    {
+      "id": "comparison-impact",
+      "points": 3,
+      "observation": "For the equivalent comparisons, follow a changed classification and caller-specific retry policy through their consumers. Identify actual change propagation and spare independent decisions from false alarms.",
+      "skills": [
+        "review-code-health"
+      ]
+    },
+    {
+      "id": "decision",
+      "points": 1,
+      "observation": "The merge judgment and severity reflect the evidenced consequences, counting the same cause once.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    }
+  ]
+}

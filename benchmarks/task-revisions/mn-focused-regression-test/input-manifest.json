@@ -1,0 +1,40 @@
+{
+  "id": "mn-focused-regression-test",
+  "version": "task-revision-1",
+  "rubric_sha256": "934d85f483a90838046e52c9f204b0c3897d4018c8b6f29953d08d5a8cbd0c34",
+  "editable": [
+    "workspace/test/session-key.test.mjs"
+  ],
+  "files": [
+    {
+      "path": "task.md",
+      "bytes": 1165,
+      "sha256": "7d9c11bbb06e329d5aa0f0618f30de95ebb69cd62f4beaefe1beb16abaf4ae5d",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/package.json",
+      "sha256": "9917efea8e57cb07719d5af2c2b97aaa556cdfe220279b9d2b73336501d7ca2e",
+      "bytes": 186,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/spec/session-key.md",
+      "sha256": "0962415189e2a2c12a5ebff7db8d149524a7409eeb342b814251d1a0caa24bad",
+      "bytes": 435,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/session-key.mjs",
+      "sha256": "34cbda6cafabd736e07b262a655bcbbfb92cbe6af0409803a8b2545bfa9cc510",
+      "bytes": 420,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/test/session-key.test.mjs",
+      "sha256": "72c2db145559a241d1f315efda792cb105c9fce4e153ae6b0e12ca67ba38500a",
+      "bytes": 451,
+      "source": "inherited"
+    }
+  ]
+}

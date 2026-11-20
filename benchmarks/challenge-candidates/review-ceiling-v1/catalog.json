@@ -7,7 +7,7 @@
   "status": "registered_staged_runner_synthetic_verified",
   "runtime_config": true,
   "ready_for_measurement": false,
-  "model_calibration_run": true,
+  "model_calibration_run": false,
   "candidates": [
     {
       "id": "rc01-shared-review-platform",
@@ -15,7 +15,7 @@
       "task_class": "review_investigation_decision",
       "workspace_path": "workspace",
       "task_path": "workspace/task.md",
-      "difficulty_status": "pilot_observed_not_established",
+      "difficulty_status": "current_edition_not_calibrated",
       "quality_maximum": 100,
       "evaluator_reference_path": "../../evaluation-tasks.json#/challenges/0/evaluator",
       "formal_admission": false

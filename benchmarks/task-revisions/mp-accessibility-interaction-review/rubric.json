@@ -1,0 +1,52 @@
+{
+  "criteria": [
+    {
+      "id": "contract",
+      "points": 1,
+      "observation": "Relates the recommendation to the documented interaction and supplied source.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    },
+    {
+      "id": "journey",
+      "points": 2,
+      "observation": "Identifies the starting control, keyboard action, expected destination and actual focus for the relevant transition.",
+      "skills": [
+        "ui-ux-design"
+      ]
+    },
+    {
+      "id": "continuation",
+      "points": 2,
+      "observation": "Connects focus and viewport movement to the editor’s ability to reach or identify the next action.",
+      "skills": [
+        "ui-ux-design"
+      ]
+    },
+    {
+      "id": "resolution",
+      "points": 2,
+      "observation": "Describes a repeatable post-fix check and the outcome required to clear the material finding.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    },
+    {
+      "id": "decision",
+      "points": 1,
+      "observation": "The merge decision and severity follow the observed impact. Repeated descriptions of one impact receive credit once.",
+      "skills": [
+        "review-ai-quality"
+      ]
+    },
+    {
+      "id": "verification",
+      "points": 2,
+      "observation": "The reported browser journey agrees with independent observations and identifies the method. Manual and automated observations of the same result count equally. A simulated event labeled as browser evidence earns zero.",
+      "skills": [
+        "test-first-verification"
+      ]
+    }
+  ]
+}

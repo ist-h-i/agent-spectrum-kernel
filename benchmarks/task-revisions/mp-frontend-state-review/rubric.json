@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "interaction",
+      "points": 3,
+      "observation": "Traces a concrete select/filter sequence and compares selected row and detail before and after it.",
+      "skills": [
+        "ui-ux-design"
+      ]
+    },
+    {
+      "id": "ownership",
+      "points": 2,
+      "observation": "Identifies the owner and API consumers of visible selection and specifies a correction that keeps their observed states consistent.",
+      "skills": [
+        "review-architecture-impact"
+      ]
+    },
+    {
+      "id": "change-impact",
+      "points": 2,
+      "observation": "Explains which implementation sites depend on the selection rule and shows a concrete outcome left wrong by a one-sided correction.",
+      "skills": [
+        "review-code-health"
+      ]
+    },
+    {
+      "id": "precision",
+      "points": 1,
+      "observation": "Distinguishes intentional history retention from a selection defect and avoids duplicate or unrelated findings.",
+      "skills": [
+        "review-code-health"
+      ]
+    },
+    {
+      "id": "decision-check",
+      "points": 2,
+      "observation": "Supports the merge decision with a repeatable contract-level check covering the returned state and view. A shared derivation or consistent state transition can satisfy it.",
+      "skills": [
+        "review-architecture-impact"
+      ]
+    }
+  ]
+}

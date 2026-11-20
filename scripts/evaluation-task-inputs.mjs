@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { lstatSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { assertAtomicOutputAbsent } from './ask-benchmark-atomic-publication.mjs';
@@ -94,6 +95,37 @@ export function verifyStagedEvaluationTaskInput(input) {
     .sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
 }
 
+// The solver sees public scoring observations and weights. Skill mappings stay with the assessor.
+export function primaryRevisionTaskText(task, criteria) {
+  const rows = criteria.map(item => `- ${item.id} (${item.points} pts) — ${item.observation}`);
+  return `${task.trimEnd()}\n\n## Scoring (10 points)\n\n${rows.join('\n')}\n`;
+}
+
+export function readPrimaryRevision(id, input) {
+  const revision = join(sourceRoot, 'benchmarks/task-revisions', id);
+  const base = join(sourceRoot, 'benchmarks/fixtures/checkpoint-b2', id);
+  const manifest = pinnedManifest(join(revision, 'input-manifest.json'), input.digest);
+  assert.equal(manifest.id, id);
+  assert.equal(manifest.version, input.version);
+  const paths = inventoryPaths(manifest.files);
+  assert.ok(paths.has('task.md') && paths.has('workspace/package.json'), 'primary revision is incomplete');
+  const rubric = pinnedManifest(join(revision, 'rubric.json'), `sha256:${manifest.rubric_sha256}`);
+  const files = manifest.files.map(row => {
+    assert.ok(row.source === 'revision' || row.source === 'inherited', 'invalid primary file source');
+    assert.ok(row.path === 'task.md' || row.path.startsWith('workspace/'), 'unexpected primary input');
+    const path = join(row.source === 'revision' ? revision : base, row.path);
+    let bytes;
+    if (row.path === 'task.md') {
+      const source = readStableFile(path, 'primary task', maximumFileBytes).bytes.toString('utf8');
+      bytes = Buffer.from(primaryRevisionTaskText(source, rubric.criteria));
+      assert.equal(createHash('sha256').update(bytes).digest('hex'), row.sha256, 'revised task digest changed');
+      assert.equal(bytes.length, row.bytes);
+    } else bytes = pinnedFile(path, `sha256:${row.sha256}`, 'primary revision input', row.bytes);
+    return { path: row.path, bytes };
+  });
+  return { files, editable: manifest.editable, workingDirectory: 'workspace' };
+}
+
 function readBusinessInput(id, input, root, mode) {
   assert.ok(mode === 'one_shot' || mode === 'goal_with_pr', 'unsupported business delivery mode');
   const manifest = pinnedManifest(join(root, relativeInputPath(input.manifest)), input.digest);
@@ -118,7 +150,7 @@ function readPrivateInput(input, root, assessment) {
   const entries = manifest.files.map(row => ({ ...row, path: `public/${row.path}` }));
   assert.ok(entries.some(row => row.path === relativeInputPath(input.task_path)), 'private evaluation task file missing');
   const criteria = entries.find(row => row.path === relativeInputPath(assessment.path));
-  assert.ok(criteria && `sha256:${criteria.sha256}` === assessment.digest,
+  assert.ok(criteria && `sha256:${criteria.sha256}` === (assessment.native_digest ?? assessment.digest),
     'private acceptance criteria do not match the input manifest');
   const promptPath = relativeInputPath(input.prompt_path);
   assert.ok(!entries.some(row => row.path === promptPath), 'duplicate private prompt path');
@@ -130,7 +162,7 @@ function readPrivateInput(input, root, assessment) {
 
 // Validate the entire selected inventory before creating a fresh solver workspace.
 export function prepareEvaluationTaskInput({ id, input, assessment }, output, { deliveryMode, logisticsSource } = {}) {
-  assert.ok(['business', 'staged', 'private'].includes(input.kind), 'unsupported evaluation input kind');
+  assert.ok(['primary', 'business', 'staged', 'private'].includes(input.kind), 'unsupported evaluation input kind');
   assert.ok(deliveryMode === undefined || input.kind === 'business', 'delivery mode is only available for business inputs');
   assert.ok(logisticsSource === undefined || input.kind === 'private', 'logistics source is only available for the private input');
   const destination = assertAtomicOutputAbsent(output, 'evaluation output');
@@ -141,7 +173,8 @@ export function prepareEvaluationTaskInput({ id, input, assessment }, output, { 
 
   const selectedMode = input.kind === 'business' ? deliveryMode ?? 'one_shot' : undefined;
   let inventory;
-  if (input.kind === 'business') inventory = readBusinessInput(id, input, root, selectedMode);
+  if (input.kind === 'primary') inventory = readPrimaryRevision(id, input);
+  else if (input.kind === 'business') inventory = readBusinessInput(id, input, root, selectedMode);
   else if (input.kind === 'private') inventory = readPrivateInput(input, root, assessment);
   else inventory = { files: readStagedInput({ ...input, id, root }), workingDirectory: '.' };
 

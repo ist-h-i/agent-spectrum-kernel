@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "incident",
+      "points": 2,
+      "observation": "Uses matched pre/post windows and identifies the observed change in customer-facing latency with attributable source evidence.",
+      "skills": [
+        "evidence-ledger"
+      ]
+    },
+    {
+      "id": "discrimination",
+      "points": 2,
+      "observation": "Uses comparable observations to explain why a leading mechanism fits better than a credible competitor.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "causal-limit",
+      "points": 2,
+      "observation": "Separates incident association, local mechanism evidence and unresolved operational causality or effect size.",
+      "skills": [
+        "evidence-ledger"
+      ]
+    },
+    {
+      "id": "next-comparison",
+      "points": 2,
+      "observation": "Specifies differing predictions and which conclusion would change if the result contradicts the leading explanation.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "reproduction",
+      "points": 2,
+      "observation": "A second operator can reproduce the selected comparison from its inputs, controlled conditions, observable measurement and stop boundary.",
+      "skills": [
+        "test-first-verification"
+      ]
+    }
+  ]
+}

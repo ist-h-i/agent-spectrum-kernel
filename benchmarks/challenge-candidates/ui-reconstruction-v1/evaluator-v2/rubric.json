@@ -1,6 +1,6 @@
 {
   "kind": "ch08_semantic_rubric_v2",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "maximum": 100,
   "categories": {
     "functional": 40,
@@ -88,7 +88,7 @@
         },
         {
           "id": "F03.4",
-          "acceptance": "確認取消は無変更、採用は一度だけ反映して再利用拒否"
+          "acceptance": "確認だけ・取消後は正式計画を保ち、再度の採用後の再読み込みで一度だけ反映して再利用を拒否する。"
         }
       ]
     },
@@ -138,7 +138,7 @@
         },
         {
           "id": "F05.3",
-          "acceptance": "条件と取組の一部採用・取消を独立に実行"
+          "acceptance": "条件と取組の一部採用・取消を独立に行い、再読み込み後も選んだ対象だけが正式な結果として残る。"
         },
         {
           "id": "F05.4",
@@ -342,7 +342,7 @@
         {
           "id": "U02.1",
           "source_text": "今の判断に必要な情報を、優先して見せる。",
-          "acceptance": "Changed fields, current target and decision constraints appear before raw payload/metadata.",
+          "acceptance": "At both 360px and 1280px the current target, differences and decision constraints are legible before raw payloads when comparing a plan and selecting an assessment.",
           "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
           "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
           "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
@@ -566,7 +566,7 @@
         {
           "id": "U06.2",
           "source_text": "マウス、キーボード、タッチなど、単一の操作手段だけに依存しない。",
-          "acceptance": "Core scenarios can be completed with pointer and keyboard; include linking, confirmation and cancellation.",
+          "acceptance": "Complete comparison, cancellation, reopening, selective adoption and return to the originating task with both pointer and keyboard. Record viewport, focused target and any observed limitation.",
           "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
           "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
           "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
@@ -622,7 +622,7 @@
         {
           "id": "U07.1",
           "source_text": "可能な操作はできるだけ可逆にする。",
-          "acceptance": "Record changes and human adoption can be cancelled/revised/restored without losing unrelated data; temporary draft loss is included.",
+          "acceptance": "Before adopting a plan or selected evaluation, the person can identify the target, changes, and official status from the confirmation, and cancel without changing saved work.",
           "pass": "The observable acceptance is demonstrated in the listed applicable task states, with concrete evidence.",
           "partial": "The acceptance is partly achieved, but a specific observed friction or limitation remains; name both. Missing observation alone is unknown.",
           "fail": "A concrete observed counterexample prevents the stated purpose or materially misleads the user.",
@@ -740,5 +740,17 @@
     "unsaved_input_loss": "An ordinary navigation or supported conflict recovery silently loses meaningful unsaved input with no warning or recoverable draft.",
     "misleading_state": "A consequential current judgment or recovery state is demonstrably presented as valid/safe despite missing required evidence or known loss. A merely ambiguous label without consequential false state is reported as a UX defect, not automatically this blocker."
   },
-  "semantics": "Functional pass/fail/unknown; UX pass=1 partial=0.5 fail=0 unknown=missing. Partial requires observed benefit and limitation, never substitutes for untested behavior. NA is task-level only, identical for all candidates, evidence required, no cross-domain redistribution. All-NA domain remains unavailable. Blockers never offset by points. Resources reported separately."
+  "semantics": "Functional pass/fail/unknown; UX pass=1 partial=0.5 fail=0 unknown=missing. Partial requires observed benefit and limitation, never substitutes for untested behavior. NA is task-level only, identical for all candidates, evidence required, no cross-domain redistribution. All-NA domain remains unavailable. Blockers never offset by points. Resources reported separately.",
+  "submission_checks": [
+    {
+      "id": "review-match",
+      "points": 2,
+      "acceptance": "提出者がREASSESSMENT.mdに記した画面・主操作とつまずきの位置が独立の操作記録に一致する（U01・U03）。"
+    },
+    {
+      "id": "verification-record",
+      "points": 2,
+      "acceptance": "提出者の記録で確認のみ・取消・一部採用・再読後を識別し、結果を操作・保存の独立観測と照合できる（F03・F05）。"
+    }
+  ]
 }

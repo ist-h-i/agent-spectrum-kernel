@@ -1,0 +1,37 @@
+{
+  "criteria": [
+    {
+      "id": "render-sequence",
+      "points": 3,
+      "observation": "At search start and each stale settlement, the latest query retains its correct busy, items and alert state without transient or extra notifications.",
+      "skills": [
+        "ui-ux-design"
+      ]
+    },
+    {
+      "id": "current-result",
+      "points": 2,
+      "observation": "A current success preserves ordered results, and current failure or throw displays the specified safe error. Replacing visible content clears obsolete results and errors.",
+      "skills": [
+        "ui-ux-design"
+      ]
+    },
+    {
+      "id": "instance-lifetime",
+      "points": 3,
+      "observation": "Replacing a request aborts its signal, and disposal silences that view. The other mounted view keeps its own signal and delivers its result. Snapshots remain isolated.",
+      "skills": [
+        "application-boundary-architecture"
+      ]
+    },
+    {
+      "id": "completion-trace",
+      "points": 2,
+      "observation": "The submitted sequence of starts, settlements and closing agrees with the adapter’s actual notifications for one and two views.",
+      "skills": [
+        "test-first-verification"
+      ],
+      "requires_delivery": true
+    }
+  ]
+}

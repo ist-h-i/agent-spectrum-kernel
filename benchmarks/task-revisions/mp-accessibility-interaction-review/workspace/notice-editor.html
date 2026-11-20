@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Customer notice editor</title>
+<style>
+  body { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.6 system-ui; }
+  section { margin-block: 45vh 90vh; }
+  button, textarea { font: inherit; }
+  label, textarea { display: block; }
+</style>
+<main>
+  <h1>Customer notice</h1>
+  <section aria-label="Notice draft">
+    <button type="button" id="preview">Preview notice</button>
+    <div id="formatting"></div>
+    <label for="message">Notice text</label>
+    <textarea id="message">We will reopen on Monday.</textarea>
+  </section>
+  <p>End of draft</p>
+</main>
+<script type="module">
+  import { connectToolbar } from './src/format-toolbar.mjs';
+  const response = await fetch('./src/format-toolbar.html');
+  if (!response.ok) throw new Error('Toolbar markup could not be loaded');
+  const fragment = new DOMParser().parseFromString(await response.text(), 'text/html');
+  const toolbar = fragment.querySelector('[role="toolbar"]');
+  document.getElementById('formatting').append(toolbar);
+  connectToolbar(toolbar);
+</script>
+</html>

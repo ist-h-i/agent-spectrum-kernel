@@ -1,6 +1,6 @@
 # CH08 UI-first semantic assessment v2
 
-Version 2.0.0; input version ui-functional-v2. Same CH08 task identity, not a ninth challenge.
+Version 2.1.0; input version ui-functional-v2.1. Same CH08 task identity, not a ninth challenge.
 
 ## Why 40 functional / 60 UX
 
@@ -21,7 +21,7 @@ directory to submission code. Public workspace/brief/rubric.json has identical c
 No runner changes are needed. Existing evaluator/ files remain immutable v1 replay assets.
 
 Assessment kind ch08_assessor_decisions_v2; meta requires candidate_id,
-assessment_mode (prospective or retrospective), rubric_version (2.0.0).
+assessment_mode (prospective or retrospective), rubric_version (2.1.0).
 Every requirement/check/blocker occurs exactly once.
 
 - pass: observed acceptance achieved; evidence [{artifact, observation}] required.
@@ -94,3 +94,5 @@ recompute authoritative totals from those display values. The rubric digest bind
 original unrounded rubric. Resource measurements and evidence are not quantized by this
 calculator. The standard worker adds validated known/missing decimals in fixed-point
 arithmetic rather than introducing new binary floating-point digits.
+
+For 2.1.0, record both `submission_checks` alongside product decisions. Each assessor row has `id`, `status` and the evidence from the submitted review and the independent operation record. An observed row needs `answer_ref`, `independent_ref`, `observation`; a partial also needs `limitation`. An unknown row needs `missing` and `next_check`. Product points, unknown weight, and release blockers use independent product observations and do not include these four submission points.

@@ -1,0 +1,146 @@
+{
+  "type": "object",
+  "required": [
+    "decision",
+    "findings",
+    "verification",
+    "preserved_cases",
+    "decision_basis"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "enum": [
+        "request_changes",
+        "approve",
+        "comment"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "severity",
+          "before_allowed",
+          "after_allowed",
+          "required_allowed",
+          "evidence",
+          "affected_use",
+          "correction"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "before_allowed": {
+            "type": "boolean"
+          },
+          "after_allowed": {
+            "type": "boolean"
+          },
+          "required_allowed": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "line"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "affected_use": {
+            "type": "string",
+            "minLength": 1
+          },
+          "correction": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "state",
+        "commands"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run"
+          ]
+        },
+        "commands": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "npm test",
+              "npm run trace",
+              "npm run validate:review"
+            ]
+          }
+        }
+      }
+    },
+    "preserved_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "expected_allowed",
+          "preservation_condition"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_allowed": {
+            "type": "boolean"
+          },
+          "preservation_condition": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "decision_basis": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

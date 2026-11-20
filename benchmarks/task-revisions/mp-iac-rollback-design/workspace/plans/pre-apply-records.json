@@ -1,0 +1,59 @@
+{
+  "description": "Hypothetical later pre-apply captures. The original candidate and present approval remain in their original records.",
+  "records": [
+    {
+      "id": "rollout-a",
+      "saved_plan": {
+        "target": "aws_lambda_alias.api_live",
+        "changes": [
+          {
+            "scope": "alias-canary",
+            "primary": "41",
+            "secondary": {
+              "42": 0.1
+            }
+          }
+        ],
+        "state_lineage": "prod-api-us-east-1",
+        "state_serial": 318
+      },
+      "plan_digest": "sha256:9e04d8c9a4be5d6c12a9856243debb8c65f3af108dfd1a4cbe88a4b1e85d5225",
+      "approval": {
+        "role": "platform-change-approver",
+        "approved_digest": "sha256:9e04d8c9a4be5d6c12a9856243debb8c65f3af108dfd1a4cbe88a4b1e85d5225"
+      },
+      "at_write": {
+        "lineage": "prod-api-us-east-1",
+        "serial": 318,
+        "target": "aws_lambda_alias.api_live"
+      }
+    },
+    {
+      "id": "rollout-b",
+      "saved_plan": {
+        "target": "aws_lambda_alias.api_live",
+        "changes": [
+          {
+            "scope": "alias-canary",
+            "primary": "41",
+            "secondary": {
+              "42": 0.1
+            }
+          }
+        ],
+        "state_lineage": "prod-api-us-east-1",
+        "state_serial": 318
+      },
+      "plan_digest": "sha256:9e04d8c9a4be5d6c12a9856243debb8c65f3af108dfd1a4cbe88a4b1e85d5225",
+      "approval": {
+        "role": "platform-change-approver",
+        "approved_digest": "sha256:9e04d8c9a4be5d6c12a9856243debb8c65f3af108dfd1a4cbe88a4b1e85d5225"
+      },
+      "at_write": {
+        "lineage": "prod-api-us-east-1",
+        "serial": 319,
+        "target": "aws_lambda_alias.api_live"
+      }
+    }
+  ]
+}

@@ -65,7 +65,10 @@ test('canonical digest is order independent and changes for criteria changes',()
 });
 
 test('published v2 rubric integrates with the calculator',()=>{
- const rubric=JSON.parse(readFileSync(new URL('../evaluator-v2/rubric.json',import.meta.url)));const {assessment}=fixture();const r=score(rubric,assessment);near(r.quality_score,100);assert.equal(r.requirements.length,18);assert.equal(r.requirements.reduce((n,x)=>n+x.applicable_checks,0),80);
+ const rubric=JSON.parse(readFileSync(new URL('../evaluator-v2/rubric.json',import.meta.url)));const {assessment}=fixture();
+ assessment.meta.rubric_version=rubric.version;
+ assessment.submission_checks=rubric.submission_checks.map(({id})=>({id,status:'unknown',missing:'Independent operation record',next_check:'Replay T03, T06 and T14 on the submitted UI'}));
+ const r=score(rubric,assessment);near(r.quality_score,100);assert.equal(r.submission.score,null);assert.equal(r.submission.missing_weight,4);assert.equal(r.requirements.length,18);assert.equal(r.requirements.reduce((n,x)=>n+x.applicable_checks,0),80);
 });
 
 test('requirement order preserves exact all-pass maxima for strict downstream comparisons',()=>{

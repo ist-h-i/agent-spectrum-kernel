@@ -1,0 +1,49 @@
+{
+  "criteria": [
+    {
+      "id": "compiler-reuse",
+      "points": 2,
+      "observation": "タグだけを変更した新要求のコンパイラ追加呼出しが0で、新タグが要求と互換判定に反映される（B03・B06）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "approved-artifact",
+      "points": 2,
+      "observation": "後続ビルドの完了後も、他条件が成立すれば先に成功した承認対象の正確な成果物を公開する（B01・B03）。",
+      "skills": [
+        "application-boundary-architecture"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "channel-revision",
+      "points": 2,
+      "observation": "要求変更で進んだ版は承認前後どちらでも古い計画の公開を防ぎ、現公開版を保持する。現版への再申請・再承認は進められる（B03）。",
+      "skills": [
+        "application-boundary-architecture"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "rule-change",
+      "points": 2,
+      "observation": "提出された呼び出し・読み書きの根拠を実コードでたどり、公開条件の変更が通常公開・差戻しに一致して反映される修正単位と実害を検証できる。",
+      "skills": [
+        "review-code-health"
+      ],
+      "group": "submission"
+    },
+    {
+      "id": "compiler-boundary",
+      "points": 2,
+      "observation": "コンパイラ結果とアプリの判断を、具体的な応答の利用箇所・保存する状態・選択した成果物の観測から説明できる（B01・B03）。",
+      "skills": [
+        "application-boundary-architecture"
+      ],
+      "group": "submission"
+    }
+  ]
+}

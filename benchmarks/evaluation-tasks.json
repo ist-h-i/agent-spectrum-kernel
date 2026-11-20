@@ -5,11 +5,11 @@
       "kind": "practical_challenge_registration_v1",
       "id": "rc01-shared-review-platform",
       "series": "review-ceiling-v1",
-      "input_version": "review-public-v1",
+      "input_version": "review-public-v2",
       "workspace": "benchmarks/challenge-candidates/review-ceiling-v1/workspace",
       "input_manifest": {
         "path": "benchmarks/challenge-candidates/review-ceiling-v1/input-manifests/rc01-shared-review-platform.json",
-        "digest": "sha256:88622054a565fdbbe910454b1927a78f1bb4d8e81f573307b2089fbfe1d93a55"
+        "digest": "sha256:4936e8dce085da65bf047827f30b038b2cba752571c9f8fb4187eda9feee013d"
       },
       "stages": [
         {
@@ -27,7 +27,7 @@
           ],
           "update": {
             "target": "OPERATIONAL-UPDATE.md",
-            "digest": "sha256:53b2659fe1eab7da432a39821f3eec29daded27d4f243bf06b859245ecba7bbf",
+            "digest": "sha256:58eda2d842e0861b944f30b580eadf3c7b00a105ecb71ecd08e74d5619a74711",
             "path": "benchmarks/challenge-candidates/review-ceiling-v1/stages/reassessment.md"
           },
           "prompt": "Continue this same trial with the fixed operational update in OPERATIONAL-UPDATE.md. Read that file and add REASSESSMENT.md only, explaining which judgments remain or change and why. INITIAL.md and REVIEW.md are frozen: do not modify them. Do not modify application, original tests, contracts or existing evidence. This is a bounded reassessment, not a new task or a full review restart. Do not invent additional updates. Retain the original execution boundaries, tools, model and settings. Stop when REASSESSMENT.md is saved."
@@ -40,34 +40,24 @@
         "files": [
           {
             "path": "rubric.json",
-            "digest": "sha256:aa897375e1c594cc84aff896a2a5f405133014f6cdfffb79f75e4dc542aeeb95"
+            "digest": "sha256:e2601a827eb1d9897e83c8de8618ddbc6a07f80a2ec3e1816ffcb1e2fbfb0fab"
           },
           {
             "path": "score.mjs",
-            "digest": "sha256:5caef5fd7e63dae9bb1677ea83c4e013698840763cd1cd5ac7537c6c8f2d93d0"
+            "digest": "sha256:9be03afca50a210719f7f79a29554d9b51475ca8156f113d51575701c4e7e8e6"
           },
           {
             "path": "README.md",
-            "digest": "sha256:e18ac5d88b40f5d3e1667e4752441f7ed7654b00016cbc89a445f806c0bac091"
+            "digest": "sha256:9cb3d1bd59f827a823605c974bcfcb18fe81bb45399bb4c03de5d823ff293841"
           }
         ]
       },
       "primary_catalog_member": false,
       "formal_primary_admission": false,
       "calibration": {
-        "status": "pilot_observed",
-        "model": "gpt-6.1-sol",
-        "conditions": [
-          {
-            "reasoning": "low",
-            "quality_score": 83.5
-          },
-          {
-            "reasoning": "max",
-            "quality_score": 89
-          }
-        ],
-        "limits": "One trial per effort; semantic assessor decisions, not a difficulty or comparative significance guarantee."
+        "status": "not_run",
+        "ready_for_measurement": false,
+        "limits": "This revised input and rubric have no solver trials. Archived scores for review-public-v1 refer to its frozen input and assessment."
       },
       "selection": {
         "domain": "release_review",
@@ -85,12 +75,12 @@
       "display_id": "CH08",
       "ordinal": 8,
       "series": "ui-reconstruction-v1",
-      "input_version": "ui-functional-v2",
+      "input_version": "ui-functional-v2.1",
       "workspace": "benchmarks/challenge-candidates/ui-reconstruction-v1/workspace",
       "freeze_submission": true,
       "input_manifest": {
         "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/input-manifests/ch08-growth-workspace.json",
-        "digest": "sha256:8eeefd3261128127f2598decda94f9f18ec0c1f3e58fa0a028665209000dc9c6"
+        "digest": "sha256:75b2907177fc4154c5f9575020070a919fdbf3b0a0d0fc930d6df553afd6f9f7"
       },
       "stages": [
         {
@@ -108,7 +98,7 @@
           "update": {
             "target": "OPERATIONAL-UPDATE.md",
             "path": "benchmarks/challenge-candidates/ui-reconstruction-v1/stages/verification-turn.md",
-            "digest": "sha256:6de149a89884c23b93f3cd8e222fcc9aebc9c96c11dd432fda50c2ee89295345"
+            "digest": "sha256:c00ab9233289e3b4d04fe23f63660832a8735bdb7cacba0ee3f50a19b07fea38"
           },
           "prompt": "Continue this same trial. Read OPERATIONAL-UPDATE.md and perform its read-only checks against the frozen implementation. Add REASSESSMENT.md only. Change no existing files and add no other files. Retain the original workspace, local-only network boundary, tools, model and settings. Missing runtime evidence must remain explicit. Stop when the reassessment is saved."
         }
@@ -124,15 +114,15 @@
         "files": [
           {
             "path": "rubric.json",
-            "digest": "sha256:2c014262261d49d006d62abbff8b52210e79304e3a99f2d36789d99dcbb57f18"
+            "digest": "sha256:16d59a5cf7a6c3b579711a58282472429475a7ad8776d2f15eca8363e5754150"
           },
           {
             "path": "score.mjs",
-            "digest": "sha256:2b3f1f6c00a3b4fc8101e2cb9752b68dc63d51843d91f50ab38ca11235ffc658"
+            "digest": "sha256:b8549ef6ebe1d900240c07c034cb095d7468d32561ec3df974b88381fa9d862d"
           },
           {
             "path": "README.md",
-            "digest": "sha256:09d1cab6da780eae919301eb2c351a10e0b4b0a58edfad9ea61b83c2abfdfd8b"
+            "digest": "sha256:82dc58c732c271063ee6fd58f31a2518981ce76f9ff65625bab9da68e5290854"
           }
         ]
       },
@@ -161,24 +151,63 @@
       "title": "複数職務で使う在庫・予約・物流アプリ",
       "domain": "inventory_reservation_logistics",
       "github_repository_id": 1442456886,
-      "revision": "714ea785dbbdb89111808e9b55b9d5f907cac9cf",
-      "version": "comparison-business-2026-11-02.1",
+      "revision": "29764bf8f387e6134c8a6d4453f6af87888a7144",
+      "version": "comparison-business-2026-11-20.1",
       "input_manifest": {
         "path": "public-manifest.json",
-        "digest": "sha256:ec0e594227fa85e4e540eefd0165eefd95a973706d3cbf060eaf41bf4df33659"
+        "digest": "sha256:9dd9ad37644506cb4380609cff4eb2bb4c3f4c9023cdb108c18f049c1444d30d"
       },
       "task_path": "public/TASK.md",
       "prompt": {
         "path": "prompt.txt",
-        "digest": "sha256:a8557439ccb018c814576f2a29570d91002b3424ad7252e9f26e5d3fd40c744b"
+        "digest": "sha256:abe180ffd6d34f85a27877fb7ffed48294ea7f527924ff453fe5e60a4eb4b8cb"
       },
       "acceptance": {
         "path": "public/acceptance.md",
-        "digest": "sha256:62e759747ac167eb2a2b5ea5a1829b0e9abd8d32da1062847109b218759cfa69"
+        "digest": "sha256:cc7ca12c579a96631f69df34c2811daacc58605c2d79802341bef74929e59f6f"
       },
-      "acceptance_criterion_ids": [
-        "UX03"
+      "observations": [
+        {
+          "id": "RH01",
+          "points": 1,
+          "observation": "引き継ぎ後の保存結果と業務記録を照合する。",
+          "skills": [
+            "controlled-implementation"
+          ],
+          "group": "product"
+        },
+        {
+          "id": "RH02",
+          "points": 1,
+          "observation": "担当者が最新の状況を読み取り、作業を続けられる。",
+          "skills": [
+            "ui-ux-design"
+          ],
+          "group": "product"
+        },
+        {
+          "id": "RH03",
+          "points": 1,
+          "observation": "条件を変更した後の各操作経路の結果を照合する。",
+          "skills": [
+            "application-boundary-architecture"
+          ],
+          "group": "product"
+        },
+        {
+          "id": "RH04",
+          "points": 1,
+          "observation": "提出者の検証記録を独立した業務観測に照らす。",
+          "skills": [
+            "review-domain-impact"
+          ],
+          "group": "submission"
+        }
       ]
     }
-  ]
+  ],
+  "calibration": {
+    "github_repository_id": 1442549076,
+    "revision": "823bab12e367e333bf475c4998e5bc84459b1668"
+  }
 }

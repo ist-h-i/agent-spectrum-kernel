@@ -1,0 +1,49 @@
+{
+  "criteria": [
+    {
+      "id": "target-and-change",
+      "points": 2,
+      "observation": "T03・T06の比較と一部採用で、360px・1280pxの現対象、差分、操作の結果が確認できる（U02・U04）。",
+      "skills": [
+        "ui-ux-design"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "keyboard-return",
+      "points": 2,
+      "observation": "各幅でキーボードだけで確認・取消・再度の採用と起点からの作業継続を観測する（T14・U06・U07）。",
+      "skills": [
+        "ui-ux-design"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "formal-state",
+      "points": 2,
+      "observation": "AI参考案、確認中、人が正式に採用した計画・評価が位置や色だけに頼らず画面と保存状態で区別できる（F03・F05・U04）。",
+      "skills": [
+        "ui-ux-design"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "review-match",
+      "points": 2,
+      "observation": "提出者がREASSESSMENT.mdに記した画面・主操作とつまずきの位置が独立の操作記録に一致する（U01・U03）。",
+      "skills": [
+        "review-output-quality"
+      ],
+      "group": "submission"
+    },
+    {
+      "id": "verification-record",
+      "points": 2,
+      "observation": "提出者の記録で確認のみ・取消・一部採用・再読後を識別し、結果を操作・保存の独立観測と照合できる（F03・F05）。",
+      "skills": [
+        "test-first-verification"
+      ],
+      "group": "submission"
+    }
+  ]
+}

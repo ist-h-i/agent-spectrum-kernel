@@ -1,0 +1,37 @@
+{
+  "criteria": [
+    {
+      "id": "regression-detected",
+      "points": 4,
+      "observation": "An added public-function check detects the target mixed-case regression missed by the original suite.",
+      "skills": [
+        "test-first-verification"
+      ]
+    },
+    {
+      "id": "portable-expectation",
+      "points": 3,
+      "observation": "The tests accept conforming alternative implementations and check only the documented result, preserving tenant and whitespace semantics.",
+      "skills": [
+        "spec-driven-development"
+      ]
+    },
+    {
+      "id": "change-boundary",
+      "points": 2,
+      "observation": "Existing checks remain effective and only the allowed test file changes.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "test-result",
+      "points": 1,
+      "observation": "The reported result and description of the new observed coverage match the submitted test run.",
+      "skills": [
+        "test-first-verification"
+      ],
+      "requires_delivery": true
+    }
+  ]
+}

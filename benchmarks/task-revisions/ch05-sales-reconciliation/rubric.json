@@ -1,0 +1,49 @@
+{
+  "criteria": [
+    {
+      "id": "reserved-balance",
+      "points": 2,
+      "observation": "未解決中も承認額が拘束され、残高を超える別件の承認を拒否する（S02・S05）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "two-settlements",
+      "points": 2,
+      "observation": "receipt未確認の版は返金を未解決と記し、確認後の版だけが返金を差し引く（S05・S06）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "immutable-versions",
+      "points": 2,
+      "observation": "後日再読・精算再実行しても元の締めと既発行版、外部返金件数が変わらない（S05・S06）。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "reconciliation",
+      "points": 2,
+      "observation": "提出者の照合説明から締め・承認・受理・精算の各識別子と二つの差引額の理由を第三者がたどれる（S07・S08）。",
+      "skills": [
+        "review-domain-impact"
+      ],
+      "group": "submission"
+    },
+    {
+      "id": "timepoint-regression",
+      "points": 2,
+      "observation": "提出テストが独立した期待額をもち、正しい別実装を受け入れ、早期算入と旧版の後日改変の双方を検出する（S05・S06）。",
+      "skills": [
+        "test-first-verification"
+      ],
+      "group": "submission"
+    }
+  ]
+}

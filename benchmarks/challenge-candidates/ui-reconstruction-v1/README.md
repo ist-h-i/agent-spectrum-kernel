@@ -64,4 +64,4 @@ node --test benchmarks/challenge-candidates/ui-reconstruction-v1/tools/public-pa
 
 ## 採点基準v2
 
-現在の公開入力・登録はui-functional-v2 / rubric 2.0.0です。同じCH08であり問題数は増えません。旧`evaluator/`の3ファイルはv1過去結果の再現用としてbyte不変で保持します。旧入力を凍結した試行へv2を遡及上書きしません。詳細は[evaluator-v2/README.md](evaluator-v2/README.md)。
+現役の公開入力は `ui-functional-v2.1`、採点基準は `2.1.0` です。従前の `ui-functional-v2` / `2.0.0` の再現には当時のコミットを使います。同じCH08であり問題数は増えません。旧`evaluator/`の3ファイルはv1過去結果の再現用としてbyte不変で保持します。旧入力を凍結した試行へv2を遡及上書きしません。詳細は[evaluator-v2/README.md](evaluator-v2/README.md)。

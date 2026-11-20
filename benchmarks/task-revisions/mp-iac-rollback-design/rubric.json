@@ -1,0 +1,52 @@
+{
+  "criteria": [
+    {
+      "id": "proposal",
+      "points": 2,
+      "observation": "Assesses the current candidate against requested scope and captured state with cited evidence.",
+      "skills": [
+        "grill-design"
+      ]
+    },
+    {
+      "id": "preparation",
+      "points": 1,
+      "observation": "Identifies permitted non-mutating preparation with the corresponding commands while a write is blocked.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "recheck",
+      "points": 2,
+      "observation": "At the proposed write, compares the approved plan and the live state identity, explains the effect of changed prerequisites and how to prepare a fresh decision.",
+      "skills": [
+        "grill-design"
+      ]
+    },
+    {
+      "id": "approval",
+      "points": 2,
+      "observation": "Binds each proposed forward and rollback mutation to the authorized target, exact plan and appropriate approver.",
+      "skills": [
+        "risk-gate"
+      ]
+    },
+    {
+      "id": "recovery",
+      "points": 2,
+      "observation": "Uses the trigger, observed post-change traffic and target to decide if service recovered and retains diagnostic evidence; a repository change alone earns no recovery credit.",
+      "skills": [
+        "test-first-verification"
+      ]
+    },
+    {
+      "id": "promotion",
+      "points": 1,
+      "observation": "Applies the documented promotion trigger, destination, owner and available evidence without assuming a completed operation.",
+      "skills": [
+        "grill-design"
+      ]
+    }
+  ]
+}

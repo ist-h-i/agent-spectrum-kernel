@@ -1,0 +1,45 @@
+{
+  "criteria": [
+    {
+      "id": "reader-compatibility",
+      "points": 2,
+      "observation": "Existing consumers still read legacy records and the new reader supplies the missing-note view while preserving stored records and extensions.",
+      "skills": [
+        "application-boundary-architecture"
+      ]
+    },
+    {
+      "id": "up-idempotence",
+      "points": 2,
+      "observation": "First and repeated transitions populate absent notes and preserve explicit notes, unrelated fields and record order.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "exact-down",
+      "points": 2,
+      "observation": "Rollback recovers the original presence or absence of each field and its exact value.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "invalid-schema",
+      "points": 2,
+      "observation": "The submitted schema identifies invalid notes in a mixed batch and accepts valid records. Inspect the batch after rejection; the fixed interpreter’s copying alone earns no implementation points.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "observed-lifecycle",
+      "points": 2,
+      "observation": "The answer’s read, transition, repeat, rollback and rejection observations can be reproduced from its inputs; unexecuted evidence is identified.",
+      "skills": [
+        "test-first-verification"
+      ],
+      "requires_delivery": true
+    }
+  ]
+}

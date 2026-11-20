@@ -3,12 +3,12 @@
   "fixture_id": "rc01-shared-review-platform",
   "counts": {
     "files": 151,
-    "bytes": 1337898,
+    "bytes": 1339658,
     "implementation_lines": 19647,
     "test_lines": 6768,
     "styles_lines": 172,
     "markup_lines": 35,
-    "other_text_lines": 7707
+    "other_text_lines": 7720
   },
   "files": [
     {
@@ -728,8 +728,8 @@
     },
     {
       "path": "task.md",
-      "sha256": "98492d7a4e7054fa02805a5b07315b3f3e6bf111856198ccce7f5f7cc31b5119",
-      "bytes": 4209
+      "sha256": "aa82e3e367c8e38d0d7de4fe6e59afa5c7e7917c96b321eaeaa2fb1cb167e239",
+      "bytes": 5969
     },
     {
       "path": "tests/policy/ai-network-guard.test.ts",

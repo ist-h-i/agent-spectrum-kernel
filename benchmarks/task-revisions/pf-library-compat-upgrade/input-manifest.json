@@ -1,0 +1,97 @@
+{
+  "id": "pf-library-compat-upgrade",
+  "version": "task-revision-1",
+  "rubric_sha256": "84436379650d4d6f02911d86f975a5ccf745142d8dda08fc98c0f996e36fcba0",
+  "editable": [
+    "workspace/migration-record.json",
+    "workspace/src/archive-compat.mjs",
+    "workspace/src/download-export.mjs",
+    "workspace/src/scheduled-export.mjs"
+  ],
+  "files": [
+    {
+      "path": "task.md",
+      "bytes": 2815,
+      "sha256": "424794632be18653f5e81aef4e46d7dd489bd925d4da8e3381a24260734336be",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/config/migration-settings.json",
+      "sha256": "c94849ae6c817d5668934c106460e5d266e4218985b0bf8067c2c095efd0fa7f",
+      "bytes": 86,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/data/compatibility-matrix.json",
+      "sha256": "4237f8f1f9a61f52da74f745e9f1a112e99498af84ca9cb677edbcc257e13936",
+      "bytes": 566,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/docs/migration-contract.md",
+      "bytes": 3434,
+      "sha256": "63ecc2fcbfb36032764d7a8111c0e554021ddd3b6367bdfbde20cc39348379c2",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/package.json",
+      "sha256": "efddca87cfde435a8389073ab4d746330efcd05f8be38535c3ffbe53f56ee639",
+      "bytes": 297,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/scripts/check-rollback.mjs",
+      "sha256": "1e47d9b4f880336564a20e6f9c20df68aeec3d42c0397ee0106d718c60805a92",
+      "bytes": 945,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/scripts/validate-migration.mjs",
+      "sha256": "d2cc29b3ab631189f96f9ac6a0ea42530dff946f0cb75e3cfac04349d18972ca",
+      "bytes": 1190,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/archive-compat.mjs",
+      "sha256": "521955dc1918de9262e14f8395985fa715b4feb8b1e945b9bab052ef5128b91c",
+      "bytes": 358,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/src/download-export.mjs",
+      "bytes": 150,
+      "sha256": "7d3e7826c5cdea5b9d1426465e4163ddbc811e05154aaa1de0d91ece89ced0ea",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/src/scheduled-export.mjs",
+      "bytes": 151,
+      "sha256": "5a4fe7d214ddec00c0af05ea8d20989a5b39ef2a9af7407163a5ef6c937d3ef3",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/test/application-callers.test.mjs",
+      "bytes": 960,
+      "sha256": "f189117263e680fef7e4513ad2f71fbe2eb272b5ee048b8152d528dd5150403c",
+      "source": "revision"
+    },
+    {
+      "path": "workspace/test/archive-compat.test.mjs",
+      "sha256": "493f898c2c92b522a82ba50142c29bd65802dcd24b93b833ab4731b0f9960a42",
+      "bytes": 3448,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/vendor/archive-v1.mjs",
+      "sha256": "032b624c513fe482b8571ec9b190214db8f721ff2f2f395427a2b75773cbc18c",
+      "bytes": 523,
+      "source": "inherited"
+    },
+    {
+      "path": "workspace/vendor/archive-v2.mjs",
+      "sha256": "49f30a5d94c58d535f6ba4c8e7cf32a09fa726f13199a64d2765ac5b850d058e",
+      "bytes": 692,
+      "source": "inherited"
+    }
+  ]
+}

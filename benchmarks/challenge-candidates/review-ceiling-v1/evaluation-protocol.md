@@ -52,3 +52,7 @@ The complete RC01 assessment uses the fixed staged update. If only the first pha
 ### Previously unknown findings
 
 A valid additional finding does not create points beyond the frozen 100. If it proves the same causal requirement, assess it there without duplication. If it is a genuinely different issue, record its severity, evidence and release consequence separately; it may support the existing evidence/prioritization dimensions but does not replace an unrelated seeded requirement. If it exposes an invalid or ambiguous task assumption, suspend that affected requirement for **all** conditions and version the rubric before a new comparison, rather than changing weights to favor one answer.
+
+## Outcome edition (review-public-v2)
+
+For each major causal group record the inspected initial answer and source, affected producer and consumer, and any missed impact. Record unwarranted release stops separately, including the accepted behavior and counterevidence. Group repeated wording with the same cause and effect once. Use the frozen initial artifact and the operational update to trace both retained and revised judgments. Count neither findings nor reversals as points. A bounded pilot and a deferral are both eligible when the evidence and limits support them. The diagnostic item scores in task.md are separate from the 100-point review. The two scores in the archived report belong to review-public-v1. No solver has been scored on this edition.

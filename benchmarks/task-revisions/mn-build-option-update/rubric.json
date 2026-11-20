@@ -1,0 +1,38 @@
+{
+  "criteria": [
+    {
+      "id": "release-map",
+      "points": 5,
+      "observation": "The release configuration yields the documented hidden script-map mode and suppresses stylesheet maps in the configuration validator.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "unaffected-settings",
+      "points": 3,
+      "observation": "The allowed file change preserves the complete debug profile, release target and minification settings when compared as configuration data.",
+      "skills": [
+        "scope-control"
+      ]
+    },
+    {
+      "id": "unit-result",
+      "points": 1,
+      "observation": "The reported npm test result matches evidence for that check on the submitted configuration. An unexecuted check is unobserved.",
+      "skills": [
+        "test-first-verification"
+      ],
+      "requires_delivery": true
+    },
+    {
+      "id": "config-result",
+      "points": 1,
+      "observation": "The reported validate:build result agrees with the configuration check and limits claims to what it examined. An unexecuted check is unobserved.",
+      "skills": [
+        "test-first-verification"
+      ],
+      "requires_delivery": true
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "model": "Local walkthrough for record-two. Rollback checkpoints are alternative observations; treat each on its own evidence.",
+  "record_id": "record-two",
+  "events": [
+    {
+      "event": "read_mixed_row",
+      "phase": "expanded",
+      "readers": [
+        "v1",
+        "v2_fallback"
+      ]
+    },
+    {
+      "event": "copy_current_name",
+      "phase": "expanded",
+      "writer": "v2_dual",
+      "source_field": "name"
+    },
+    {
+      "event": "edit_before_drain",
+      "phase": "expanded",
+      "writer": "v1",
+      "value": "Updated before drain"
+    },
+    {
+      "event": "observe_before_reconciliation",
+      "phase": "expanded",
+      "readers": [
+        "v1",
+        "v2_fallback"
+      ]
+    },
+    {
+      "event": "writers_drained",
+      "remaining_legacy_writers": 0
+    },
+    {
+      "event": "read_after_verification",
+      "readers": [
+        "v2"
+      ]
+    },
+    {
+      "event": "edit_after_snapshot",
+      "phase": "contracted",
+      "writer": "v2",
+      "value": "Updated after capture"
+    }
+  ],
+  "checkpoints": "data/rollback-cases.json",
+  "phase_capabilities": "data/schema-phases.json"
+}

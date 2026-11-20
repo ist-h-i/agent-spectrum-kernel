@@ -1,0 +1,110 @@
+{
+  "type": "object",
+  "required": [
+    "mode",
+    "read_policy",
+    "writer_policy",
+    "rollout_steps",
+    "execute_requires_specific_approval",
+    "restore_requires_new_approval",
+    "revalidate_current_state",
+    "rollback_cases"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "const": "prepare_only"
+    },
+    "read_policy": {
+      "enum": [
+        "fallback_until_verified",
+        "legacy_only",
+        "new_field_only",
+        "legacy_during_overlap_then_v2"
+      ]
+    },
+    "writer_policy": {
+      "enum": [
+        "dual_write_until_contract",
+        "legacy_only",
+        "new_field_only"
+      ]
+    },
+    "rollout_steps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "backfill",
+          "cutover_reads",
+          "deploy_dual_writer",
+          "drain_legacy_writers",
+          "drop_legacy_field",
+          "expand_optional_field",
+          "verify_fresh_backfill"
+        ]
+      },
+      "minItems": 1
+    },
+    "execute_requires_specific_approval": {
+      "const": true
+    },
+    "restore_requires_new_approval": {
+      "const": true
+    },
+    "revalidate_current_state": {
+      "const": true
+    },
+    "rollback_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "cutover_ready",
+          "rollback_possible",
+          "action",
+          "snapshot_id",
+          "loss_risk"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cutover_ready": {
+            "type": "boolean"
+          },
+          "rollback_possible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "action": {
+            "enum": [
+              "revert_app_keep_expanded",
+              "restore_snapshot",
+              "forward_recover",
+              "manual_review"
+            ]
+          },
+          "snapshot_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "loss_risk": {
+            "enum": [
+              "none",
+              "post_snapshot_writes",
+              "unknown"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
