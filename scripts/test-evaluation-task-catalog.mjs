@@ -28,7 +28,9 @@ test('one selection entry lists the current primary, business and staged tasks',
   assert.ok(matches[0].observations.some(item => item.skills.includes('controlled-implementation') && item.observation));
   assert.ok(cli('task-list', '--difficulty', 'unassessed').some(task => task.id === 'ch02-report-operations'));
   assert.ok(cli('task-list', '--type', 'test').some(task => task.id === 'ch08-growth-workspace'));
-  assert.ok(tasks.find(task => task.id === 'ch02-report-operations').assessment.sources.some(source => source.path.endsWith('/contract.md')));
+  const business = tasks.find(task => task.id === 'ch02-report-operations');
+  assert.ok(business.assessment.sources.some(source => source.path.endsWith('/contract.md')));
+  assert.equal(business.assessment.input_manifest_digest, business.input.digest);
   assert.throws(() => cli('task-list', '--skill', 'not-a-skill'), /unknown skill/u);
 });
 

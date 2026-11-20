@@ -61,6 +61,7 @@ function businessEntries() {
   const catalog = json('benchmarks/challenge-candidates/business-five-v3-decisions/catalog.json');
   return catalog.tasks.map(row => {
     const manifestPath = join(businessRoot, row.input_manifest);
+    const inputDigest = digest(manifestPath);
     const taskRoot = join(businessRoot, dirname(row.task_path));
     const sources = [
       join(taskRoot, 'acceptance.md'), join(taskRoot, 'contract.md'), join(taskRoot, 'nonfunctional.md'),
@@ -75,16 +76,18 @@ function businessEntries() {
           `business acceptance criteria drift: ${row.id}`);
       }
     }
+    const assessment = { kind: 'public_acceptance_criteria', version: catalog.version, sources,
+      input_manifest_digest: inputDigest };
     return {
       id: row.id, title: row.title, domain: row.primary_axis,
       ...withDifficulty('unassessed', 'no_difficulty_estimate'),
       task_types: ['implementation'],
       input: {
-        kind: 'business', root: businessRoot, manifest: row.input_manifest, digest: digest(manifestPath),
+        kind: 'business', root: businessRoot, manifest: row.input_manifest, digest: inputDigest,
         task_path: row.task_path, version: catalog.version,
         prompts: { one_shot: row.one_shot_prompt, goal_with_pr: row.goal_with_pr_prompt },
       },
-      assessment: { kind: 'public_acceptance_criteria', version: catalog.version, sources, digest: canonicalDigest(sources) },
+      assessment: { ...assessment, digest: canonicalDigest(assessment) },
       criterionIds: row.requirements,
     };
   });

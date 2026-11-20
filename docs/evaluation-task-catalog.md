@@ -23,7 +23,7 @@ node scripts/practical-evaluation-cli.mjs task-prepare --id ch02-report-operatio
 node scripts/practical-evaluation-cli.mjs task-prepare --id ch06-build-operations --root /absolute/new-ch06 --delivery-mode goal_with_pr
 ```
 
-CH02〜CH06の既定は `one_shot` です。両モードとも共通仕様への相対参照が解決できるように準備します。実行の承認、モデル呼び出し、採点はそれぞれ既存の手順に従います。採点定義は通常課題の公表要件・評価器参照、業務課題の受入仕様、段階課題の固定評価器参照に対応します。
+CH02〜CH06の既定は `one_shot` です。両モードとも共通仕様への相対参照が解決できるように準備します。実行の承認、モデル呼び出し、採点はそれぞれ既存の手順に従います。採点定義は通常課題の公表要件・評価器参照、業務課題の受入仕様、段階課題の固定評価器参照に対応します。業務課題では、受入仕様が参照する個別の仕様書も入力目録のハッシュで結び付けます。
 
 ### 在庫・予約・物流
 
