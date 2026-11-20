@@ -106,8 +106,16 @@ test('measured scores stay bound to the tested input, scoring definition and pro
   };
   assert.equal(observe().edition, 'current');
   assert.deepEqual(observe().conditions[0], { condition: 'control', scores: [0, null, 6], trial_count: 3, scored_count: 2 });
+  result.maximum_points = 100;
+  result.conditions[0].scores = [50];
+  assert.throws(observe, /maximum must match the registered rubric group/u);
+  result.maximum_points = 10;
+  result.conditions[0].scores = [0, null, 6];
   registration.assets.revision = '1'.repeat(40);
   assert.equal(observe().edition, 'previous_protected_revision');
+  result.score_group = 'product';
+  assert.throws(observe, /maximum must match the registered rubric group/u);
+  delete result.score_group;
   row.acceptance_files = [join(row.input.root, 'task.md')];
   assert.equal(observe().edition, 'previous_assessment');
   row.input.version += '-updated';

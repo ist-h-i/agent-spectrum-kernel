@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "hi-financial-state-integrity",
-  "version": "task-revision-3",
+  "version": "task-revision-4",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1262,
-          "sha256": "b770aca5dd632d078eefcd663d55a3ce64d794c95abafe45147fbbd257415eb3"
+          "bytes": 1317,
+          "sha256": "7f1db3610159051d05831cd8ced92a615e596bdfd61b0cf2b28b41b25b7b7e26"
         },
         {
           "path": "workspace/data/incident.json",
@@ -23,14 +23,19 @@
           "sha256": "097d53fb1b80a7ee570292c9f19b8d3631b1331eddad7f7cefa0e40bc2691947"
         },
         {
+          "path": "workspace/data/service-save.json",
+          "bytes": 3075,
+          "sha256": "d69e34e48deba8c5b2555fb5916d211e6f25aa4f5f38b2160701f6091e9cdd2d"
+        },
+        {
           "path": "workspace/docs/bank-interchange.md",
-          "bytes": 3279,
-          "sha256": "5e0bd7c76827dfce4f91ff5973d577e6a78fdda533e1a46e2bd731b39f7f7439"
+          "bytes": 3285,
+          "sha256": "75958d012f13fa36a13d956a7eb7fa5eb494b9ba42381a7d8d0ef4db4247f832"
         },
         {
           "path": "workspace/docs/close-instructions.md",
-          "bytes": 2184,
-          "sha256": "dcd2c3bd5edfe5ce55e2087f8d6a3da4b523eb71cf7be780bbcbd1a154011544"
+          "bytes": 4389,
+          "sha256": "ea727317b963a58ff5bd28ac20b0419c142642db63c5684c9b525dc3b3f5c6cd"
         },
         {
           "path": "workspace/docs/ledger-contract.md",
@@ -64,13 +69,13 @@
         },
         {
           "path": "workspace/test/ledger.test.mjs",
-          "bytes": 1624,
-          "sha256": "ff7b611ce96892d473b22eef64c921ae7d4943fb4e6971cd38bf43bef33b79cf"
+          "bytes": 2162,
+          "sha256": "a9d1d36bfd876c71f196175ebd44e63c0787d6daed32ecf767b100c4695a8ac9"
         }
       ]
     }
   },
-  "rubric_digest": "sha256:c6b36c2405c9d63efe71883d84787fa3bb444ac51a2814c399bfe7237a067530",
+  "rubric_digest": "sha256:7fcb303e4664cc49d123086a8cbe6d213d9d1bf6f349507f2269b60a3617f664",
   "editable": [
     "workspace/src/archive.mjs",
     "workspace/src/clearing.mjs",

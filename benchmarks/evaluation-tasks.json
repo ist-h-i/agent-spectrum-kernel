@@ -192,7 +192,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-financial-state-integrity",
-        "version": "task-revision-3",
+        "version": "task-revision-4",
         "editable": [
           "workspace/src/archive.mjs",
           "workspace/src/clearing.mjs",

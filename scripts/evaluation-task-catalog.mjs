@@ -101,13 +101,13 @@ function studyResultsByTask(studies, tasks) {
       assert.ok(byTask.has(task_id) && result.input_version?.trim(), 'model result must identify the task and edition');
       assert.match(result.input_digest, digestPattern);
       assert.match(result.assessment_digest, digestPattern);
-      assert.ok(Number.isFinite(result.maximum_points) && result.maximum_points > 0, 'model result needs a positive score maximum');
+      assert.ok(Number.isSafeInteger(result.maximum_points) && result.maximum_points > 0, 'model result needs a positive raw score maximum');
       assert.ok(result.conditions.length && new Set(result.conditions.map(row => row.condition)).size === result.conditions.length,
         'duplicate or missing study conditions');
       const conditions = result.conditions.map(condition => {
         const { scores } = condition;
         assert.ok(condition.condition?.trim() && Array.isArray(scores) && scores.length
-          && scores.every(score => score === null || Number.isFinite(score) && score >= 0 && score <= result.maximum_points),
+          && scores.every(score => score === null || Number.isSafeInteger(score) && score >= 0 && score <= result.maximum_points),
         `invalid model scores for ${task_id}`);
         return { ...condition, trial_count: scores.length, scored_count: scores.filter(score => score !== null).length };
       });
@@ -170,9 +170,17 @@ export function listEvaluationTasks({ id: selection, difficulty, type, labels = 
       return { criterion_id, ...item };
     });
     const assessment = assessmentDefinition(row, assets, input, observations, runner);
-    const difficulty_observations = measured.get(id).map(observation => ({
-      ...observation, edition: observationEdition(observation, input, assessment),
-    }));
+    const difficulty_observations = measured.get(id).map(observation => {
+      const edition = observationEdition(observation, input, assessment);
+      const score_group = observation.score_group ?? 'task';
+      if (edition === 'current' || edition === 'previous_protected_revision') {
+        const group = observations.filter(item => (item.group ?? 'task') === score_group);
+        const maximum = score_group === 'challenge' ? runner?.evaluator.maximum : group.reduce((total, item) => total + item.points, 0);
+        assert.ok(maximum === observation.maximum_points,
+          `model score maximum must match the registered rubric group for ${id}`);
+      }
+      return { ...observation, score_group, edition };
+    });
     return { id, catalog_id, title, domain, primary_type: task_types[0], task_types, labels, difficulty, difficulty_basis,
       ...(difficulty_source ? { difficulty_source } : {}),
       difficulty_observations, input, assessment, observations };

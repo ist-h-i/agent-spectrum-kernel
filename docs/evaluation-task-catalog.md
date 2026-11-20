@@ -33,6 +33,8 @@ ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
 
 観測を追加するときは、`model_studies` に出典レポートの名前とSHA-256、ソースと非公開資材のコミット、モデル・推論強度・実行環境を記録します。各課題の観測は、実行した版の `input.version`、`input.digest`、`assessment.digest` に結び付けます。難易度を校正するときは条件ごとに得点分布と満点率を見て、同じ条件の反復と採点上の制約を確認します。1回の試行からは、その条件で実際に得た点数を報告できます。
 
+実測値は `task-score` の採点範囲に対応する素点で記録します。段階課題の本体得点は `score_group: "challenge"` と登録済み評価器の満点を使います。補足評価の製品観測と提出観測はそれぞれ `product` と `submission` で指定します。表示中の配点と素点の分母が一致することをカタログが検査します。
+
 ## 回答者に渡す範囲
 
 `task-prepare` は新しい `--root` に固定入力を照合して用意します。運用者は出力の `workspace/` だけを回答者の作業領域に渡します。`working_directory` から作業し、`prompt_file` があればそれを使います。ホスト側の準備記録、ソースリポジトリ、npmパッケージ、閲覧用の認証情報は運用者側に置きます。CH02〜CH06は `--delivery-mode one_shot` と `--delivery-mode goal_with_pr` を使えます。

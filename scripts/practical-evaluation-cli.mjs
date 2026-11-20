@@ -46,7 +46,8 @@ function catalogTable(tasks) {
   const scoreCell = task => task.difficulty_observations.filter(row => row.edition === 'current').flatMap(study =>
     study.conditions.map(({ condition, scores }) => {
       const values = scores.map(value => value === null ? '?' : value).join(', ');
-      return `${study.model}/${study.reasoning_effort} ${condition} [${values}]/${study.maximum_points}`;
+      const group = study.score_group === 'task' ? '' : ` (${study.score_group})`;
+      return `${study.model}/${study.reasoning_effort} ${condition}${group} [${values}]/${study.maximum_points}`;
     })
   ).join('<br>') || (task.difficulty_observations.length ? '— (earlier edition in JSON)' : '—');
   const rows = [

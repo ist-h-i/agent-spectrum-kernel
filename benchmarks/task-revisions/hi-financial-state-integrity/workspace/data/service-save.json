@@ -1,0 +1,160 @@
+{
+  "format": 2,
+  "firstOpen": "2025-05-01",
+  "tariffs": [
+    {
+      "code": "A",
+      "from": "2019-01-01",
+      "collector": "clearing",
+      "bands": [
+        {
+          "through": null,
+          "bps": 100
+        }
+      ],
+      "ceiling": "90"
+    },
+    {
+      "code": "B",
+      "from": "2025-01-01",
+      "collector": "clearing",
+      "bands": [
+        {
+          "through": "1000",
+          "bps": 150
+        },
+        {
+          "through": null,
+          "bps": 50
+        }
+      ],
+      "ceiling": "175"
+    }
+  ],
+  "cash": {
+    "float": "99300",
+    "merchant": "594",
+    "clearing": "8",
+    "reserve": "10098"
+  },
+  "cards": {
+    "north/14": {
+      "ticket": {
+        "office": "north",
+        "day": "2025-04-08",
+        "serial": "14"
+      },
+      "from": "float",
+      "to": "merchant",
+      "limit": "2500",
+      "plan": "A",
+      "gross": "600",
+      "final": false,
+      "revision": 1
+    },
+    "quay/22": {
+      "ticket": {
+        "office": "quay",
+        "day": "2025-05-02",
+        "serial": "22"
+      },
+      "from": "float",
+      "to": "reserve",
+      "limit": "1250",
+      "plan": "B",
+      "gross": "100",
+      "revision": 1,
+      "final": false
+    }
+  },
+  "positions": {
+    "night": 27,
+    "evening": 1
+  },
+  "lines": [
+    {
+      "account": "float",
+      "posted": "2025-04-10",
+      "entry": {
+        "ticket": {
+          "office": "north",
+          "day": "2025-04-08",
+          "serial": "14"
+        },
+        "revision": 1,
+        "valueDay": "2025-04-10",
+        "movement": "-600"
+      }
+    },
+    {
+      "account": "merchant",
+      "posted": "2025-04-10",
+      "entry": {
+        "ticket": {
+          "office": "north",
+          "day": "2025-04-08",
+          "serial": "14"
+        },
+        "revision": 1,
+        "valueDay": "2025-04-10",
+        "movement": "594"
+      }
+    },
+    {
+      "account": "clearing",
+      "posted": "2025-04-10",
+      "entry": {
+        "ticket": {
+          "office": "north",
+          "day": "2025-04-08",
+          "serial": "14"
+        },
+        "revision": 1,
+        "valueDay": "2025-04-10",
+        "movement": "6"
+      }
+    },
+    {
+      "account": "float",
+      "posted": "2025-05-02",
+      "entry": {
+        "ticket": {
+          "office": "quay",
+          "day": "2025-05-02",
+          "serial": "22"
+        },
+        "revision": 1,
+        "valueDay": "2025-05-02",
+        "movement": "-100"
+      }
+    },
+    {
+      "account": "reserve",
+      "posted": "2025-05-02",
+      "entry": {
+        "ticket": {
+          "office": "quay",
+          "day": "2025-05-02",
+          "serial": "22"
+        },
+        "revision": 1,
+        "valueDay": "2025-05-02",
+        "movement": "98"
+      }
+    },
+    {
+      "account": "clearing",
+      "posted": "2025-05-02",
+      "entry": {
+        "ticket": {
+          "office": "quay",
+          "day": "2025-05-02",
+          "serial": "22"
+        },
+        "revision": 1,
+        "valueDay": "2025-05-02",
+        "movement": "2"
+      }
+    }
+  ]
+}

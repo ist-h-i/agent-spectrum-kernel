@@ -29,3 +29,12 @@ test('the bank can check its archived delivery position', () => {
   const book = openBook(archive);
   assert.deepEqual(book.receive({feed: 'night', codec: 'json', after: 28, rows: []}), {status: 'gap', through: 27});
 });
+
+test('teller can read and continue work from a deployed kiosk save', () => {
+  const saved = JSON.parse(readFileSync(new URL('../data/service-save.json', import.meta.url)));
+  const book = openBook(saved);
+  assert.deepEqual(book.balance('float'), {posted: '99300', available: '96250'});
+  assert.equal(book.statement('reserve', '2025-05-02')[0].ticket.office, 'quay');
+  const ticket = {office: 'mill', day: '2025-05-08', serial: '23'};
+  assert.equal(book.place({ticket, from: 'reserve', to: 'merchant', limit: '300'}), 'opened');
+});

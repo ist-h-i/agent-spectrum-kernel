@@ -27,7 +27,7 @@
     {
       "id": "continuity",
       "points": 2,
-      "observation": "Existing branch books and saved service books remain usable on the live interfaces.",
+      "observation": "Signed archives, deployed kiosk saves and subsequent saves preserve the records and decisions they can support.",
       "skills": ["controlled-implementation"]
     }
   ]
