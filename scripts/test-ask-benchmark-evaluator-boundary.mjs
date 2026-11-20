@@ -816,6 +816,7 @@ try {
     { path: "schemas/compact-profile-control-map.json", reader: "scripts/fixed-entry-profile.mjs" },
     { path: "schemas/fixed-entry-profile-registry.json", reader: "scripts/fixed-entry-profile.mjs" },
     { path: "schemas/verification-proof-policy.schema.json", reader: "scripts/verification-proof-policy.mjs" },
+    { path: "benchmarks/portfolio-catalog.json", reader: "scripts/ask-primary-public-catalog-registry.mjs" },
   ], "eager authority reads must remain an exact frozen binding inventory");
   for (const { path: authorityPath, reader: readerPath } of EVALUATOR_EAGER_AUTHORITY_READS) {
     assert.ok(currentDependencyGraph.node_inventory.some(({ path, file_type: fileType }) => path === authorityPath && fileType === "authority_data"), `current evaluator graph must freeze ${authorityPath} as authority data`);
@@ -823,6 +824,16 @@ try {
   }
   const coreAuthorityPaths = EVALUATOR_EAGER_AUTHORITY_READS
     .filter(({ reader }) => reader === "scripts/ask-core-capabilities.mjs").map(({ path }) => path);
+  const historicalRegistry = writeDependencyGraphFixture("historical-primary-registry",
+    'import "./scripts/ask-primary-fixture-registry.mjs";\n', {
+      "scripts/ask-primary-fixture-registry.mjs": "export const PRIMARY_FIXTURE_REGISTRY = [];\n",
+    });
+  const historicalParameters = { root: historicalRegistry.root, baseRevision: historicalRegistry.revision, entryPaths: ["entry.mjs"] };
+  assert.deepEqual(
+    deriveEvaluatorDependencyGraph({ ...historicalParameters, authorityPaths: ["benchmarks/portfolio-catalog.json"] }),
+    deriveEvaluatorDependencyGraph({ ...historicalParameters, authorityPaths: [] }),
+    "a historical registry that never read the catalog retains its original graph",
+  );
   const inactiveReaderFixture = writeDependencyGraphFixture("inactive-core-reader", 'export { value } from "./nested.mjs";\n');
   const inactiveParameters = { root: inactiveReaderFixture.root, baseRevision: inactiveReaderFixture.revision, entryPaths: ["entry.mjs"] };
   assert.deepEqual(

@@ -33,7 +33,9 @@ for (const entries of [
 });
 test("primary registry leaf remains pinned by the existing producer source closure", async () => {
   const { primaryProducerSources } = await import("./ask-primary-evaluation-producer.mjs");
-  assert.match(primaryProducerSources()["scripts/ask-primary-fixture-registry.mjs"], /^sha256:[a-f0-9]{64}$/u);
+  const sources = primaryProducerSources();
+  for (const path of ["scripts/ask-primary-fixture-registry.mjs", "scripts/ask-primary-public-catalog-registry.mjs",
+    "benchmarks/portfolio-catalog.json"]) assert.match(sources[path], /^sha256:[a-f0-9]{64}$/u);
 });
 function source(id) {
   const base = join(root, "benchmarks/fixtures/checkpoint-b2", id);

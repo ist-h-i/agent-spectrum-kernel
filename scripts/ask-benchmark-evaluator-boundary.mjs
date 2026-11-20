@@ -96,6 +96,7 @@ export const EVALUATOR_EAGER_AUTHORITY_READS = Object.freeze([
   Object.freeze({ path: "schemas/compact-profile-control-map.json", reader: "scripts/fixed-entry-profile.mjs" }),
   Object.freeze({ path: "schemas/fixed-entry-profile-registry.json", reader: "scripts/fixed-entry-profile.mjs" }),
   Object.freeze({ path: "schemas/verification-proof-policy.schema.json", reader: "scripts/verification-proof-policy.mjs" }),
+  Object.freeze({ path: "benchmarks/portfolio-catalog.json", reader: "scripts/ask-primary-public-catalog-registry.mjs" }),
 ]);
 export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/schemas/evaluator-authority-manifest.schema.json",
