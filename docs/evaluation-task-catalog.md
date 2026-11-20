@@ -1,12 +1,13 @@
 # 評価課題の一覧と実行準備
 
-通常24問、業務6問、RC01、CH08を一つのカタログから選べます。全32問に固定番号（`ASK-001` など）、主な作業種別、対象領域のラベル、難易度の見立てがあります。[共通カタログ](../benchmarks/evaluation-tasks.json)
+通常25問、業務6問、RC01、CH08を一つのカタログから選べます。全33問に固定番号（`ASK-001` など）、主な作業種別、対象領域のラベル、難易度の見立てがあります。[共通カタログ](../benchmarks/evaluation-tasks.json)
 
 ```sh
 ask evaluate task-list --format table
 ask evaluate task-list --type review --label ui --format table
 ask evaluate task-list --label data-migration --label recovery --format table
 ask evaluate task-list --difficulty expert --format table
+ask evaluate task-list --model gpt-6.2-astra --effort max --score-range 40-60 --format table
 ask evaluate task-list --difficulty medium_hard --type review --skill controlled-implementation
 ask evaluate task-list --id ASK-012
 ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
@@ -21,6 +22,12 @@ ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
 ## 難易度と実モデルの観測
 
 `--difficulty` は出題者の見立てで絞り込みます。`unassessed` は見立てが未設定の課題、`expert` は上位モデルの評価を想定して設計した課題です。`difficulty_basis` でその根拠を確認できます。
+
+上位モデル向けの設計例は、決済台帳の移行・再照合（`ASK-003`）と、過去の明細を共有アーカイブから復元する追加課題（`ASK-033`）です。既存の `ASK-023` は、疎な入力と密な入力でイベント取得の実行時間を測る `hard` の課題です。
+
+`--score-range 40-60` は、現行版の実測得点の中央値が40〜60%の課題を抽出します。両端を含み、小数も指定できます。`--model`、`--effort`、`--condition` は登録されたモデル名、推論強度、実行条件名の完全一致で絞り込みます。たとえば `--condition ask_none` はその条件だけを対象にします。いずれかの実測フィルターを使うと、該当する試行系列だけを表示します。一致する観測がなければ結果は0問です。
+
+各系列は同じ研究・モデル・推論強度・実行条件・採点グループに属します。採点できた素点から中央値を求め、そのグループの満点で割って100を掛けます。偶数件では中央2件の平均を使います。`null` は試行数に残し、中央値の計算からは除きます。1件だけでも表示されるため、実用上の難易度を判断するときは分布と試行数を確認してください。
 
 `task-list --id <ID>` の `difficulty_observations` には、実モデルで得た条件ごとの素点、満点、試行数、採点できた件数が入ります。空配列は登録済みの観測がないことを示します。試行したが採点できなかった点数は `null` です。`edition` は観測と現在の版との関係を示します。
 

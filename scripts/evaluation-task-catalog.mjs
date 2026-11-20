@@ -130,7 +130,35 @@ function observationEdition(observation, input, assessment) {
   return observation.assessment_digest === canonicalDigest(earlier) ? 'previous_protected_revision' : 'previous_assessment';
 }
 
-export function listEvaluationTasks({ id: selection, difficulty, type, labels = [], skill } = {}) {
+function parseScoreRange(value) {
+  const match = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/u.exec(value);
+  assert.ok(match, '--score-range must be MIN-MAX between 0 and 100');
+  const minimum = Number(match[1]), maximum = Number(match[2]);
+  assert.ok(minimum <= maximum && maximum <= 100, '--score-range requires 0 <= MIN <= MAX <= 100');
+  return { minimum, maximum };
+}
+
+function selectMeasurements(observations, { model, effort, condition, range }) {
+  const matches = [];
+  for (const study of observations) {
+    if (study.edition !== 'current' || (model !== undefined && study.model !== model)
+      || (effort !== undefined && study.reasoning_effort !== effort)) continue;
+    const conditions = [];
+    for (const series of study.conditions) {
+      if (!series.scored_count || (condition !== undefined && series.condition !== condition)) continue;
+      const ordered = series.scores.filter(score => score !== null).sort((a, b) => a - b);
+      const half = Math.floor(ordered.length / 2);
+      const median = ordered.length % 2 ? ordered[half] : (ordered[half - 1] + ordered[half]) / 2;
+      const percent = median * 100 / study.maximum_points;
+      if (range && (percent < range.minimum || percent > range.maximum)) continue;
+      conditions.push({ ...series, median_percent: percent });
+    }
+    if (conditions.length) matches.push({ ...study, conditions });
+  }
+  return matches;
+}
+
+export function listEvaluationTasks({ id: selection, difficulty, type, labels = [], skill, model, effort, condition, scoreRange } = {}) {
   const skills = new Set(json('manifest.json').skills);
   assert.ok(difficulty === undefined || difficulties.has(difficulty), `unknown difficulty: ${difficulty}`);
   assert.ok(type === undefined || types.has(type), `unknown task type: ${type}`);
@@ -138,6 +166,8 @@ export function listEvaluationTasks({ id: selection, difficulty, type, labels = 
   const { tasks, assets, labels: vocabulary, model_studies } = readEvaluationTaskRegistrations();
   for (const label of labels) assert.ok(vocabulary.includes(label), `unknown label: ${label}`);
   const measured = studyResultsByTask(model_studies, tasks);
+  const empiricalFilter = [model, effort, condition, scoreRange].some(value => value !== undefined);
+  const range = scoreRange === undefined ? undefined : parseScoreRange(scoreRange);
   const matchesId = task => selection === undefined || task.id === selection || task.catalog_id === selection;
   assert.ok(tasks.some(matchesId), `unknown evaluation task: ${selection}`);
   return tasks.map(row => {
@@ -171,7 +201,7 @@ export function listEvaluationTasks({ id: selection, difficulty, type, labels = 
       return { criterion_id, ...item };
     });
     const assessment = assessmentDefinition(row, assets, input, observations, runner);
-    const difficulty_observations = measured.get(id).map(observation => {
+    const studies = measured.get(id).map(observation => {
       const edition = observationEdition(observation, input, assessment);
       const score_group = observation.score_group ?? 'task';
       if (edition === 'current' || edition === 'previous_protected_revision') {
@@ -182,11 +212,13 @@ export function listEvaluationTasks({ id: selection, difficulty, type, labels = 
       }
       return { ...observation, score_group, edition };
     });
+    const difficulty_observations = empiricalFilter ? selectMeasurements(studies, { model, effort, condition, range }) : studies;
     return { id, catalog_id, title, domain, primary_type: task_types[0], task_types, labels, difficulty, difficulty_basis,
       ...(difficulty_source ? { difficulty_source } : {}),
       difficulty_observations, input, assessment, observations };
   }).filter(task => matchesId(task) && (difficulty === undefined || task.difficulty === difficulty)
     && (type === undefined || task.task_types.includes(type))
     && labels.every(label => task.labels.includes(label))
+    && (!empiricalFilter || task.difficulty_observations.length)
     && (skill === undefined || task.observations.some(item => item.skills.includes(skill))));
 }

@@ -17,15 +17,24 @@ test('one selection entry lists the current primary, business and staged tasks',
   const tasks = cli('task-list');
   const ids = tasks.map(task => task.id);
   const registration = readEvaluationTaskRegistrations();
-  assert.equal(new Set(ids).size, 32);
-  assert.equal(ids.length, 32);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(ids.length >= 33);
   assert.deepEqual(ids, registration.tasks.map(task => task.id));
-  assert.equal(tasks.filter(task => task.input.kind === 'primary').length, 24);
+  assert.ok(tasks.filter(task => task.input.kind === 'primary').length >= 25);
   assert.deepEqual(tasks.filter(task => task.input.kind !== 'primary').map(task => task.id), ['ch01-inventory-reservation-logistics',
     'ch02-report-operations', 'ch03-price-rollout', 'ch04-document-access',
     'ch05-sales-reconciliation', 'ch06-build-operations', 'rc01-shared-review-platform', 'ch08-growth-workspace']);
   assert.ok(tasks.every(task => task.title && task.domain && task.observations.length));
   assert.equal(new Set(tasks.map(task => task.catalog_id)).size, tasks.length);
+  const byNumber = new Map(tasks.map(task => [task.catalog_id, task]));
+  for (const [number, slug, estimate] of [
+    ['ASK-003', 'hi-financial-state-integrity', 'expert'],
+    ['ASK-023', 'pf-performance-regression', 'hard'],
+    ['ASK-033', 'implementation-timeline-restore', 'expert'],
+  ]) {
+    assert.equal(byNumber.get(number)?.id, slug);
+    assert.equal(byNumber.get(number)?.difficulty, estimate);
+  }
   for (const task of tasks) {
     assert.match(task.catalog_id, /^ASK-\d{3,}$/u);
     assert.equal(task.primary_type, task.task_types[0]);
@@ -70,9 +79,13 @@ test('operators select by stable catalog number, work type and all requested lab
   assert.doesNotMatch(text, /ASK-013/u);
   assert.throws(() => cli('task-list', '--label', 'not-a-label'), /unknown label/u);
   assert.throws(() => cli('task-list', '--id', 'ASK-000'), /unknown evaluation task/u);
+  const absent = ['task-list', '--model', 'unregistered-test-model', '--effort', 'max', '--condition', 'test', '--score-range', '40-60'];
+  assert.deepEqual(cli(...absent), []);
+  assert.doesNotMatch(cliOutput(...absent, '--format', 'table'), /ASK-\d+/u);
+  assert.throws(() => cli('task-list', '--score-range', '60-40'), /--score-range/u);
 });
 
-test('measured scores stay bound to the tested input, scoring definition and protected revision', async t => {
+async function isolatedScoreCatalog(t) {
   const root = mkdtempSync(join(realpathSync(tmpdir()), 'ask-difficulty-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const registration = readEvaluationTaskRegistrations();
@@ -93,6 +106,11 @@ test('measured scores stay bound to the tested input, scoring definition and pro
   write();
   const { listEvaluationTasks } = await import(pathToFileURL(join(root, 'scripts/evaluation-task-catalog.mjs')));
   const [task] = listEvaluationTasks();
+  return { root, registration, row, write, listEvaluationTasks, task };
+}
+
+test('measured scores stay bound to the tested input, scoring definition and protected revision', async t => {
+  const { root, registration, row, write, listEvaluationTasks, task } = await isolatedScoreCatalog(t);
   const result = { task_id: task.id, input_version: task.input.version, input_digest: task.input.digest,
     assessment_digest: task.assessment.digest, maximum_points: 10, conditions: [{ condition: 'control', scores: [0, null, 6] }] };
   registration.model_studies.push({
@@ -141,9 +159,61 @@ test('measured scores stay bound to the tested input, scoring definition and pro
     conditions: [{condition: 'control', scores: [50.25]}]}];
   registration.model_studies = [study];
   assert.equal(observe().edition, 'current');
+  const product = { ...study.results[0], score_group: 'product', maximum_points: 6, conditions: [{ condition: 'control', scores: [3] }] };
+  registration.model_studies.push({ ...study, id: 'supplemental', results: [product] });
+  write();
+  for (const [range, expected] of [['50-50', 'product'], ['50.25-50.25', 'challenge']]) {
+    const [match] = listEvaluationTasks({ scoreRange: range });
+    assert.deepEqual(match.difficulty_observations.map(row => row.score_group), [expected]);
+  }
   study.results[0].score_group = 'product';
   study.results[0].conditions[0].scores = [50];
   assert.throws(observe, /maximum must match the registered rubric group/u);
+});
+
+test('empirical selection compares medians within current scored conditions and retains raw samples', async t => {
+  const { registration, write, listEvaluationTasks, task } = await isolatedScoreCatalog(t);
+  const result = {
+    task_id: task.id, input_version: task.input.version, input_digest: task.input.digest,
+    assessment_digest: task.assessment.digest, maximum_points: 10,
+    conditions: [
+      { condition: 'automatic', scores: [8, null, 2] },
+      { condition: 'manual', scores: [10, 0, 10] },
+      { condition: 'missing', scores: [null] },
+      { condition: 'low', scores: [0] },
+    ],
+  };
+  const study = {
+    id: 'current', report: 'test fixture', report_digest: 'sha256:' + '0'.repeat(64),
+    model: 'A', runtime: 'fixture', reasoning_effort: 'max', source_revision: '0'.repeat(40),
+    protected_revision: registration.assets.revision, limitations: ['Contract test only.'], results: [result],
+  };
+  registration.model_studies = [
+    study, { ...study, id: 'other-model', model: 'B' }, { ...study, id: 'other-effort', reasoning_effort: 'medium' },
+    { ...study, id: 'prior-input', results: [{ ...result, input_version: 'earlier' }] },
+    { ...study, id: 'prior-scoring', results: [{ ...result, assessment_digest: 'sha256:' + 'f'.repeat(64) }] },
+    { ...study, id: 'prior-assets', protected_revision: 'a'.repeat(40) },
+  ];
+  write();
+  const select = options => listEvaluationTasks({ model: 'A', effort: 'max', ...options });
+  const [match] = select({ scoreRange: '50-50' });
+  assert.deepEqual(match.difficulty_observations.map(study => study.id), ['current']);
+  assert.deepEqual(match.difficulty_observations[0].conditions, [{
+    condition: 'automatic', scores: [8, null, 2], trial_count: 3, scored_count: 2, median_percent: 50,
+  }]);
+  assert.equal(select({ scoreRange: '49.99-50', condition: 'automatic' }).length, 1);
+  assert.equal(select({ scoreRange: '50-50.01', condition: 'automatic' }).length, 1);
+  assert.equal(select({ scoreRange: '0-0', condition: 'low' }).length, 1);
+  assert.equal(select({ scoreRange: '100-100', condition: 'manual' }).length, 1);
+  assert.deepEqual(select({ scoreRange: '40-60', condition: 'manual' }), []);
+  assert.deepEqual(select({ condition: 'missing' }), []);
+  assert.deepEqual(select({ model: 'unseen' }), []);
+  assert.deepEqual(select({ effort: 'unseen' }), []);
+  assert.equal(listEvaluationTasks()[0].difficulty_observations.length, 6);
+  assert.equal(listEvaluationTasks()[0].difficulty_observations[0].conditions.length, 4);
+  for (const scoreRange of ['60-40', '0-101', '-5-10', '50', 'x-60']) {
+    assert.throws(() => select({ scoreRange }), /--score-range/u);
+  }
 });
 
 test('every listed public task prepares independently through the selection CLI', () => {

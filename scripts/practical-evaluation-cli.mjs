@@ -44,10 +44,11 @@ function prepareSelectedTask(options) {
 
 function catalogTable(tasks) {
   const scoreCell = task => task.difficulty_observations.filter(row => row.edition === 'current').flatMap(study =>
-    study.conditions.map(({ condition, scores }) => {
+    study.conditions.map(({ condition, scores, median_percent }) => {
       const values = scores.map(value => value === null ? '?' : value).join(', ');
       const group = study.score_group === 'task' ? '' : ` (${study.score_group})`;
-      return `${study.model}/${study.reasoning_effort} ${condition}${group} [${values}]/${study.maximum_points}`;
+      const median = median_percent === undefined ? '' : ` (median ${median_percent}%)`;
+      return `${study.model}/${study.reasoning_effort} ${condition}${group} [${values}]/${study.maximum_points}${median}`;
     })
   ).join('<br>') || (task.difficulty_observations.length ? '— (earlier edition in JSON)' : '—');
   const rows = [
@@ -74,11 +75,12 @@ try{
     else o[key] = value;
   }
   if (command === 'task-list') {
-    const options = ['--id', '--difficulty', '--type', '--label', '--skill', '--format'];
+    const options = ['--id', '--difficulty', '--type', '--label', '--skill', '--format', '--model', '--effort', '--condition', '--score-range'];
     assert.ok(Object.keys(o).every(key => options.includes(key)), 'unsupported task-list options');
     assert.ok([undefined, 'json', 'table'].includes(o['--format']), 'task-list --format must be json or table');
     const tasks = listEvaluationTasks({
       id: o['--id'], difficulty: o['--difficulty'], type: o['--type'], labels: o['--label'], skill: o['--skill'],
+      model: o['--model'], effort: o['--effort'], condition: o['--condition'], scoreRange: o['--score-range'],
     });
     console.log(o['--format'] === 'table' ? catalogTable(tasks) : JSON.stringify(tasks, null, 2));
   }
