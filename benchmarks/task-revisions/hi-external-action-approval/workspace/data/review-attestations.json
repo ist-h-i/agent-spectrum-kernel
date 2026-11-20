@@ -1,0 +1,257 @@
+[
+  {
+    "review_receipt_id": "review-21",
+    "receipt_id": "receipt-general",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-22",
+    "receipt_id": "receipt-other-service",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-23",
+    "receipt_id": "receipt-other-env",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-24",
+    "receipt_id": "receipt-other-params",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-25",
+    "receipt_id": "receipt-old-state",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-26",
+    "receipt_id": "receipt-expired",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-27",
+    "receipt_id": "receipt-used",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-28",
+    "receipt_id": "receipt-pending",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-29",
+    "receipt_id": "receipt-missing",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-30",
+    "receipt_id": "receipt-exact-7",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-31",
+    "receipt_id": "receipt-exact-7",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 4,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-38",
+    "receipt_id": "receipt-reviewed-7",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-39",
+    "receipt_id": "receipt-reviewed-7",
+    "status": "approved",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-9"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-40",
+    "receipt_id": "receipt-reviewed-7",
+    "status": "approved",
+    "issued_by": "operator-mori",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  },
+  {
+    "review_receipt_id": "review-42",
+    "receipt_id": "receipt-reviewed-7",
+    "status": "revoked",
+    "issued_by": "reviewer-lin",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 300,
+    "single_use": true,
+    "used": false
+  }
+]

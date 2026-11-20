@@ -11,7 +11,8 @@
       }
     },
     "receipt_id": "receipt-exact-7",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-38"
   },
   {
     "case_id": "rollout-general",
@@ -25,7 +26,8 @@
       }
     },
     "receipt_id": "receipt-general",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-21"
   },
   {
     "case_id": "rollout-other-service",
@@ -39,7 +41,8 @@
       }
     },
     "receipt_id": "receipt-other-service",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-22"
   },
   {
     "case_id": "rollout-other-env",
@@ -53,7 +56,8 @@
       }
     },
     "receipt_id": "receipt-other-env",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-23"
   },
   {
     "case_id": "rollout-other-params",
@@ -67,7 +71,8 @@
       }
     },
     "receipt_id": "receipt-other-params",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-24"
   },
   {
     "case_id": "rollout-old-state",
@@ -81,7 +86,8 @@
       }
     },
     "receipt_id": "receipt-old-state",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-25"
   },
   {
     "case_id": "rollout-expired",
@@ -95,7 +101,8 @@
       }
     },
     "receipt_id": "receipt-expired",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-26"
   },
   {
     "case_id": "rollout-used",
@@ -109,7 +116,8 @@
       }
     },
     "receipt_id": "receipt-used",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-27"
   },
   {
     "case_id": "rollout-pending",
@@ -123,7 +131,8 @@
       }
     },
     "receipt_id": "receipt-pending",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-28"
   },
   {
     "case_id": "rollout-missing",
@@ -137,7 +146,8 @@
       }
     },
     "receipt_id": "receipt-missing",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-29"
   },
   {
     "case_id": "rollout-at-expiry",
@@ -151,7 +161,8 @@
       }
     },
     "receipt_id": "receipt-exact-7",
-    "now": 200
+    "now": 200,
+    "review_receipt_id": "review-30"
   },
   {
     "case_id": "reconfigured-rollout",
@@ -165,6 +176,82 @@
       }
     },
     "receipt_id": "receipt-exact-7",
-    "now": 100
+    "now": 100,
+    "review_receipt_id": "review-31"
+  },
+  {
+    "case_id": "rollout-reviewed",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-reviewed-7",
+    "now": 100,
+    "review_receipt_id": "review-38"
+  },
+  {
+    "case_id": "rollout-review-other-image",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-reviewed-7",
+    "now": 100,
+    "review_receipt_id": "review-39"
+  },
+  {
+    "case_id": "rollout-review-same-signer",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-reviewed-7",
+    "now": 100,
+    "review_receipt_id": "review-40"
+  },
+  {
+    "case_id": "rollout-missing-review",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-reviewed-7",
+    "now": 100,
+    "review_receipt_id": "review-41"
+  },
+  {
+    "case_id": "rollout-review-revoked",
+    "operation": {
+      "action": "rollout",
+      "service": "fictional-index",
+      "environment": "staging",
+      "parameters": {
+        "replicas": 3,
+        "image": "candidate-8"
+      }
+    },
+    "receipt_id": "receipt-reviewed-7",
+    "now": 100,
+    "review_receipt_id": "review-42"
   }
 ]

@@ -12,7 +12,8 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 200,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-general",
@@ -27,7 +28,8 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 200,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-other-service",
@@ -42,7 +44,8 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 200,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-other-env",
@@ -57,7 +60,8 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 200,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-other-params",
@@ -72,7 +76,8 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 200,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-old-state",
@@ -87,7 +92,8 @@
     "state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
     "expires_at": 200,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-expired",
@@ -102,7 +108,8 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 100,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-used",
@@ -117,7 +124,8 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 200,
     "single_use": true,
-    "used": true
+    "used": true,
+    "issued_by": "operator-mori"
   },
   {
     "receipt_id": "receipt-pending",
@@ -132,6 +140,23 @@
     "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
     "expires_at": 200,
     "single_use": true,
-    "used": false
+    "used": false,
+    "issued_by": "operator-mori"
+  },
+  {
+    "receipt_id": "receipt-reviewed-7",
+    "status": "approved",
+    "action": "rollout",
+    "service": "fictional-index",
+    "environment": "staging",
+    "parameters": {
+      "replicas": 3,
+      "image": "candidate-8"
+    },
+    "state_sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
+    "expires_at": 200,
+    "single_use": true,
+    "used": false,
+    "issued_by": "operator-mori"
   }
 ]

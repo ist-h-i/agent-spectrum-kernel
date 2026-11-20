@@ -7,6 +7,7 @@ export const stateBytes = readFileSync(new URL('../data/state.json', import.meta
 export const state = JSON.parse(stateBytes);
 export const stateSha = createHash('sha256').update(stateBytes).digest('hex');
 export const receipts = load('../data/approval-receipts.json');
+export const reviews = load('../data/review-attestations.json');
 export const cases = load('../data/operation-cases.json');
 const schema = load('../plan.schema.json');
 
@@ -35,6 +36,7 @@ export function inspectPlan(plan) {
     }
     seen.add(decision.case_id);
     if (decision.receipt_id !== row.receipt_id) failures.add('receipt_binding');
+    if (decision.review_receipt_id !== row.review_receipt_id) failures.add('review_binding');
     if ((decision.disposition === 'ready') !== (decision.reasons.length === 0)) {
       failures.add('decision_consistency');
     }

@@ -14,13 +14,18 @@
         },
         {
           "path": "workspace/data/approval-receipts.json",
-          "bytes": 3535,
-          "sha256": "059a91b51e7e98fb901a907c9bb49ab6bc1e0980c3883d2aab9813a0e21e5375"
+          "bytes": 4269,
+          "sha256": "bc22febfccebf32907748f52e6fb26440022c819c5cd6c23f7b59605d5678f89"
         },
         {
           "path": "workspace/data/operation-cases.json",
-          "bytes": 3632,
-          "sha256": "8a603853b5e0a322d5562e2ea8f24dc008659ec66862961564060aaf1e6179d0"
+          "bytes": 5830,
+          "sha256": "df76662a2b5cadce4944522797df6ca5f6590c47e8f9b8bef43ca89a8a04d9d4"
+        },
+        {
+          "path": "workspace/data/review-attestations.json",
+          "bytes": 6957,
+          "sha256": "1e71b7b30a9863285b7427d521f6e827a453e36db79d5f11404a4b7bd0cfbc2b"
         },
         {
           "path": "workspace/data/state.json",
@@ -29,8 +34,8 @@
         },
         {
           "path": "workspace/docs/action-contract.md",
-          "bytes": 2849,
-          "sha256": "3f132a7e44dcdc7ae9b3656074e30e2945f0ce604eb9f67fd114d7df105982d3"
+          "bytes": 3139,
+          "sha256": "47a4f6758cc083c41b8b421e1eb5146dcba30175503cf2cd7bcbe8070499d33d"
         },
         {
           "path": "workspace/operation-plan.json",
@@ -44,13 +49,13 @@
         },
         {
           "path": "workspace/plan.schema.json",
-          "bytes": 2674,
-          "sha256": "036b0ebf6496acc218584c0c4c24ec1dbfc6d1fb4180fd910bffd7f159a56381"
+          "bytes": 3145,
+          "sha256": "e02fb3863e15afda3a77ef11f8a25804ebaad538ec2dac4a6727ebb92af8b833"
         },
         {
           "path": "workspace/scripts/controller.mjs",
-          "bytes": 1596,
-          "sha256": "cff26cdab42df8a98894c6f5287b0338eed86dac9ad48fac8f2015448fdb7d75"
+          "bytes": 1755,
+          "sha256": "cea53787de8823996cb21625a6a39a93e2f46150cec3feb660ed7158091841a0"
         },
         {
           "path": "workspace/scripts/dry-run.mjs",
@@ -69,8 +74,8 @@
         },
         {
           "path": "workspace/test/approval.test.mjs",
-          "bytes": 2708,
-          "sha256": "22dc71955561910e405e8cc1e5dd90c3658eec2ce1da76fba7b319d99a85185a"
+          "bytes": 2908,
+          "sha256": "67e5470bc61428713b26490e0b18068b8fe0b05a3228c684238e30f7e93a91c6"
         }
       ]
     }

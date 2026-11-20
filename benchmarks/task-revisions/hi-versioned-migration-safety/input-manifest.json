@@ -19,8 +19,8 @@
         },
         {
           "path": "workspace/data/rollback-cases.json",
-          "bytes": 966,
-          "sha256": "e15d4fbeaadf3ee3a68adbfa68389807af6a2f9c84d16dbbcef22f78d3015415"
+          "bytes": 2208,
+          "sha256": "7f7cae21c2bd31b301e31eb5e9a72df62c0feed1b7994821049aec82414e27a5"
         },
         {
           "path": "workspace/data/schema-phases.json",
@@ -34,8 +34,8 @@
         },
         {
           "path": "workspace/docs/migration-contract.md",
-          "bytes": 3513,
-          "sha256": "0ac65cf5146c58cd1bac7a14762c2bfab053f31eb9025d55feb61b09dac05c7f"
+          "bytes": 3882,
+          "sha256": "07b286a30f756049d40493f92beb7f9af0e487df7244237d4a3e6aaa0e431873"
         },
         {
           "path": "workspace/migration-plan.json",
