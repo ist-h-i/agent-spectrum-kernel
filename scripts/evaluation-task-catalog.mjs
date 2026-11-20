@@ -143,28 +143,43 @@ function observationEdition(observation, input, assessment) {
   return observation.assessment_digest === canonicalDigest(earlier) ? 'previous_protected_revision' : 'previous_assessment';
 }
 
+function decimalRatio(value) {
+  const [mantissa, exponent = '0'] = String(value).split('e');
+  const [whole, fraction = ''] = mantissa.split('.');
+  const digits = BigInt(whole + fraction);
+  const places = fraction.length - Number(exponent);
+  return places >= 0
+    ? { numerator: digits, denominator: 10n ** BigInt(places) }
+    : { numerator: digits * 10n ** BigInt(-places), denominator: 1n };
+}
+
+function compareRatios(a, b) {
+  return a.numerator * b.denominator - b.numerator * a.denominator;
+}
+
 function parseScoreRange(value) {
   const match = /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/u.exec(value);
   assert.ok(match, '--score-range must be MIN-MAX between 0 and 100');
-  const minimum = Number(match[1]), maximum = Number(match[2]);
-  assert.ok(minimum <= maximum && maximum <= 100, '--score-range requires 0 <= MIN <= MAX <= 100');
+  const minimum = decimalRatio(match[1]), maximum = decimalRatio(match[2]);
+  assert.ok(compareRatios(minimum, maximum) <= 0n && maximum.numerator <= 100n * maximum.denominator,
+    '--score-range requires 0 <= MIN <= MAX <= 100');
   return { minimum, maximum };
 }
 
 function medianPercent(ordered, maximum) {
-  // Keep both central scores in exact decimal units until the final percentage conversion.
-  const middle = [ordered[Math.floor((ordered.length - 1) / 2)], ordered[Math.floor(ordered.length / 2)]];
-  const parts = middle.map(value => {
-    const [mantissa, power = '0'] = String(value).split('e');
-    const [whole, fraction = ''] = mantissa.split('.');
-    return { units: BigInt(whole + fraction), power: Number(power) - fraction.length };
-  });
-  const power = Math.min(parts[0].power, parts[1].power);
-  const sum = parts.reduce((total, part) => total + part.units * 10n ** BigInt(part.power - power), 0n);
-  // Scaling the integer division retains at least 20 significant digits for non-terminating ratios.
-  const places = String(maximum).length + 20;
-  const digits = sum * 50n * 10n ** BigInt(places) / BigInt(maximum);
-  return Number(`${digits}e${power - places}`);
+  const lower = decimalRatio(ordered[Math.floor((ordered.length - 1) / 2)]);
+  const upper = decimalRatio(ordered[Math.floor(ordered.length / 2)]);
+  return {
+    numerator: 50n * (lower.numerator * upper.denominator + upper.numerator * lower.denominator),
+    denominator: BigInt(maximum) * lower.denominator * upper.denominator,
+  };
+}
+
+function displayPercent({ numerator, denominator }) {
+  if (numerator === 0n) return 0;
+  // Round only the returned JSON number. Range selection uses the exact fraction.
+  const places = Math.max(0, String(denominator).length - String(numerator).length) + 20;
+  return Number(`${numerator * 10n ** BigInt(places) / denominator}e-${places}`);
 }
 
 function selectMeasurements(observations, { model, effort, condition, range }) {
@@ -177,8 +192,8 @@ function selectMeasurements(observations, { model, effort, condition, range }) {
       if (!series.scored_count || (condition !== undefined && series.condition !== condition)) continue;
       const ordered = series.scores.filter(score => score !== null).sort((a, b) => a - b);
       const percent = medianPercent(ordered, study.maximum_points);
-      if (range && (percent < range.minimum || percent > range.maximum)) continue;
-      conditions.push({ ...series, median_percent: percent });
+      if (range && (compareRatios(percent, range.minimum) < 0n || compareRatios(percent, range.maximum) > 0n)) continue;
+      conditions.push({ ...series, median_percent: displayPercent(percent) });
     }
     if (conditions.length) matches.push({ ...study, conditions });
   }

@@ -185,6 +185,8 @@ test('measured scores stay bound to the tested input, scoring definition and pro
   assert.equal(paired('0.9-0.9')[0].difficulty_observations[0].conditions[0].median_percent, 0.9);
   assert.deepEqual(paired('0-0.8999999999999999'), []);
   assert.deepEqual(paired('0.9000000000000001-100'), []);
+  assert.deepEqual(paired('0.90000000000000001-1'), []);
+  assert.throws(() => paired('100.000000000000001-100.000000000000001'), /--score-range/u);
   study.results.push({ ...submission });
   assert.throws(observe, /duplicate study task and score group/u);
   study.results = [study.results[0]];
