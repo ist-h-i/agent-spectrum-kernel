@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "pf-performance-regression",
-  "version": "task-revision-3",
+  "version": "task-revision-2",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,43 +9,53 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1346,
-          "sha256": "9d70ce3f6ded16cb301b763150916eaad8acfda64062f1ebe5b4e1202372feeb"
+          "bytes": 2687,
+          "sha256": "5e528a1cf80200631f58cefbc19c6f694f22f5550baeb8b3eca333e78d7bef8b"
         },
         {
-          "path": "workspace/docs/archive-operations.md",
-          "bytes": 2227,
-          "sha256": "7a324308715f29a3e84792e710552c2ab0ae6b9abd266800f3fc95cb54e51dd4"
+          "path": "workspace/data/measurement-config.json",
+          "bytes": 366,
+          "sha256": "39c99ef4f2862e8a3bbff704d95d96e216ea66482c977468a54d5f11df33fa94"
         },
         {
-          "path": "workspace/docs/interchange.md",
-          "bytes": 1364,
-          "sha256": "8dd10b96fe5528bf983de19423a8f2fb0b02a24d712a6d6d7bad1fbf079bd82a"
-        },
-        {
-          "path": "workspace/docs/statement-interface.md",
-          "bytes": 1704,
-          "sha256": "8d564809e66d93e6b4626cec5dc8a821abd327afba0f76453a7e83277a882520"
+          "path": "workspace/docs/lookup-contract.md",
+          "bytes": 2756,
+          "sha256": "0f2b77ad07258d6b9089c381dd48fac6d38aa20de4d18f0a2d3d88520bb02821"
         },
         {
           "path": "workspace/package.json",
-          "bytes": 145,
-          "sha256": "587b6e9835d66c034ed12d4dda452af3eea618be0fc529d7e0d9e7be6212dcdf"
+          "bytes": 225,
+          "sha256": "5f9aaa8750bc6a5c6966526f363b3d076b38c0b5ba22d599130103d31cf8ae20"
+        },
+        {
+          "path": "workspace/reference/scan-lookup.mjs",
+          "bytes": 527,
+          "sha256": "a29942b5523324e7f05b5f72901e31bebfd6fdce776401970c1b51da56772eff"
+        },
+        {
+          "path": "workspace/scripts/generate-data.mjs",
+          "bytes": 512,
+          "sha256": "86c05e9d5a1cd67ae7984edb5f2bbdc27c34ca266653b5552fbbd1cdad68a2c3"
+        },
+        {
+          "path": "workspace/scripts/measure-lookup.mjs",
+          "bytes": 5104,
+          "sha256": "7ede0fe3fa6f12dabe48f833d2091953c8f42932280312b82499270931d14603"
         },
         {
           "path": "workspace/src/event-lookup.mjs",
-          "bytes": 1998,
-          "sha256": "2e8d27bead25636ea8285936f890fa8916a7eb59b416cd5b59a3e09fce9b9423"
+          "bytes": 527,
+          "sha256": "a29942b5523324e7f05b5f72901e31bebfd6fdce776401970c1b51da56772eff"
         },
         {
-          "path": "workspace/test/client.test.mjs",
-          "bytes": 1962,
-          "sha256": "1b81be289394b677bd749a9aadf4e7ce8f62de5da786b6aee13d385053146cd8"
+          "path": "workspace/test/event-lookup.test.mjs",
+          "bytes": 3988,
+          "sha256": "338bcd006cc6c30bb7190053141bbc7620ff051dc3cfb18af370cef765cfdd30"
         }
       ]
     }
   },
-  "rubric_digest": "sha256:15156a44005ab0578d69e44b97e0a93c16e372a5d67e9f6dfb0df018a28cf315",
+  "rubric_digest": "sha256:4e378277a939a50d484c845f7129b0706546a1808485e15bf2dd146328a4a628",
   "editable": [
     "workspace/src/event-lookup.mjs"
   ]

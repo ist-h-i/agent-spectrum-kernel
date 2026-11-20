@@ -1,44 +1,45 @@
 {
   "criteria": [
     {
-      "id": "statements",
+      "id": "reference-behavior",
       "points": 2,
-      "observation": "Reconstructs the records and amounts of issued statements across supported archive generations.",
+      "observation": "Returned groups match the reference, including strict selector identity, order, windows and repeated occurrences.",
       "skills": [
         "controlled-implementation"
       ]
     },
     {
-      "id": "historical-changes",
+      "id": "next-call",
       "points": 2,
-      "observation": "Reproduces the requested revisions after corrections, including repeated deliveries and pagination.",
+      "observation": "After in-place input edits a new call observes current events and boundaries while preserving inputs and fresh result arrays.",
       "skills": [
         "controlled-implementation"
       ]
     },
     {
-      "id": "read-plan",
+      "id": "sparse-runtime",
       "points": 2,
-      "observation": "Determines the attainable cost of complete historical evidence and enforces the caller’s allowance.",
+      "observation": "On the fixed sparse workload the measured candidate meets the configured median target. Timing skipped after failed equivalence, missing output or inconclusive samples are unobserved.",
       "skills": [
         "doubt-driven-development"
       ]
     },
     {
-      "id": "batch-efficiency",
+      "id": "dense-runtime",
       "points": 2,
-      "observation": "Shares paid work across requests and serves the specified multi-zone workload.",
+      "observation": "On the fixed dense workload the measured candidate meets the configured median target. Preserve observed failure, inconclusive and not timed as different outcomes.",
       "skills": [
         "doubt-driven-development"
       ]
     },
     {
-      "id": "interrupted-restore",
+      "id": "measurement-evidence",
       "points": 2,
-      "observation": "Handles supplier failures and subsequent calls within the statement and charging contracts.",
+      "observation": "The account links exact source, workload and raw measurement to each functional or performance claim, preserves uncertainty and identifies which measurement would resolve it.",
       "skills": [
-        "doubt-driven-development"
-      ]
+        "evidence-ledger"
+      ],
+      "requires_delivery": true
     }
   ]
 }
