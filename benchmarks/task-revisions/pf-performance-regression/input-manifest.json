@@ -44,8 +44,8 @@
     },
     {
       "path": "workspace/scripts/measure-lookup.mjs",
-      "bytes": 3091,
-      "sha256": "6882cb10c2b0b85bd8e7e3845ad40474c25b99a83b120b86e1041af09c879964",
+      "bytes": 5104,
+      "sha256": "7ede0fe3fa6f12dabe48f833d2091953c8f42932280312b82499270931d14603",
       "source": "revision"
     },
     {
