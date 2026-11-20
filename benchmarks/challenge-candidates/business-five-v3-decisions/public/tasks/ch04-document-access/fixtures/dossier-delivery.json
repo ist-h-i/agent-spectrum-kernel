@@ -67,9 +67,18 @@
       "actor": "reader-north",
       "tenant": "north",
       "operations": [
-        "read",
         "export",
         "cancelOwn"
+      ]
+    },
+    {
+      "actor": "reader-north",
+      "tenant": "north",
+      "operations": [
+        "read"
+      ],
+      "scope": [
+        "d3"
       ]
     },
     {

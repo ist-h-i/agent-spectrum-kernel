@@ -12,8 +12,8 @@
         },
         {
           "path": "public/tasks/ch04-document-access/TASK.md",
-          "bytes": 2466,
-          "sha256": "8b0e9d1294cf67142922fb2622fda835582b971e75b5b5a703c539a5482d65c0"
+          "bytes": 2767,
+          "sha256": "50884305052ebaced99da9e65a1aa0449a763ddd9031e221370241261dd099d5"
         },
         {
           "path": "public/tasks/ch04-document-access/acceptance.md",
@@ -37,8 +37,8 @@
         },
         {
           "path": "public/tasks/ch04-document-access/fixtures/dossier-delivery.json",
-          "bytes": 6132,
-          "sha256": "5051e450243cb6b32f0d1a3213d25b6a9c90b8e7428a76b55132d7f2eefea352"
+          "bytes": 6269,
+          "sha256": "7270efd5153af6b283796bbb576f87505c86c685c48f7467436a6bcf073e882e"
         },
         {
           "path": "public/tasks/ch04-document-access/fixtures/example.json",
@@ -66,7 +66,7 @@
           "sha256": "07d60a9f04a0678512972ff089cdf8bc80b4cec34737860b592732fb6fafe7e5"
         }
       ],
-      "inventory_sha256": "e9a004fed75489a73cce07c00bcffd6705d616890aafad715f7cb27672b07b73"
+      "inventory_sha256": "ac2962fa5ba56f22944d58566dfadb6bb8a542407d423cff89d48df130de0b2b"
     },
     "goal_with_pr": {
       "files": [
@@ -77,8 +77,8 @@
         },
         {
           "path": "public/tasks/ch04-document-access/TASK.md",
-          "bytes": 2466,
-          "sha256": "8b0e9d1294cf67142922fb2622fda835582b971e75b5b5a703c539a5482d65c0"
+          "bytes": 2767,
+          "sha256": "50884305052ebaced99da9e65a1aa0449a763ddd9031e221370241261dd099d5"
         },
         {
           "path": "public/tasks/ch04-document-access/acceptance.md",
@@ -102,8 +102,8 @@
         },
         {
           "path": "public/tasks/ch04-document-access/fixtures/dossier-delivery.json",
-          "bytes": 6132,
-          "sha256": "5051e450243cb6b32f0d1a3213d25b6a9c90b8e7428a76b55132d7f2eefea352"
+          "bytes": 6269,
+          "sha256": "7270efd5153af6b283796bbb576f87505c86c685c48f7467436a6bcf073e882e"
         },
         {
           "path": "public/tasks/ch04-document-access/fixtures/example.json",
@@ -131,7 +131,7 @@
           "sha256": "07d60a9f04a0678512972ff089cdf8bc80b4cec34737860b592732fb6fafe7e5"
         }
       ],
-      "inventory_sha256": "9da4fee98fa1a4d215bb136fdd5c62398e8aea39e9d109f3918e0867f5a358c1"
+      "inventory_sha256": "d10e5c9cd90e1151c2bcab2d0b4ee157a2140d5ca2d607d06c0432fe80ca09ab"
     }
   },
   "working_directory": "public/tasks/ch04-document-access"
