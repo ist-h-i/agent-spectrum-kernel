@@ -1,0 +1,15 @@
+{
+  "plan_id": "plan-cr482-318",
+  "plan_digest": "sha256:9e04d8c9a4be5d6c12a9856243debb8c65f3af108dfd1a4cbe88a4b1e85d5225",
+  "state_lineage": "prod-api-us-east-1",
+  "state_serial": 318,
+  "changes": [
+    {
+      "resource": "aws_lambda_alias.api_live",
+      "scope_id": "alias-canary",
+      "action": "update",
+      "before": { "primary_version": "41", "secondary_weights": {} },
+      "after": { "primary_version": "41", "secondary_weights": { "42": 0.1 } }
+    }
+  ]
+}

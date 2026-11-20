@@ -162,15 +162,9 @@ carrierは人工値であり認証済み実計測の受入証拠にはしない�
 | 実装不足／通常権限での検証待ち | 候補7件の課題別安全・rollback観測とwhole admission | carrierの存在を安全証明にせず、対応付けを実装し、観測不足はunknownのまま独立reviewへ渡す |
 | fake受入済み・統合head CIで確認 | 24件比較・採点と途中失敗保存 | 1件の明確なfail品質0、別のmanual品質null、その後の24件目の成功を同じreportへ保存。固定headの既存CI入口へ試験登録 |
 
-## 既存入口からの使い方
+## 現行課題と比較の準備
 
-公開契約だけを点検する（モデル・採点実行なし）:
-
-```sh
-node scripts/ask-benchmark.mjs list-primary-inputs
-node scripts/ask-benchmark.mjs prepare-primary-inputs --output /absolute/new-public-inputs
-node scripts/ask-benchmark.mjs verify-primary-inputs --input /absolute/new-public-inputs --output /absolute/new-report.json
-```
+現行課題の選択と準備は [評価課題カタログ](evaluation-task-catalog.md) を参照する。
 
 既存`ask-primary-evaluation-prepare.mjs`のoptions JSONに`"fixtureSet":"catalog24"`を追加すると、
 正本順24件・P/K2/Fの72枠を準備する。省略時は従来9件。新しい管理入口は作らない。
@@ -219,7 +213,6 @@ Upstream refs: Issues #207・#379、PR407、通常マージ済みPR408、正本`
 
 | Behavior proof obligation | Focused check / required evidence |
 | --- | --- |
-| 正本24件の入力・出力・要件・変更範囲が存在し、不良入力の影響が局所化される | `test-ask-primary-public-inputs.mjs`。24件列挙、公開入力だけの準備、ドリフト・欠損・不正scopeの負例と残り23件の保存 |
 | 明示catalog24と共通v7の接続、過去versionの互換性 | `test-ask-primary-registered-fixture-v7.mjs`。集合・順序・未知ID負例、全24resource、新規課題のproducer/scope、selectorなし拒否 |
 | 既存入口でv7 selector付き72枠を未実行のまま準備する | `test-ask-primary-principles-v2-connection.mjs`。実公開入力、選択freeze digest、モデル0、品質null、旧renderer維持と追加依存の改変拒否 |
 | 一部失敗・manualを品質0と混同せず保存し、後続課題を処理する | `test-ask-primary-evaluation-batch.mjs`。24件fake、課題×条件の成果物・ログ・要件・理由、明確なfail0とmanual/null、24件目の成功 |

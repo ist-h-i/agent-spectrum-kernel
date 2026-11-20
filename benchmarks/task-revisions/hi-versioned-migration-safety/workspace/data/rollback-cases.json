@@ -1,0 +1,84 @@
+[
+  {
+    "case_id": "expanded-mixed",
+    "phase": "expanded",
+    "legacy_writers": 1,
+    "backfill_complete": false,
+    "post_snapshot_writes": 0,
+    "current_sequence": 65,
+    "verified_through_sequence": null,
+    "snapshot_sequence": 61,
+    "write_report_through_sequence": 65
+  },
+  {
+    "case_id": "cutover-dual",
+    "phase": "cutover",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 0,
+    "current_sequence": 70,
+    "verified_through_sequence": 70,
+    "snapshot_sequence": 67,
+    "write_report_through_sequence": 70
+  },
+  {
+    "case_id": "cutover-incomplete",
+    "phase": "cutover",
+    "legacy_writers": 0,
+    "backfill_complete": false,
+    "post_snapshot_writes": 0,
+    "current_sequence": 73,
+    "verified_through_sequence": null,
+    "snapshot_sequence": 71,
+    "write_report_through_sequence": 73
+  },
+  {
+    "case_id": "contracted-no-new-writes",
+    "phase": "contracted",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 0,
+    "current_sequence": 90,
+    "verified_through_sequence": 90,
+    "snapshot_sequence": 90,
+    "write_report_through_sequence": 90
+  },
+  {
+    "case_id": "contracted-later-write",
+    "phase": "contracted",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 0,
+    "current_sequence": 100,
+    "verified_through_sequence": 100,
+    "snapshot_sequence": 99,
+    "write_report_through_sequence": 99,
+    "observed_later_write": {
+      "sequence": 100,
+      "record_id": "record-two",
+      "value": "Updated after capture"
+    }
+  },
+  {
+    "case_id": "contracted-write-count-unknown",
+    "phase": "contracted",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 0,
+    "current_sequence": 108,
+    "verified_through_sequence": 108,
+    "snapshot_sequence": 106,
+    "write_report_through_sequence": 106
+  },
+  {
+    "case_id": "cutover-readback-lag",
+    "phase": "cutover",
+    "legacy_writers": 0,
+    "backfill_complete": true,
+    "post_snapshot_writes": 0,
+    "current_sequence": 71,
+    "verified_through_sequence": 70,
+    "snapshot_sequence": 67,
+    "write_report_through_sequence": 70
+  }
+]

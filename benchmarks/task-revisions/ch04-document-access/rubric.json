@@ -3,7 +3,7 @@
     {
       "id": "current-permission",
       "points": 2,
-      "observation": "送信開始時に有効な閲覧権がすべて失効した対象の新規送信を止める（A05・A06）。",
+      "observation": "送信開始時に、対象文書の受取人に適用される閲覧権と配信の結果が一致する（A05・A06）。",
       "skills": [
         "controlled-implementation"
       ],
@@ -12,7 +12,7 @@
     {
       "id": "allowed-delivery",
       "points": 2,
-      "observation": "別文書の正当な配信が完了し、別の有効な許可が残る場合も現在の権限どおり進められる（A05・A06）。",
+      "observation": "許可された文書を、同じ一式の他の文書の権限変更に影響されずに配信できる（A05・A06）。",
       "skills": [
         "controlled-implementation"
       ],

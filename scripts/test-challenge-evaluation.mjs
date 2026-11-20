@@ -12,7 +12,9 @@ const id='rc01-shared-review-platform';
 function setup(t){
  const base=realpathSync(mkdtempSync(join(tmpdir(),'challenge-test-')));t.after(()=>rmSync(base,{recursive:true,force:true}));
  const root=join(base,'run');
- const config={id,root,evidenceKind:'synthetic',options:{executable:realpathSync('/bin/echo'),model:'test-model',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']};
+ const updatePath=join(base,'synthetic-update.md');
+ writeFileSync(updatePath,'Synthetic later-turn observation. Re-evaluate the frozen review.');
+ const config={id,root,evidenceKind:'synthetic',updatePath,options:{executable:realpathSync('/bin/echo'),model:'test-model',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']};
  const ready=preparePracticalChallenge(config),calls=[];
  const fake=async request=>{calls.push(request);
   const resume=request.argv[1]==='resume';
@@ -31,12 +33,14 @@ function setup(t){
  const run=(stage='initial',session=fake)=>startPracticalChallenge(root,ready.manifest_digest,{allowModelCalls:true,stage,session});
  return {base,root,config,ready,calls,fake,run};
 }
-test('staged registrations retain their primary boundary and their legacy JSON view',()=>{
+test('staged registrations share the only task selection and preparation entry points',()=>{
  const rows=listPracticalChallenges();assert.equal(rows.length,2);assert.deepEqual(rows.map(c=>c.id),[id,'ch08-growth-workspace']);
  assert.equal(rows[0].primary_catalog_member,false);
  assert.equal(Object.keys(PRIMARY_FIXTURE_REGISTRY).length,24);
- const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs','challenge-list'],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);
- assert.deepEqual(JSON.parse(r.stdout),rows);
+ for(const entry of ['challenge-list','challenge-prepare']){
+  const r=spawnSync(process.execPath,['scripts/practical-evaluation-cli.mjs',entry],{encoding:'utf8'});
+  assert.equal(r.status,1);
+ }
  assert.ok(rows.every(row=>row.stages.length===2&&row.input_manifest&&row.evaluator));
 });
 test('unified task preparation can bind a staged run without a model call', t => {
@@ -62,6 +66,25 @@ test('prepare freezes 151 public files; update and evaluator are not solver inpu
  assert.equal(existsSync(join(f.root,'workspace','OPERATIONAL-UPDATE.md')),false);
  assert.equal(existsSync(join(f.root,'workspace','rubric.json')),false);
  assert.throws(()=>preparePracticalChallenge(f.config),/fresh run/);
+});
+test('the reveal path is reserved and a post-turn update cannot be substituted before handoff', async t=>{
+ const f=setup(t);
+ const update=join(f.root,'workspace','OPERATIONAL-UPDATE.md');
+ writeFileSync(update,'Unauthorised update');
+ await assert.rejects(f.run(),/reassessment update already exists/);
+ assert.equal(f.calls.length,0);
+ rmSync(update);
+ await f.run();
+ const protectedBytes=readFileSync(f.config.updatePath);
+ writeFileSync(f.config.updatePath,'Changed source.');
+ await assert.rejects(f.run('reassessment'),/challenge asset drift/);
+ assert.equal(f.calls.length,1);
+ assert.ok(!existsSync(join(f.root,'reassessment')));
+ writeFileSync(f.config.updatePath,protectedBytes);
+ await f.run('reassessment');
+ writeFileSync(update,'Substituted after the provider completed.');
+ assert.throws(()=>preparePracticalChallengeScoreHandoff(f.root),/challenge asset drift/);
+ assert.ok(!existsSync(join(f.root,'score-handoff.json')));
 });
 test('initial and same-session resume retain standard provider usage and frozen answers',async t=>{
  const f=setup(t);const first=await f.run();assert.equal(first.status,'awaiting_resume_confirmation');

@@ -1,0 +1,11 @@
+{
+  "name": "account-schema-migration-handoff",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "validate:handoff": "node scripts/validate-handoff.mjs handoff.json"
+  }
+}

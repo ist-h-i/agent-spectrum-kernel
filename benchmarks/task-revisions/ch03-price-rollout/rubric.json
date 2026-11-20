@@ -3,7 +3,7 @@
     {
       "id": "store-compatibility",
       "points": 2,
-      "observation": "両店を独立に操作し、表現できる北店だけが現価格を保って旧新併用になり、南店の拒否理由を確認できる（M02・M07）。",
+      "observation": "各店の差戻しの結果と理由が、その店舗の商品・操作時点の互換条件と一致する（M02・M07）。",
       "skills": [
         "controlled-implementation"
       ],

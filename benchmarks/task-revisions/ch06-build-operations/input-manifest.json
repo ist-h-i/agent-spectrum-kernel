@@ -1,0 +1,141 @@
+{
+  "kind": "evaluation_input_manifest_v2",
+  "id": "ch06-build-operations",
+  "version": "business-five-20261120-outcomes2",
+  "modes": {
+    "one_shot": {
+      "working_directory": "public/tasks/ch06-build-operations",
+      "task_path": "public/tasks/ch06-build-operations/TASK.md",
+      "prompt_path": "public/tasks/ch06-build-operations/prompt.txt",
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "bytes": 5509,
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/TASK.md",
+          "bytes": 2503,
+          "sha256": "cb465f26b6561838d7e7875afcb548048341f0d66867a7065473cda301bd82e1"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/acceptance.md",
+          "bytes": 2933,
+          "sha256": "22dd14615a50d1b6db6640cf2ba43c2e8b40fcf4cd257902a4129c83a26df93c"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/business-decisions.md",
+          "bytes": 4059,
+          "sha256": "98434aab51d9483f11e94f4d8530aa1aecd35f0428654971fd7c0c27474564af"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/compiler-provider.md",
+          "bytes": 2083,
+          "sha256": "082834fdc0eee4931907e367d9c647a6fa58d8fdea3b77c905b362657901d905"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/contract.md",
+          "bytes": 3279,
+          "sha256": "62449f44221f2403aee1eb08b4b55f92779e8ea3ea066decd855bb436cb8aba9"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixture-format.md",
+          "bytes": 2159,
+          "sha256": "1332356b6dd192f98eb69d1c017e728a92c6de4d915029692a01a1e79ea76e12"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixtures/example.json",
+          "bytes": 5844,
+          "sha256": "95ec17fd9bce4e88e8baa49be78a1219aab9b5a40beadb587b36cb745e35a039"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/nonfunctional.md",
+          "bytes": 653,
+          "sha256": "71e749c3e10ecd692713be5b2839f996ca3a808ef2e4a089872719cb133006dc"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/prompt.txt",
+          "bytes": 1009,
+          "sha256": "629fc45c5ae7b201d88ed94bdf1936244915a4a840b4449bbf7c9b3d35382e71"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/roles.md",
+          "bytes": 2389,
+          "sha256": "13fc8d6f93ea166415b591e212493f94b72d596db3b67d2371e2bfa2e276040b"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/workflows.md",
+          "bytes": 3874,
+          "sha256": "d577dc4046aaadb8088707c0d8c46a0b49e94f307829d81564bab98ba79f7081"
+        }
+      ]
+    },
+    "goal_with_pr": {
+      "working_directory": "public/tasks/ch06-build-operations",
+      "task_path": "public/tasks/ch06-build-operations/TASK.md",
+      "prompt_path": "public/tasks/ch06-build-operations/goal-pr.txt",
+      "files": [
+        {
+          "path": "public/common/operation-and-observation.md",
+          "bytes": 5509,
+          "sha256": "e8391c670b632810ad18d230e2b99ff6b2403816feb8cd9d13dba9a4bd2d9b03"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/TASK.md",
+          "bytes": 2503,
+          "sha256": "cb465f26b6561838d7e7875afcb548048341f0d66867a7065473cda301bd82e1"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/acceptance.md",
+          "bytes": 2933,
+          "sha256": "22dd14615a50d1b6db6640cf2ba43c2e8b40fcf4cd257902a4129c83a26df93c"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/business-decisions.md",
+          "bytes": 4059,
+          "sha256": "98434aab51d9483f11e94f4d8530aa1aecd35f0428654971fd7c0c27474564af"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/compiler-provider.md",
+          "bytes": 2083,
+          "sha256": "082834fdc0eee4931907e367d9c647a6fa58d8fdea3b77c905b362657901d905"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/contract.md",
+          "bytes": 3279,
+          "sha256": "62449f44221f2403aee1eb08b4b55f92779e8ea3ea066decd855bb436cb8aba9"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixture-format.md",
+          "bytes": 2159,
+          "sha256": "1332356b6dd192f98eb69d1c017e728a92c6de4d915029692a01a1e79ea76e12"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/fixtures/example.json",
+          "bytes": 5844,
+          "sha256": "95ec17fd9bce4e88e8baa49be78a1219aab9b5a40beadb587b36cb745e35a039"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/goal-pr.txt",
+          "bytes": 1015,
+          "sha256": "89f0c501a12119e300230b02b441e22f74d6065b73f991065ec87dba53e727b5"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/nonfunctional.md",
+          "bytes": 653,
+          "sha256": "71e749c3e10ecd692713be5b2839f996ca3a808ef2e4a089872719cb133006dc"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/roles.md",
+          "bytes": 2389,
+          "sha256": "13fc8d6f93ea166415b591e212493f94b72d596db3b67d2371e2bfa2e276040b"
+        },
+        {
+          "path": "public/tasks/ch06-build-operations/workflows.md",
+          "bytes": 3874,
+          "sha256": "d577dc4046aaadb8088707c0d8c46a0b49e94f307829d81564bab98ba79f7081"
+        }
+      ]
+    }
+  }
+}

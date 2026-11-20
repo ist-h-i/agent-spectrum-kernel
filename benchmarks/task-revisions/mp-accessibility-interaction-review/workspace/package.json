@@ -1,0 +1,14 @@
+{
+  "name": "format-toolbar-review-fixture",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/unit/*.test.mjs",
+    "test:interaction": "node --test test/integration/*.test.mjs",
+    "test:all": "npm test && npm run test:interaction",
+    "validate:review": "node scripts/validate-review.mjs review.json"
+  }
+}

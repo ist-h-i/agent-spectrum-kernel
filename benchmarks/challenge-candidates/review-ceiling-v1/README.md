@@ -2,7 +2,7 @@
 
 This **new candidate** is separate from the existing 24 tasks and ceiling CH01–CH06. It is a review task, not a repair contest. A large existing TypeScript system plus a synthetic multi-team portal must be assessed against product constraints, architecture contracts, operational evidence and observed UI behavior.
 
-Status: **registered separately from primary24; staged integration verified synthetically; real entry-point execution unverified**. Two pilot trials are documented below; model difficulty is not established. A large source tree does not establish difficulty. No score target is enforced by changing grading after a run.
+Status: **staged integration verified synthetically**. No model trials have measured this edition. A large source tree does not establish difficulty. The grading contract is fixed before a run.
 
 - `workspace/`: answer-free reviewer input; `task.md` is the starting point.
 - `evaluation-protocol.md`: public scoring dimensions and evidence semantics.
@@ -23,6 +23,4 @@ Prepare the reviewer input from the repository root with `node scripts/practical
 
 ## Registered staged execution
 
-Select this problem from the [evaluation task catalog](../../../docs/evaluation-task-catalog.md). The [staged evaluation guide](../../../docs/practical-challenge-evaluation.md) covers initial and resume approval and the external semantic scoring handoff. The registered runner has synthetic integration evidence, and `ready_for_measurement` remains false. See [pilot calibration](https://github.com/ist-h-i/agent-spectrum-kernel/blob/445eec92545e694becf04278b96da867134c1758/benchmarks/challenge-candidates/review-ceiling-v1/calibration-report.md) for the prior two trials and their limitations.
-
-現役版は `review-public-v2` です。`calibration-report.md` と `calibration-summary.json` の2回の記録は旧問題 `review-public-v1` に対応します。新版の採点や難度を表す値には使用しません。
+Select this problem from the [evaluation task catalog](../../../docs/evaluation-task-catalog.md). The [staged evaluation guide](../../../docs/practical-challenge-evaluation.md) covers initial and resume approval and assessment. The current `review-public-v3` registration uses an operator-only reassessment update and has no measured solver trials.

@@ -44,8 +44,7 @@ node benchmarks/challenge-candidates/ui-reconstruction-v1/tools/manifest.mjs
 node --test benchmarks/challenge-candidates/ui-reconstruction-v1/tools/public-package.test.mjs
 ```
 
-入力変更時は内容をレビューしてから `manifest.mjs --write` でこの課題のmanifestと
-登録hashだけを更新する。RC01の登録byteと既存課題は維持する。
+入力変更時は内容をレビューし、共通の `node scripts/seal-evaluation-revisions.mjs --write` で入力目録を更新する。
 
 実モデル試行・難度校正・正解UI実装による全機能の通過確認は未実施。
 登録済みと、測定準備完了・難度検証済み・過去結果での受入済みを混同しない。
@@ -64,4 +63,4 @@ node --test benchmarks/challenge-candidates/ui-reconstruction-v1/tools/public-pa
 
 ## 採点基準v2
 
-現役の公開入力は `ui-functional-v2.1`、採点基準は `2.1.0` です。従前の `ui-functional-v2` / `2.0.0` の再現には当時のコミットを使います。同じCH08であり問題数は増えません。旧`evaluator/`の3ファイルはv1過去結果の再現用としてbyte不変で保持します。旧入力を凍結した試行へv2を遡及上書きしません。詳細は[evaluator-v2/README.md](evaluator-v2/README.md)。
+現行入力は `ui-functional-v2.2`、採点基準は `2.1.0` です。追加資料は、初回提出を固定した後に運用者が共通の非公開資材から渡します。現行の実行手順と固定版は [評価課題ガイド](../../../docs/evaluation-task-catalog.md) にあります。

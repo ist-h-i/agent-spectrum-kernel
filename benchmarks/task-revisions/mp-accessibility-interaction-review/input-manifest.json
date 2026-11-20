@@ -1,88 +1,82 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "mp-accessibility-interaction-review",
-  "version": "task-revision-1",
-  "rubric_sha256": "9f20f0d797eac24468c38aa121208c52cc22e4e020e1887c0c65844413400471",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1237,
+          "sha256": "234018610453607d0ba5d16d342ca369a3f87436d7be38da8879e352f7bb5258"
+        },
+        {
+          "path": "workspace/docs/interaction-notes.md",
+          "bytes": 699,
+          "sha256": "7ad466f4c94e36eab22e582e000bcfc4c319bf7f114d898c0411c852678d6d6f"
+        },
+        {
+          "path": "workspace/notice-editor.html",
+          "bytes": 1176,
+          "sha256": "8b830c2f42c5fe02c41ca29ab5c0d2dc4cb45dfefa2f95b6205a4baa585ba60a"
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "bytes": 272,
+          "sha256": "c6b3a3cb44bf02b66312be43e3e7bc3bff0eb3968ef9e65c1a44de3163ed1588"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 385,
+          "sha256": "5744d8cb38e85ae586c4f71f61400fc7394b93cade8efc2bafa00e7996712a33"
+        },
+        {
+          "path": "workspace/pr.diff",
+          "bytes": 2900,
+          "sha256": "cb79a3b1b9710ae3a9d383015558a53e22d731f38adb4f0ea904c1221511e932"
+        },
+        {
+          "path": "workspace/review.schema.json",
+          "bytes": 1856,
+          "sha256": "63574a07fb0ff2a67e8839c5356bfa30e777955596ad0309589f14767371cd81"
+        },
+        {
+          "path": "workspace/scripts/validate-review.mjs",
+          "bytes": 2981,
+          "sha256": "04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682"
+        },
+        {
+          "path": "workspace/src/format-toolbar.html",
+          "bytes": 521,
+          "sha256": "18719ebf6c7e82dbf5953b9f214742ffa4ffab42ca1feef6872d2d2972e595c5"
+        },
+        {
+          "path": "workspace/src/format-toolbar.mjs",
+          "bytes": 1160,
+          "sha256": "35ca15bc10869a79e73fd1846dea0f9fa2ded86004aa9927fd8c859c1b89374e"
+        },
+        {
+          "path": "workspace/test/helpers/toolbar-fixture.mjs",
+          "bytes": 540,
+          "sha256": "9dd81fdbfa3d425c76976f34ccbd56404c48519d44b139f0e34ce8481f1752af"
+        },
+        {
+          "path": "workspace/test/integration/format-toolbar.test.mjs",
+          "bytes": 668,
+          "sha256": "fb0d1a44160de4180098b35a6392068a85012f21e1180dbf32896717af52a256"
+        },
+        {
+          "path": "workspace/test/unit/format-toolbar.test.mjs",
+          "bytes": 989,
+          "sha256": "0b64dfd2efbb4fc377e47e1f0e2ab3392ef1a19bfd9047af5060361c8c266bc2"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:c0c677ff18e5ae9315d1d93e8db48cf80539662fe52e06687aa04eabd0a1c8c0",
   "editable": [
     "workspace/review.json"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 2093,
-      "sha256": "bf44e92c52108d25b3312ed58ea1f5cca0147d03d00e8ad282e678bd0bc10efa",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/docs/interaction-notes.md",
-      "sha256": "7ad466f4c94e36eab22e582e000bcfc4c319bf7f114d898c0411c852678d6d6f",
-      "bytes": 699,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/notice-editor.html",
-      "bytes": 1176,
-      "sha256": "8b830c2f42c5fe02c41ca29ab5c0d2dc4cb45dfefa2f95b6205a4baa585ba60a",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/package-lock.json",
-      "sha256": "c6b3a3cb44bf02b66312be43e3e7bc3bff0eb3968ef9e65c1a44de3163ed1588",
-      "bytes": 272,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "5744d8cb38e85ae586c4f71f61400fc7394b93cade8efc2bafa00e7996712a33",
-      "bytes": 385,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/pr.diff",
-      "sha256": "fbf9df8302ac97dbf8917340fa8b329d70ee71f53fef042189924a20838e9766",
-      "bytes": 2845,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/review.schema.json",
-      "sha256": "63574a07fb0ff2a67e8839c5356bfa30e777955596ad0309589f14767371cd81",
-      "bytes": 1856,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/validate-review.mjs",
-      "sha256": "04596758f6cf4269b7681001d21bb211bee07b992c71ab759af1d9712bb9c682",
-      "bytes": 2981,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/format-toolbar.html",
-      "sha256": "18719ebf6c7e82dbf5953b9f214742ffa4ffab42ca1feef6872d2d2972e595c5",
-      "bytes": 521,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/format-toolbar.mjs",
-      "sha256": "c5378f1d4de5933fb5841961a69a3fae9eee9a9da4e21d5512607b7897d76fb2",
-      "bytes": 1107,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/helpers/toolbar-fixture.mjs",
-      "sha256": "9dd81fdbfa3d425c76976f34ccbd56404c48519d44b139f0e34ce8481f1752af",
-      "bytes": 540,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/integration/format-toolbar.test.mjs",
-      "sha256": "fb0d1a44160de4180098b35a6392068a85012f21e1180dbf32896717af52a256",
-      "bytes": 668,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/unit/format-toolbar.test.mjs",
-      "sha256": "e610d2250c51216e2b6c2f1be86d19ff4766e9440f75aff5b85cbe07550344fe",
-      "bytes": 986,
-      "source": "inherited"
-    }
   ]
 }

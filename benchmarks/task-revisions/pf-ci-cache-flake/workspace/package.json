@@ -1,0 +1,14 @@
+{
+  "name": "catalog-build-investigation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "investigate": "node scripts/reproduce-cache.mjs",
+    "validate-report": "node scripts/validate-report.mjs"
+  }
+}

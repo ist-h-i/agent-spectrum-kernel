@@ -5,10 +5,10 @@ import { join, resolve } from 'node:path';
 import { readJsonFileStrict,canonicalDigest } from './content-addressed-store.mjs';
 import { createPracticalEvaluationCommandRuntime } from './instruction-loop-command-runtime.mjs';
 import { advancePracticalEvaluation,inspectPracticalEvaluation } from './practical-evaluation-runner.mjs';
-import {listPracticalChallenges,preparePracticalChallenge,inspectPracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff} from './practical-challenge-evaluation.mjs';
+import {preparePracticalChallenge,inspectPracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff} from './practical-challenge-evaluation.mjs';
 import {importChallengeSemanticAssessment} from './practical-challenge-worker.mjs';
 import {listEvaluationTasks} from './evaluation-task-catalog.mjs';
-import {inspectEvaluationSubmission,scoreEvaluationSubmission} from './evaluation-task-scoring.mjs';
+import {freezeEvaluationInitialSubmission,inspectEvaluationSubmission,prepareEvaluationFollowup,scoreEvaluationSubmission} from './evaluation-task-scoring.mjs';
 import {prepareEvaluationTaskInput} from './evaluation-task-inputs.mjs';
 
 function prepareSelectedTask(options) {
@@ -17,28 +17,25 @@ function prepareSelectedTask(options) {
   const task = listEvaluationTasks().find(row => row.id === options['--id']);
   assert.ok(task, `unknown evaluation task: ${options['--id']}`);
   const { input, assessment } = task;
-  const deliveryMode = options['--delivery-mode'], logisticsSource = options['--logistics-source'];
+  const deliveryMode = options['--delivery-mode'], assetsRoot = options['--assets-root'];
   assert.ok(!deliveryMode || input.kind === 'business', '--delivery-mode requires CH02–06');
-  assert.ok(!logisticsSource || input.kind === 'private', '--logistics-source requires the inventory/logistics task');
-  assert.ok(input.kind !== 'private' || logisticsSource, 'the inventory/logistics task requires --logistics-source');
+  assert.ok(input.kind !== 'private' || assetsRoot, 'the inventory/logistics task requires --assets-root');
   const configPath = options['--config'];
   assert.ok(!configPath || input.kind === 'staged', '--config is for a staged run (RC01 or CH08)');
-  const source = resolve(import.meta.dirname, '..');
   let prepared;
   if (configPath) {
     const config = readJsonFileStrict(resolve(configPath));
     assert.ok(config.id === undefined || config.id === task.id, 'staged config task ID differs from --id');
     assert.ok(config.root === undefined || resolve(config.root) === root, 'staged config root differs from --root');
-    const staged_run = preparePracticalChallenge({ ...config, id: task.id, root,
+    assert.ok(!assetsRoot || !config.assetsRoot || resolve(assetsRoot) === resolve(config.assetsRoot),
+      'staged config assets root differs from --assets-root');
+    const staged_run = preparePracticalChallenge({ ...config, assetsRoot: assetsRoot ?? config.assetsRoot, id: task.id, root,
       expectedRegistrationDigest: input.registration_digest });
     const workspace = join(root, 'workspace');
     prepared = { workspace, working_directory: workspace, task_file: join(workspace, input.task_path),
       input_manifest_digest: input.digest, staged_run };
   } else {
-    const sourceInput = { ...input };
-    if (input.root) sourceInput.root = join(source, input.root);
-    if (input.kind === 'staged') sourceInput.manifest = join(source, input.manifest);
-    prepared = prepareEvaluationTaskInput({ id: task.id, input: sourceInput, assessment }, root, { deliveryMode, logisticsSource });
+    prepared = prepareEvaluationTaskInput(task, root, { deliveryMode, assetsRoot });
   }
   const report = { task_id: task.id, input, assessment, model_calls: 0, ...prepared };
   writeFileSync(join(root, 'evaluation-preparation.json'), JSON.stringify(report, null, 2) + '\n',
@@ -58,7 +55,7 @@ try{
     console.log(JSON.stringify(listEvaluationTasks({difficulty:o['--difficulty'],type:o['--type'],skill:o['--skill']}),null,2));
   }
   else if(command==='task-prepare'){
-    assert.ok(Object.keys(o).every(key=>['--id','--root','--delivery-mode','--logistics-source','--config'].includes(key)),
+    assert.ok(Object.keys(o).every(key=>['--id','--root','--delivery-mode','--assets-root','--config'].includes(key)),
       'unsupported task-prepare options');
     console.log(JSON.stringify(prepareSelectedTask(o),null,2));
   }
@@ -66,21 +63,23 @@ try{
     assert.ok(o['--root'] && Object.keys(o).length===1, 'task-inspect requires --root');
     console.log(JSON.stringify(inspectEvaluationSubmission(o['--root']),null,2));
   }
+  else if(command==='task-freeze'){
+    assert.ok(o['--root'] && Object.keys(o).length===1, 'task-freeze requires --root');
+    console.log(JSON.stringify(freezeEvaluationInitialSubmission(o['--root']),null,2));
+  }
+  else if(command==='task-followup'){
+    assert.ok(o['--root'] && o['--assets-root'] && Object.keys(o).length===2, 'task-followup requires --root and --assets-root');
+    console.log(JSON.stringify(prepareEvaluationFollowup(o['--root'],o['--assets-root']),null,2));
+  }
   else if(command==='task-score'){
     assert.ok(o['--root'] && o['--record'] && Object.keys(o).length===2, 'task-score requires --root and --record');
     console.log(JSON.stringify(scoreEvaluationSubmission(o['--root'],o['--record']),null,2));
   }
-  else if(command==='challenge-list'){
-    // Compatibility for callers that consume staged registration JSON.
-    assert.equal(Object.keys(o).length,0);
-    console.log(JSON.stringify(listPracticalChallenges(),null,2));
-  }
   else if(command.startsWith('challenge-')){
-    const allowed={ 'challenge-prepare':['--config'], 'challenge-status':['--root'], 'challenge-start':['--root','--confirm','--allow-model-calls'], 'challenge-resume':['--root','--confirm','--allow-model-calls'], 'challenge-score-handoff':['--root','--evaluator-root'], 'challenge-import-score':['--root','--assessment'] };
+    const allowed={ 'challenge-status':['--root'], 'challenge-start':['--root','--confirm','--allow-model-calls'], 'challenge-resume':['--root','--confirm','--allow-model-calls'], 'challenge-score-handoff':['--root','--evaluator-root'], 'challenge-import-score':['--root','--assessment'] };
     assert.ok(allowed[command]&&Object.keys(o).every(k=>allowed[command].includes(k)),'unsupported challenge options');
     let report;
-    if(command==='challenge-prepare'){assert.ok(o['--config']);report=preparePracticalChallenge(readJsonFileStrict(resolve(o['--config'])));}
-    else{assert.ok(o['--root']);const root=resolve(o['--root']);
+    assert.ok(o['--root']);const root=resolve(o['--root']);
       if(command==='challenge-status')report=inspectPracticalChallenge(root);
       else if(command==='challenge-import-score'){assert.ok(o['--assessment']);report=await importChallengeSemanticAssessment(root,readJsonFileStrict(resolve(o['--assessment'])));}
       else if(command==='challenge-score-handoff')report=preparePracticalChallengeScoreHandoff(root,{evaluatorRoot:o['--evaluator-root']??null});
@@ -88,7 +87,6 @@ try{
         if(o['--allow-model-calls']===true)process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
         report=await startPracticalChallenge(root,o['--confirm'],{allowModelCalls:o['--allow-model-calls']===true,stage:command==='challenge-start'?'initial':'reassessment'});
       }
-    }
     console.log(JSON.stringify(report,null,2));
   }else{
   assert.ok(o['--root']);const root=resolve(o['--root']);

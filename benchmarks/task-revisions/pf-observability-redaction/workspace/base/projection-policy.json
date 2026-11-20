@@ -1,0 +1,14 @@
+{
+  "allow_paths": [
+    "event_type",
+    "request_id",
+    "outcome",
+    "status",
+    "duration_ms",
+    "method",
+    "route_template",
+    "error.code"
+  ],
+  "redact_paths": [],
+  "marker": "[redacted]"
+}

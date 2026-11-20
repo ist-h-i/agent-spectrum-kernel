@@ -1,82 +1,77 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "pf-ci-cache-flake",
-  "version": "task-revision-1",
-  "rubric_sha256": "f7acf0bfa2033a8bb0fc966ff3e21ab65eabd019e724d54701f73096160ab85e",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 2628,
+          "sha256": "f04aeabf54b3389b81790b8290b5bd3d9059ee8d747a57f3392e317b616b7c58"
+        },
+        {
+          "path": "workspace/ci/build-config.json",
+          "bytes": 212,
+          "sha256": "dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942"
+        },
+        {
+          "path": "workspace/ci/build-history.log",
+          "bytes": 573,
+          "sha256": "4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271"
+        },
+        {
+          "path": "workspace/ci/scenarios.json",
+          "bytes": 844,
+          "sha256": "b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d"
+        },
+        {
+          "path": "workspace/docs/investigation-contract.md",
+          "bytes": 3572,
+          "sha256": "ba8b371bddb2e52e773438dc18c3de295fd01f56852252de9137df3820254f11"
+        },
+        {
+          "path": "workspace/investigation.schema.json",
+          "bytes": 12215,
+          "sha256": "23b2da0e485d964192af7f1b3fc738234f78d1fd59db1577d55ea28d1aace03b"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 324,
+          "sha256": "10537ac134a2957fecb7b30753992caeacd2d76e16de3810b960df6610b890b2"
+        },
+        {
+          "path": "workspace/scripts/reproduce-cache.mjs",
+          "bytes": 705,
+          "sha256": "2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b"
+        },
+        {
+          "path": "workspace/scripts/validate-report.mjs",
+          "bytes": 1884,
+          "sha256": "97d3a9238a8061e866f91ce14c3c8256968dea9db5b1bac0da460dc6d4a4fca8"
+        },
+        {
+          "path": "workspace/src/cache-model.mjs",
+          "bytes": 1131,
+          "sha256": "3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86"
+        },
+        {
+          "path": "workspace/test/cache-observation.test.mjs",
+          "bytes": 1722,
+          "sha256": "85a00bcd43efcb002d7874c1106b556232a07550e762684252f4ce7e9e89c71f"
+        },
+        {
+          "path": "workspace/test/report-structure.test.mjs",
+          "bytes": 340,
+          "sha256": "d7daf7abc069f718a7ace0f1b947fd7674130d1b5e582dc5588cfd9609d8aef5"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:f7acf0bfa2033a8bb0fc966ff3e21ab65eabd019e724d54701f73096160ab85e",
   "editable": [
     "workspace/investigation.json"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 2628,
-      "sha256": "f04aeabf54b3389b81790b8290b5bd3d9059ee8d747a57f3392e317b616b7c58",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/ci/build-config.json",
-      "sha256": "dea1af75bc003425d77b45f3375602e9bde3e811d3aa9ed601ef5d935d03b942",
-      "bytes": 212,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/ci/build-history.log",
-      "sha256": "4288f4f83a1c905ce14aa3dc93a64a4e6620373d904e6b3512d84da67e30f271",
-      "bytes": 573,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/ci/scenarios.json",
-      "sha256": "b16010300c28f0bf0dd0e083e2c032b1c855e553117d741cf7ba74b39d30829d",
-      "bytes": 844,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/docs/investigation-contract.md",
-      "sha256": "ba8b371bddb2e52e773438dc18c3de295fd01f56852252de9137df3820254f11",
-      "bytes": 3572,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/investigation.schema.json",
-      "sha256": "23b2da0e485d964192af7f1b3fc738234f78d1fd59db1577d55ea28d1aace03b",
-      "bytes": 12215,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "10537ac134a2957fecb7b30753992caeacd2d76e16de3810b960df6610b890b2",
-      "bytes": 324,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/reproduce-cache.mjs",
-      "sha256": "2efab731082f3adf6f086580c29d87427cfdc9d000ce18ac328773fec083a75b",
-      "bytes": 705,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/validate-report.mjs",
-      "sha256": "97d3a9238a8061e866f91ce14c3c8256968dea9db5b1bac0da460dc6d4a4fca8",
-      "bytes": 1884,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/src/cache-model.mjs",
-      "sha256": "3a73cfed43492a3f40e51f59e5d8ed0c4d9c25465019ef4674ae807afce56d86",
-      "bytes": 1131,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/cache-observation.test.mjs",
-      "sha256": "85a00bcd43efcb002d7874c1106b556232a07550e762684252f4ce7e9e89c71f",
-      "bytes": 1722,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/report-structure.test.mjs",
-      "sha256": "d7daf7abc069f718a7ace0f1b947fd7674130d1b5e582dc5588cfd9609d8aef5",
-      "bytes": 340,
-      "source": "inherited"
-    }
   ]
 }

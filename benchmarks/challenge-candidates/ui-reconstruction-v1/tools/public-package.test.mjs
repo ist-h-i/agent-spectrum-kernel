@@ -4,28 +4,32 @@ import {mkdtempSync,realpathSync,rmSync,readFileSync,writeFileSync,mkdirSync,cpS
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {seal,root,id,source,inventory} from './manifest.mjs';
-import {score} from '../evaluator/score.mjs';
-import {score as scoreV2} from '../evaluator-v2/score.mjs';
 import {preparePracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff,inspectPracticalChallengeScoreHandoff} from '../../../../scripts/practical-challenge-evaluation.mjs';
 import {importChallengeSemanticAssessment,registeredChallengeFiles} from '../../../../scripts/practical-challenge-worker.mjs';
 import {canonicalDigest} from '../../../../scripts/content-addressed-store.mjs';
 import {runtimePackageFiles} from '../../../../scripts/build-npm-package.mjs';
 const read=p=>JSON.parse(readFileSync(join(root,p),'utf8'));
-const rubric=read('evaluator/rubric.json');
 const activeRubric=read('evaluator-v2/rubric.json');
 function decisionsV2(){return {kind:'ch08_assessor_decisions_v2',meta:{candidate_id:'synthetic',assessment_mode:'prospective',rubric_version:activeRubric.version},submission_checks:activeRubric.submission_checks.map(({id})=>({id,status:'pass',answer_ref:'REASSESSMENT.md',independent_ref:'synthetic-operation',observation:'Synthetic comparison only'})),requirements:activeRubric.requirements.map(r=>({id:r.id,checks:r.checks.map(c=>({id:c.id,status:'pass',evidence:[{artifact:'synthetic/'+c.id,observation:'Synthetic calculator input only'}]}))})),release_blockers:Object.keys(activeRubric.release_blocker_rules).map(id=>({id,status:'clear',evidence:[{artifact:'synthetic/'+id,observation:'Synthetic only'}]}))};}
-function decisions(status='pass'){
- return {kind:'ch08_assessor_decisions_v1',requirements:rubric.requirements.map(r=>({id:r.id,checks:r.checks.map(c=>({id:c.id,status,evidence:[{artifact:'synthetic/check/'+c.id,observation:'Artificial calculator input; no UI or model executed.'}]}))})),release_blockers:Object.keys(rubric.release_blocker_rules).map(id=>({id,status:'clear',evidence:[{artifact:'synthetic/blocker/'+id,observation:'Artificial clear observation; not a readiness claim.'}]}))};
-}
 function fixture(t){
  const base=realpathSync(mkdtempSync(join(tmpdir(),'ch08-contract-')));t.after(()=>rmSync(base,{recursive:true,force:true}));
  const evaluator=join(base,'evaluator');cpSync(join(root,'evaluator-v2'),evaluator,{recursive:true});
- const run=join(base,'run'),ready=preparePracticalChallenge({id,root:run,evidenceKind:'synthetic',evaluatorRoot:evaluator,options:{executable:realpathSync('/bin/echo'),model:'synthetic-not-a-model',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']});
+ const updatePath=join(base,'synthetic-update.md'),update='Synthetic reassessment transport fixture. Inspect the original transport sentinel.';
+ writeFileSync(updatePath,update);
+ const run=join(base,'run'),ready=preparePracticalChallenge({id,root:run,evidenceKind:'synthetic',evaluatorRoot:evaluator,updatePath,options:{executable:realpathSync('/bin/echo'),model:'synthetic-not-a-model',reasoning:'low',task_file:'task.md',timeout_ms:1000},toolchainRoots:['/usr']});
  let calls=0;
  const session=async request=>{
   calls++;const resume=request.argv[1]==='resume';
-  if(resume)writeFileSync(join(request.cwd,'REASSESSMENT.md'),'Synthetic inspection only. No browser or model was used.');
-  else{mkdirSync(join(request.cwd,'app'));writeFileSync(join(request.cwd,'app/index.html'),'<!doctype html><title>Synthetic transport sentinel</title>');writeFileSync(join(request.cwd,'DELIVERY.md'),'Synthetic transport sentinel, not a solution.');}
+  const reveal=join(request.cwd,'OPERATIONAL-UPDATE.md');
+  if(resume){
+   assert.equal(readFileSync(reveal,'utf8'),update);
+   writeFileSync(join(request.cwd,'REASSESSMENT.md'),'Synthetic inspection only. No browser or model was used.');
+  } else {
+   assert.equal(existsSync(reveal),false);
+   mkdirSync(join(request.cwd,'app'));
+   writeFileSync(join(request.cwd,'app/index.html'),'<!doctype html><title>Synthetic transport sentinel</title>');
+   writeFileSync(join(request.cwd,'DELIVERY.md'),'Synthetic transport sentinel, not a solution.');
+  }
   return {spawnObserved:true,terminationConfirmed:true,exitCode:0,durationMs:12,stdout:Buffer.from([{type:'thread.started',thread_id:'synthetic-ch08'}, {type:'turn.completed',usage:{input_tokens:9,cached_input_tokens:2,output_tokens:4}}].map(JSON.stringify).join('\n')+'\n'),stderr:Buffer.alloc(0)};
  };
  const old=process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED;process.env.ASK_LOOP_MODEL_CALLS_AUTHORIZED='1';
@@ -37,7 +41,10 @@ test('sealed public inputs, public rubric and scenarios are complete and consist
  const scenarios=read('workspace/brief/scenarios.json').scenarios;
  assert.equal(scenarios.length,14);assert.equal(new Set(scenarios.map(s=>s.id)).size,14);
  for(const s of scenarios){assert.ok(s.steps.length&&s.positive.length&&s.negative.length);for(const ref of s.spec_refs)assert.match(ref,/^S[1-8]$/);}
- for(const r of rubric.requirements){assert.equal(r.checks.length,4);assert.ok(r.scenarios.every(id=>scenarios.some(s=>s.id===id)));}
+ for(const r of activeRubric.requirements){
+  assert.ok(r.checks.length&&r.scenarios.length);
+  assert.ok(r.scenarios.every(id=>scenarios.some(s=>s.id===id)));
+ }
  assert.equal(registeredChallengeFiles(id).length,13);
 });
 test('positive and negative JSON examples exercise request binding, plan constraints, evidence and references',()=>{
@@ -66,26 +73,6 @@ test('positive and negative JSON examples exercise request binding, plan constra
  for(const point of [career.current,career.after_goal,career.ideal]){assert.deepEqual(Object.keys(point.axes).sort(),['collaboration','delivery','design','leadership','learning']);assert.ok(Object.values(point.axes).every(n=>Number.isInteger(n)&&n>=1&&n<=5));assert.ok(point.uncertainty);}
  assert.ok(career.market_context);
 });
-test('synthetic full positive / negative scoring keeps functional and UX separate',()=>{
- const positive=score(rubric,decisions());assert.equal(positive.quality_score,100);assert.equal(positive.categories.functional.score,70);assert.equal(positive.categories.ux.score,30);
- const negative=score(rubric,decisions('fail'));assert.equal(negative.quality_score,0);assert.equal(negative.missing_weight,0);
- const partial=decisions();partial.requirements[0].checks[0].status='fail';
- assert.equal(score(rubric,partial).categories.functional.score,68);assert.equal(score(rubric,partial).categories.ux.score,30);
- partial.release_blockers[0].status='observed';assert.equal(score(rubric,partial).release_status,'blocked');assert.equal(score(rubric,partial).quality_score,98);
-});
-test('each published checkpoint changes arithmetic and unknowns preserve missing weight',()=>{
- for(let i=0;i<rubric.requirements.length;i++)for(let j=0;j<4;j++){
-  const input=decisions();input.requirements[i].checks[j].status='fail';assert.equal(score(rubric,input).quality_score,100-rubric.requirements[i].weight/4);
- }
- const input=decisions();input.requirements[0].checks[0]={id:'F01.1',status:'unknown',missing:'No rendered app',next_check:'Run T01 in a browser'};
- const result=score(rubric,input);assert.equal(result.known_points,98);assert.equal(result.missing_weight,2);assert.equal(result.quality_score,null);assert.equal(result.categories.functional.score,null);assert.equal(result.categories.ux.score,30);
- input.release_blockers[0]={id:'data_loss',status:'unknown',missing:'No persistent store observed',next_check:'Run T11 to T13'};assert.equal(score(rubric,input).release_status,'unknown');
-});
-test('calculator rejects missing, duplicated or invented decisions and unsupported evidence',()=>{
- for(const mutate of [a=>a.requirements.pop(),a=>a.requirements[1]=a.requirements[0],a=>a.requirements[0].checks[0].id='secret-check',a=>a.requirements[0].checks[0].evidence=[],a=>a.requirements[0].points=8,a=>a.release_blockers.pop(),a=>a.requirements[0].checks[0].status='maybe']){
-  const input=decisions();mutate(input);assert.throws(()=>score(rubric,input));
- }
-});
 test('standard preparation is model-free and distributes only public inputs',async t=>{
  const f=fixture(t);assert.equal(f.calls(),0);assert.equal(f.ready.status,'prepared');
  const files=inventory(join(f.run,'workspace')).map(f=>f.path);assert.deepEqual(files,inventory().map(f=>f.path));
@@ -98,6 +85,7 @@ test('synthetic staged delivery freezes app sources, binds handoff and imports s
  assert.ok(end.stages.initial.submission_files.some(f=>f.path==='app/index.html'));
  const handoff=preparePracticalChallengeScoreHandoff(f.run);const packet=inspectPracticalChallengeScoreHandoff(f.run);
  assert.ok(packet.stages[1].submission_files.some(f=>f.path==='app/index.html'));
+ assert.equal(packet.evidence_kind,'synthetic');
  const result=await importChallengeSemanticAssessment(f.run,{kind:'practical_challenge_assessment_input_v1',manifest_digest:f.ready.manifest_digest,handoff_digest:handoff.digest,assessment:decisionsV2(),grading_metrics:{duration_ms:1,input_tokens:null,output_tokens:null,cached_tokens:null}});
  assert.equal(result.result.categories.functional.score,40);assert.equal(result.semantic_truth_verified_by_calculator,false);
  assert.equal(packet.manifest_digest,f.ready.manifest_digest);assert.equal(canonicalDigest(packet),handoff.digest);
@@ -131,8 +119,10 @@ test('app modification or added files after final stage invalidates semantic han
  writeFileSync(join(f.run,'workspace/app/late.js'),'changed');assert.throws(()=>inspectPracticalChallengeScoreHandoff(f.run),/inventory changed/);
  rmSync(join(f.run,'workspace/app/late.js'));writeFileSync(join(f.run,'workspace/app/index.html'),'changed');assert.throws(()=>inspectPracticalChallengeScoreHandoff(f.run),/drift/);
 });
-test('npm runtime projection includes registration, public inputs and evaluator, never author reference HTML',()=>{
- const files=runtimePackageFiles(source);for(const path of ['benchmarks/evaluation-tasks.json',...inventory().map(f=>'benchmarks/challenge-candidates/ui-reconstruction-v1/workspace/'+f.path),'benchmarks/challenge-candidates/ui-reconstruction-v1/evaluator-v2/score.mjs'])assert.ok(files.includes(path),path);
+test('npm includes public inputs and excludes evaluator assets and protected stage updates',()=>{
+ const files=runtimePackageFiles(source);for(const path of ['benchmarks/evaluation-tasks.json','benchmarks/task-revisions/ch08-growth-workspace/input-manifest.json',...inventory().map(f=>'benchmarks/challenge-candidates/ui-reconstruction-v1/workspace/'+f.path)])assert.ok(files.includes(path),path);
+ assert.equal(files.some(p=>p.startsWith('benchmarks/challenge-candidates/ui-reconstruction-v1/evaluator')),false);
  assert.equal(files.some(p=>/reference-private|成長マップ|library-helpers-private/.test(p)),false);
+ assert.equal(files.some(p=>/^benchmarks\/(challenge-candidates\/(review-ceiling-v1|ui-reconstruction-v1)\/stages\/|task-revisions\/(rc01-shared-review-platform|ch08-growth-workspace)\/stage-2\.md$)/.test(p)),false);
  assert.equal(existsSync(join(root,'workspace/app')),false);
 });

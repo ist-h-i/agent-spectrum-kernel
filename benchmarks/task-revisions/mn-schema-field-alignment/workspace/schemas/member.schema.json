@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Member payload v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["memberId", "display_name"],
+  "properties": {
+    "memberId": {"type": "string", "minLength": 1},
+    "display_name": {"type": "string", "minLength": 1},
+    "enabled": {"type": "boolean"}
+  }
+}

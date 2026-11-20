@@ -1,0 +1,65 @@
+[
+  {
+    "case_id": "record-read",
+    "fault": {
+      "kind": "missing_record",
+      "publicMessage": "Record was not found"
+    },
+    "request": {
+      "method": "GET",
+      "attempt": 1,
+      "maximumAttempts": 3
+    }
+  },
+  {
+    "case_id": "service-ready",
+    "fault": {
+      "kind": "temporary_unavailable",
+      "publicMessage": "Please retry",
+      "retryAfterSeconds": 0
+    },
+    "request": {
+      "method": "GET",
+      "attempt": 1,
+      "maximumAttempts": 3
+    }
+  },
+  {
+    "case_id": "service-delay",
+    "fault": {
+      "kind": "temporary_unavailable",
+      "publicMessage": "Please retry",
+      "retryAfterSeconds": 2
+    },
+    "request": {
+      "method": "GET",
+      "attempt": 1,
+      "maximumAttempts": 3
+    }
+  },
+  {
+    "case_id": "service-write",
+    "fault": {
+      "kind": "temporary_unavailable",
+      "publicMessage": "Please retry",
+      "retryAfterSeconds": 2
+    },
+    "request": {
+      "method": "POST",
+      "attempt": 1,
+      "maximumAttempts": 3
+    }
+  },
+  {
+    "case_id": "unclassified",
+    "fault": {
+      "kind": "driver_fault",
+      "message": "fictional diagnostic detail"
+    },
+    "request": {
+      "method": "GET",
+      "attempt": 1,
+      "maximumAttempts": 3
+    }
+  }
+]

@@ -1,6 +1,6 @@
 # CH08 UI-first semantic assessment v2
 
-Version 2.1.0; input version ui-functional-v2.1. Same CH08 task identity, not a ninth challenge.
+Rubric version 2.1.0. The common catalog identifies the version of the prepared task input.
 
 ## Why 40 functional / 60 UX
 
@@ -15,10 +15,9 @@ JSON transfer is required; readable decision support is independently assessed.
 
 ## Collection and calculation
 
-Copy **only these three files** (rubric.json, score.mjs, README.md) to the external
-assessor root used by the existing challenge handoff. Never give this private runtime
-directory to submission code. Public workspace/brief/rubric.json has identical criteria.
-No runner changes are needed. Existing evaluator/ files remain immutable v1 replay assets.
+The operator retrieves these three pinned files from the protected asset checkout.
+The native challenge handoff binds them to the assessed submission. Public
+workspace/brief/rubric.json presents the same grading criteria.
 
 Assessment kind ch08_assessor_decisions_v2; meta requires candidate_id,
 assessment_mode (prospective or retrospective), rubric_version (2.1.0).

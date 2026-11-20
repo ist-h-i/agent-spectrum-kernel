@@ -1,0 +1,11 @@
+{
+  "artifact_cache": {
+    "namespace": "catalog-build",
+    "key_fields": [
+      "node_major"
+    ],
+    "restore_prefixes": []
+  },
+  "dependency_install": "always",
+  "build": "validate-restored-or-build"
+}

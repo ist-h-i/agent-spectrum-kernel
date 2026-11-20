@@ -1,8 +1,9 @@
 # Registered staged challenge evaluation
 
 Find RC01 and CH08 through the [evaluation task catalog](evaluation-task-catalog.md).
-Their registrations pin the initial input inventory, the fixed reassessment update,
-and the three files needed for each task's semantic assessment.
+Their common catalog records bind the initial input inventory and the protected
+reassessment and semantic assessment files. The operator-only assets are in the
+same pinned checkout used for the inventory and logistics problem.
 
 ## Standard entry point
 
@@ -11,13 +12,13 @@ commands are unchanged. The new commands manage one registered staged run:
 
 ```sh
 node scripts/practical-evaluation-cli.mjs task-list --type review
-node scripts/practical-evaluation-cli.mjs task-prepare --id rc01-shared-review-platform --root /absolute/new-run --config /absolute/config.json
+node scripts/practical-evaluation-cli.mjs task-prepare --id rc01-shared-review-platform --root /absolute/new-run --config /absolute/config.json --assets-root /absolute/protected-assets
 node scripts/practical-evaluation-cli.mjs challenge-status --root /absolute/new-run
 # Only after direct approval of the inspected exact configuration:
 node scripts/practical-evaluation-cli.mjs challenge-start --root /absolute/new-run --confirm sha256:MANIFEST_DIGEST --allow-model-calls
 # Inspect the first-stage result, then explicitly approve the same-session continuation:
 node scripts/practical-evaluation-cli.mjs challenge-resume --root /absolute/new-run --confirm sha256:MANIFEST_DIGEST --allow-model-calls
-node scripts/practical-evaluation-cli.mjs challenge-score-handoff --root /absolute/new-run --evaluator-root /absolute/private-evaluator
+node scripts/practical-evaluation-cli.mjs challenge-score-handoff --root /absolute/new-run
 ```
 
 Preparation is model-free. A minimal configuration is:
@@ -35,7 +36,7 @@ Preparation is model-free. A minimal configuration is:
   },
   "toolchainRoots": ["/usr", "/System", "/Library", "/bin", "/sbin", "/absolute/node-toolchain"],
   "instructionsRoot": "/absolute/instruction-only-overlay",
-  "evaluatorRoot": "/absolute/private-evaluator",
+  "assetsRoot": "/absolute/protected-assets",
   "sessionRoots": ["/absolute/codex-home/sessions/YYYY/MM/DD"]
 }
 ```
@@ -52,9 +53,9 @@ private grader as an overlay. The overlay is inventoried and protected just like
 public task files. An absent overlay is a different experimental condition, not
 an implicit Full installation. Dependency installation is not performed by the
 runner; provision the same dependency/tool state in each workspace before start,
-without changing the frozen files. In-workspace dependency symlinks are allowed;
-links escaping the workspace are not. All additional initial-stage files are
-frozen before reassessment. Each inventoried file is bounded to 16 MiB.
+without changing the frozen files. Retain regular files in the workspace for
+the completed submission snapshot. All additional initial-stage files
+are frozen before reassessment. Each inventoried file is bounded to 16 MiB.
 
 The staged execution port reuses `executeCodexPracticalAdapter`,
 `executeCodexSession`, `parseUserCodexTelemetry` and standard provider receipts.
@@ -79,8 +80,11 @@ standard receipt and logs; use a new run for an explicitly approved retry.
 It requires a completed first turn, unchanged original inputs and initial
 answers, and an observed session ID. Only then is `OPERATIONAL-UPDATE.md`
 materialized in the solver workspace. Reassessment must retain all prior files
-and add only `REASSESSMENT.md`. The update file lives outside the initial public
-workspace and is not copied during preparation.
+and add only `REASSESSMENT.md`. The update is read from the pinned, operator-only
+asset before preparation succeeds. The source checkout, npm package, instruction
+overlay and initial solver workspace omit its contents. An injected synthetic
+run can supply its own text with `updatePath`, and the handoff preserves the
+synthetic evidence label.
 
 Exit zero alone does not prove task completion. A successful transport,
 `turn.completed`, required nonempty answers and unchanged protected files are
@@ -124,7 +128,9 @@ packet or its referenced assets with the public problem.
 The existing reporting-policy-v3 grader remains unchanged: its supported three
 binary 10-point review contracts cannot substitute for RC01's 100-point partial
 semantic rubric. No keyword matcher, new rubric or second scoring model is
-introduced here. The two historical RC01 pilot scores belong to `review-public-v1`. The current `review-public-v2` registration has no measured solver trials. The per-item review and reassessment comparisons are described in the [evaluation task guide](evaluation-task-catalog.md).
+introduced here. The current `review-public-v3` registration has no measured
+solver trials. The per-item review and reassessment comparisons are described
+in the [evaluation task guide](evaluation-task-catalog.md).
 
 ## Verification contract
 
@@ -239,18 +245,14 @@ distributed. Actual AI APIs and external services are prohibited.
 Use the same `task-list`, `task-prepare --id ch08-growth-workspace --root /absolute/new-run --config /absolute/config.json`, exact-approval `challenge-start`,
 `challenge-resume`, and semantic handoff/import commands with the CH08 ID. The
 initial stage creates a runnable `app/` and `DELIVERY.md`; the second stage adds
-only `REASSESSMENT.md` after read-only checks. Unlike the review-only RC01,
-CH08 opts into `freeze_submission`: all files, including newly authored app
-sources, are pinned after initial delivery and after reassessment. Every stage
-verification checks those file bytes, and the final inventory rejects late
-additions before scoring. Symlinks are disallowed in that frozen submission;
-each file must fit the common 16 MiB bound. Existing RC01 registrations/runs
-retain their existing behavior. Neither stage executes without model-call
-authorization; synthetic injected sessions are explicitly labeled synthetic.
+only `REASSESSMENT.md` after read-only checks. Both RC01 and CH08 pin every
+workspace file after initial delivery and after reassessment, including authored
+app sources and reviews. The final inventory rejects changes to those files
+and late additions before scoring. Authorization is required for model calls.
+Injected sessions are labeled synthetic.
 
-The three files for the current CH08 evaluator are under `evaluator-v2/`.
-Copy them to the external isolated evaluator directory for a run.
-For `ui-functional-v2.1`, public `brief/rubric.json` is byte-identical to the registered 2.1.0 evaluator rubric. There are
+Use the three pinned CH08 evaluator files in the protected assets root.
+For `ui-functional-v2.2`, public `brief/rubric.json` presents the registered 2.1.0 evaluator rubric. There are
 no hidden functional requirements. An independent assessor must exercise the
 actual browser interactions and bind decisions to evidence. Functional /40 and
 UX /60 are separate fields in the imported result. Only a fully observed result

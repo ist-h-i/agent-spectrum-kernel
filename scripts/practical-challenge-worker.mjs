@@ -8,6 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {canonicalDigest,readJsonFileStrict,readStableBytes,writeCanonicalJsonNoReplace,assertNoSymlinkPathSegments} from './content-addressed-store.mjs';
 import {instructionBytesDigest as hash} from './instruction-environment.mjs';
 import {preparePracticalChallenge,inspectPracticalChallenge,startPracticalChallenge,preparePracticalChallengeScoreHandoff,inspectPracticalChallengeScoreHandoff,listPracticalChallenges} from './practical-challenge-evaluation.mjs';
+import {verifyStagedEvaluationTaskInput} from './evaluation-task-inputs.mjs';
 import {executePracticalEvaluationWorker} from './practical-evaluation-worker.mjs';
 import {validatePracticalQualityObservation} from './practical-quality-observation.mjs';
 const save=(path,value)=>writeCanonicalJsonNoReplace({outputPath:path,artifact:value,label:'challenge loop evidence',maximumBytes:16*1024*1024});
@@ -24,9 +25,8 @@ export function createPracticalChallengeCommandDefinition(settingsPath){
 }
 export function registeredChallengeFiles(id){
  const c=listPracticalChallenges().find(c=>c.id===id);assert.ok(c,'unknown registered challenge');
- const root=resolve(import.meta.dirname,'..'),manifestPath=join(root,c.input_manifest.path);
- assert.equal(filePin(manifestPath).digest,c.input_manifest.digest,'challenge catalog input drift');
- return read(manifestPath).files.map(f=>({source:join(root,c.workspace,f.path),target:f.path,digest:'sha256:'+f.sha256}));
+ const root=resolve(import.meta.dirname,'..');
+ return verifyStagedEvaluationTaskInput(c).map(({path,digest})=>({source:join(root,c.workspace,path),target:path,digest}));
 }
 function checked(settings,job){
  const row=job.input.row,spec=settings.cases[row.case_id],condition=settings.conditions[row.condition];assert.ok(spec&&condition,'unknown challenge case/condition');

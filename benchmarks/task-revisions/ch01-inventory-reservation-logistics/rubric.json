@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "RH01",
+      "points": 1,
+      "observation": "引き継ぎ後の保存結果と業務記録を照合する。",
+      "skills": [
+        "controlled-implementation"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "RH02",
+      "points": 1,
+      "observation": "担当者が最新の状況を読み取り、作業を続けられる。",
+      "skills": [
+        "ui-ux-design"
+      ],
+      "group": "product"
+    },
+    {
+      "id": "RH03",
+      "points": 1,
+      "observation": "条件を変更した後の各操作経路の結果を照合する。",
+      "skills": [
+        "application-boundary-architecture"
+      ],
+      "group": "product",
+      "requires_followup": true
+    },
+    {
+      "id": "RH04",
+      "points": 1,
+      "observation": "提出者の検証記録を独立した業務観測に照らす。",
+      "skills": [
+        "review-domain-impact"
+      ],
+      "group": "submission"
+    }
+  ]
+}

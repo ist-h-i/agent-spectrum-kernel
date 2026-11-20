@@ -43,7 +43,7 @@ Human approval of cases/conditions precedes model runs. Fix model/effort, ASK ve
 
 Measure task elapsed time, setup/grading time and input/output/cache usage separately. Cache is an input subset, not another summand. Include child usage when available, disclose missing usage and interrupted runs. An execution fault is not a quality score of zero. Preserve failed attempts; retry only affected runs where justified, without selecting results for a desired score.
 
-CH01-level difficulty is a design goal, not a verified fact. Two pilot model trials are recorded in [the archived calibration summary](https://github.com/ist-h-i/agent-spectrum-kernel/blob/445eec92545e694becf04278b96da867134c1758/benchmarks/challenge-candidates/review-ceiling-v1/calibration-summary.json); they do not establish comparative difficulty or readiness of the new staged entry point. Scores near a ceiling should trigger inspection of task coverage and grader discrimination, not retrospective harsher grading.
+No model trials have measured the current edition. Scores near a ceiling should trigger inspection of task coverage and grader discrimination. Fix a new version of the rubric before using it for new trials.
 
 ### One-phase score handling
 
@@ -53,6 +53,6 @@ The complete RC01 assessment uses the fixed staged update. If only the first pha
 
 A valid additional finding does not create points beyond the frozen 100. If it proves the same causal requirement, assess it there without duplication. If it is a genuinely different issue, record its severity, evidence and release consequence separately; it may support the existing evidence/prioritization dimensions but does not replace an unrelated seeded requirement. If it exposes an invalid or ambiguous task assumption, suspend that affected requirement for **all** conditions and version the rubric before a new comparison, rather than changing weights to favor one answer.
 
-## Outcome edition (review-public-v2)
+## Current edition (review-public-v3)
 
 For each major causal group record the inspected initial answer and source, affected producer and consumer, and any missed impact. Record unwarranted release stops separately, including the accepted behavior and counterevidence. Group repeated wording with the same cause and effect once. Use the frozen initial artifact and the operational update to trace both retained and revised judgments. Count neither findings nor reversals as points. A bounded pilot and a deferral are both eligible when the evidence and limits support them. The diagnostic item scores in task.md are separate from the 100-point review. The two scores in the archived report belong to review-public-v1. No solver has been scored on this edition.

@@ -1,88 +1,87 @@
 {
+  "kind": "evaluation_input_manifest_v2",
   "id": "hi-external-action-approval",
-  "version": "task-revision-1",
-  "rubric_sha256": "3ecb805e33a622fb763ef1b34945f75b88be3a4279e88e56fb63f8bbadbf66c2",
+  "version": "task-revision-2",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1259,
+          "sha256": "f0791c179b02251fd8dc8bbe7005a6b7abf1bbdccef9527e80acfda88b7d46c0"
+        },
+        {
+          "path": "workspace/data/approval-receipts.json",
+          "bytes": 4269,
+          "sha256": "bc22febfccebf32907748f52e6fb26440022c819c5cd6c23f7b59605d5678f89"
+        },
+        {
+          "path": "workspace/data/operation-cases.json",
+          "bytes": 5830,
+          "sha256": "df76662a2b5cadce4944522797df6ca5f6590c47e8f9b8bef43ca89a8a04d9d4"
+        },
+        {
+          "path": "workspace/data/review-attestations.json",
+          "bytes": 6957,
+          "sha256": "1e71b7b30a9863285b7427d521f6e827a453e36db79d5f11404a4b7bd0cfbc2b"
+        },
+        {
+          "path": "workspace/data/state.json",
+          "bytes": 101,
+          "sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655"
+        },
+        {
+          "path": "workspace/docs/action-contract.md",
+          "bytes": 3139,
+          "sha256": "47a4f6758cc083c41b8b421e1eb5146dcba30175503cf2cd7bcbe8070499d33d"
+        },
+        {
+          "path": "workspace/operation-plan.json",
+          "bytes": 84,
+          "sha256": "59ec7dac65f082e1bc4b23597cb87184a7bf02cbea08d36e7c26ee0df6d5a120"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 286,
+          "sha256": "310e7caaeff8888c806cd5b9529e7c695e3f75a347b15f85bdc34bbe5d534055"
+        },
+        {
+          "path": "workspace/plan.schema.json",
+          "bytes": 3145,
+          "sha256": "e02fb3863e15afda3a77ef11f8a25804ebaad538ec2dac4a6727ebb92af8b833"
+        },
+        {
+          "path": "workspace/scripts/controller.mjs",
+          "bytes": 1755,
+          "sha256": "cea53787de8823996cb21625a6a39a93e2f46150cec3feb660ed7158091841a0"
+        },
+        {
+          "path": "workspace/scripts/dry-run.mjs",
+          "bytes": 269,
+          "sha256": "dcd960028408017a39df66341a44cd6dc99561ab4a9b16f57abe519b44e82379"
+        },
+        {
+          "path": "workspace/scripts/validate-plan.mjs",
+          "bytes": 221,
+          "sha256": "72e1ae6be29ef14a2e4d2501eab21fe0bd03a0129d0d74b455ea6c3918cb0652"
+        },
+        {
+          "path": "workspace/scripts/validate-shape.mjs",
+          "bytes": 1877,
+          "sha256": "8be02af93a38354e49810d94cb9ef170b6d21b7d7f737408d4126bac9f3bcd9d"
+        },
+        {
+          "path": "workspace/test/approval.test.mjs",
+          "bytes": 2908,
+          "sha256": "67e5470bc61428713b26490e0b18068b8fe0b05a3228c684238e30f7e93a91c6"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:4bf6eeebba83dd39732ec2d303cc07e2bb7baafcb2f1faae118c98fe6e486b88",
   "editable": [
     "workspace/operation-plan.json"
-  ],
-  "files": [
-    {
-      "path": "task.md",
-      "bytes": 2376,
-      "sha256": "2115cd23432df5c6c75f4f7f5902570d6db7e8fd200a3b973697a5872c3e4e91",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/data/approval-receipts.json",
-      "sha256": "059a91b51e7e98fb901a907c9bb49ab6bc1e0980c3883d2aab9813a0e21e5375",
-      "bytes": 3535,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/data/operation-cases.json",
-      "sha256": "8a603853b5e0a322d5562e2ea8f24dc008659ec66862961564060aaf1e6179d0",
-      "bytes": 3632,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/data/state.json",
-      "sha256": "94bc4fcc2e3575f54d4c75d40ef262b773cc4876bc7ed785658f606cd2f48655",
-      "bytes": 101,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/docs/action-contract.md",
-      "bytes": 3066,
-      "sha256": "1ac08a01a910da8286b0f704cb2453e5eb93404ae4d9c73d1a09d7da4cbf603d",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/operation-plan.json",
-      "sha256": "59ec7dac65f082e1bc4b23597cb87184a7bf02cbea08d36e7c26ee0df6d5a120",
-      "bytes": 84,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/package.json",
-      "sha256": "310e7caaeff8888c806cd5b9529e7c695e3f75a347b15f85bdc34bbe5d534055",
-      "bytes": 286,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/plan.schema.json",
-      "bytes": 2674,
-      "sha256": "036b0ebf6496acc218584c0c4c24ec1dbfc6d1fb4180fd910bffd7f159a56381",
-      "source": "revision"
-    },
-    {
-      "path": "workspace/scripts/controller.mjs",
-      "sha256": "151f495a67e95db5a0d6d437de1f0db5ef18d9b720819cf14d7052c1f752be66",
-      "bytes": 2206,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/dry-run.mjs",
-      "sha256": "dcd960028408017a39df66341a44cd6dc99561ab4a9b16f57abe519b44e82379",
-      "bytes": 269,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/validate-plan.mjs",
-      "sha256": "72e1ae6be29ef14a2e4d2501eab21fe0bd03a0129d0d74b455ea6c3918cb0652",
-      "bytes": 221,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/scripts/validate-shape.mjs",
-      "sha256": "8be02af93a38354e49810d94cb9ef170b6d21b7d7f737408d4126bac9f3bcd9d",
-      "bytes": 1877,
-      "source": "inherited"
-    },
-    {
-      "path": "workspace/test/approval.test.mjs",
-      "bytes": 3853,
-      "sha256": "0c647d6464c4a1e7c7083f0d434a3198289c80f08eb3f1cc346232a08ddd6879",
-      "source": "revision"
-    }
   ]
 }

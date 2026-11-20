@@ -1,0 +1,10 @@
+{
+  "mode": "prepare_only",
+  "read_policy": null,
+  "writer_policy": null,
+  "rollout_steps": [],
+  "execute_requires_specific_approval": true,
+  "restore_requires_new_approval": true,
+  "revalidate_current_state": true,
+  "rollback_cases": []
+}

@@ -1,0 +1,7 @@
+started_at,finished_at,tenant_id,window_minutes,request_id,computed_key,result,build_ms
+2026-08-16T10:12:00.010Z,2026-08-16T10:12:00.617Z,tenant-a,15,req-8201,tenant-a:15,build,607
+2026-08-16T10:12:00.029Z,2026-08-16T10:12:00.641Z,tenant-a,15,req-8202,tenant-a:15,build,612
+2026-08-16T10:12:00.077Z,2026-08-16T10:12:00.697Z,tenant-a,15,req-8203,tenant-a:15,build,620
+2026-08-16T10:12:00.710Z,2026-08-16T10:12:00.712Z,tenant-a,15,req-8204,tenant-a:15,cache,0
+2026-08-16T10:12:01.002Z,2026-08-16T10:12:01.590Z,tenant-b,15,req-9201,tenant-b:15,build,588
+2026-08-16T10:12:01.692Z,2026-08-16T10:12:01.694Z,tenant-b,15,req-9202,tenant-b:15,cache,0

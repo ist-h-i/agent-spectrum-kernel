@@ -1,0 +1,1 @@
+import {readFileSync} from 'node:fs';import {inspectPlan} from './controller.mjs';const p=JSON.parse(readFileSync(new URL('../operation-plan.json',import.meta.url),'utf8')),result=inspectPlan(p);console.log(JSON.stringify(result));process.exitCode=result.accepted?0:1;

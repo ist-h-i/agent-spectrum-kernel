@@ -1,18 +1,12 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {inventory,stats,workspace} from './manifest.mjs';
-const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const rows=await inventory();
-const expected=JSON.parse(await fs.readFile(path.join(root,'input-manifests/rc01-shared-review-platform.json'),'utf8'));
-if(JSON.stringify(rows)!==JSON.stringify(expected.files)) throw new Error('Manifest drift');
-const counts=await stats(rows);
+import {sealedInput,stats} from './manifest.mjs';
+const rows=sealedInput().files;
+const counts=stats(rows);
 if(counts.implementation_lines+counts.test_lines<20000) throw new Error('Expected tens-of-thousands of meaningful source/test lines');
 if(!rows.some(r=>r.path==='LICENSE')) throw new Error('Missing MIT notice');
 for(const row of rows){
  if(/(^|\/)(private|oracle|answer-key|authoring)(\/|$)/.test(row.path)) throw new Error(`Evaluator-like path in input: ${row.path}`);
  if(row.path.endsWith('.png')) continue;
- const body=await fs.readFile(path.join(workspace,row.path),'utf8');
+ const body=row.bytes.toString('utf8');
  if(/-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|AKIA[A-Z0-9]{16}/.test(body)) throw new Error(`Credential-pattern match: ${row.path}`);
 }
 const {createPortal}=await import('../workspace/packages/portal/server/app.mjs');

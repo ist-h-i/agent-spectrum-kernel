@@ -30,7 +30,7 @@
     {
       "id": "display-regression",
       "points": 3,
-      "observation": "提出テストは正しい表示を受け入れ、同じ配信結果を取消済みと誤表示すると検出する（J04・J08）。",
+      "observation": "提出テストは配信契約に沿った画面を受け入れ、操作に実害のある表示の回帰を検出する（J04・J08）。",
       "skills": [
         "test-first-verification"
       ],

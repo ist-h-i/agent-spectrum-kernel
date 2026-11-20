@@ -23,6 +23,8 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     assert.ok(published.includes('dist/docs/npm-distribution.md'));assert.ok(published.includes('dist/docs/npm-distribution-ja.md'));
     assert.ok(published.includes('bin/ask.mjs'));assert.ok(published.includes('dist/npm-runtime-inventory.json'));
     assert.ok(!published.some(p=>/review-ceiling-v1\/calibration-(report\.md|summary\.json)$/.test(p)));
+    assert.ok(!published.some(p=>p.startsWith('dist/benchmarks/fixtures/') || p.includes('/stages/')
+      || p.includes('/evaluator/') || p.includes('/evaluator-v2/') || p.endsWith('/scripts/ask-benchmark.mjs')));
     assert.ok(!published.some(p=>p.includes('/.git/')||p.startsWith('scripts/')||p.startsWith('.github/')));
     const app=join(root,'application');mkdirSync(app);writeFileSync(join(app,'package.json'),' {"name":"ask-local-install-test","private":true} ');
     okay(run('npm',['install','--ignore-scripts','--no-audit','--no-fund',join(root,pack.filename)],{cwd:app,env:{...process.env,npm_config_cache:join(root,'npm-cache')}}));
@@ -60,7 +62,7 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     assert.ok(existsSync(join(selected.working_directory,'build.config.json')));
     assert.ok(!existsSync(join(workspace,'source','benchmarks','challenge-candidates','ceiling-v4-continuity')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','workspace','task.md')));
-    assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','evaluator','score.mjs')));
+    assert.ok(!existsSync(join(workspace,'source','benchmarks','challenge-candidates','ui-reconstruction-v1','evaluator-v2','score.mjs')));
     assert.ok(existsSync(join(workspace,'source','benchmarks','challenge-candidates','review-ceiling-v1','workspace','task.md')));
     assert.ok(existsSync(join(target,'.agent-spectrum-kernel','codex-install-state.json')));
     const copy=readFileSync(join(workspace,'source','skills','review-router','SKILL.md'));
