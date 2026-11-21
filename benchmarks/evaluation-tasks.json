@@ -220,6 +220,164 @@
           ]
         }
       ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-034-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:11d3b0108e00b326bedac67404694666a1d51d82a1199953d84412d48a9ffe95",
+      "source_revision": "dc63664de1bbda5f9a60cb5f93cdbf9c874418ee",
+      "protected_revision": "603a4ba8c312697a0b55d4aa901ea6803260202f",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-3",
+          "input_digest": "sha256:01724e8f95612c1b8a1794f02aaf6bd3e7dde6af3f4110ee780418bf4e0c3956",
+          "assessment_digest": "sha256:ad8d21906147c5660a21a866732c5adc1f3bc4a347e0e41d4028f33925fc7676",
+          "task_id": "implementation-workspace-upgrade",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                null
+              ]
+            },
+            {
+              "condition": "codex_default_helpers_75m",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-031-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:11d3b0108e00b326bedac67404694666a1d51d82a1199953d84412d48a9ffe95",
+      "source_revision": "133c1da47989105e4880f3f99f188448fb0bf3fd",
+      "protected_revision": "46167de33055faccc51b14cada35ee6b7c526467",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "review-public-v4",
+          "input_digest": "sha256:c2a351a5859fc61fe905c5184403a28ab21456d742c7c8a658f59b95ee5eed54",
+          "assessment_digest": "sha256:86e928e5fb98350c8cddc8be1dffae064e0e8e287d5633934a1489cf8a234eb2",
+          "task_id": "rc01-shared-review-platform",
+          "maximum_points": 100,
+          "conditions": [
+            {
+              "condition": "staged_codex_no_overlay",
+              "scores": [
+                97
+              ]
+            }
+          ],
+          "score_group": "challenge"
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-033-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:11d3b0108e00b326bedac67404694666a1d51d82a1199953d84412d48a9ffe95",
+      "source_revision": "1cb0c6b151a2cb4b70d09b6d9e72863dd9e1c692",
+      "protected_revision": "93c8952edaf3163d6075c18f26f8389c0416810a",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:658e53dcfae1f06e7704bcbe89047f9f8fcecdcda7cb06a980542a7cc419cb91",
+          "assessment_digest": "sha256:b3eade03884a709cc8e4e08464f77392d1ed5d8bff8412086051c1ae0b93191f",
+          "task_id": "implementation-timeline-restore",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10,
+                null
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-035-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:11d3b0108e00b326bedac67404694666a1d51d82a1199953d84412d48a9ffe95",
+      "source_revision": "8eec165948ba060f4bba0eaef6c35af72476e046",
+      "protected_revision": "a24007f4c5fd31efa3a31f0b8843ea284713ef55",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:55b01a7853c573c740f5688c3570f4a8adc84aadef5352c26cfc9cbd32476c43",
+          "assessment_digest": "sha256:6c1f8a92a70034c6869ef11d27bdcb76c49cc7e5671dc59f53d82066448f32f4",
+          "task_id": "implementation-clearing-cutover",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-034-v2-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:11d3b0108e00b326bedac67404694666a1d51d82a1199953d84412d48a9ffe95",
+      "source_revision": "c47c023c5306f7f3f847ba80f09eb5e281bb57e3",
+      "protected_revision": "c8242a7dd83ba55c37194ca7394aaadbe49fc976",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:0fc0ec593628904c0232cdab3990632208a70f6d6f3411c1eef4e1b822f39dc2",
+          "assessment_digest": "sha256:bf35ba10a7d312b81a45464f03f044bb9874eef2a9cd6786f6caffbbe449b07b",
+          "task_id": "implementation-workspace-upgrade",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "tasks": [

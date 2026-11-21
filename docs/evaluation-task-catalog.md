@@ -32,6 +32,8 @@ ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
 
 改訂前（ASK-033〜035の入力版 `task-revision-1`）に行った2026年11月21日の `gpt-6.2-astra`／`max` の試行では、`ASK-013`・`ASK-033`・`ASK-035` が各1回、`ASK-034` が2回とも10/10でした。この4問では中央値が40〜60点に入る課題を確認できませんでした。[試行条件と得点](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/upper-model-calibration-2026-11-21.md)
 
+改訂後の4問は、同じモデル・推論強度で改めて測定しました。版ごとの得点、試行数、採点を見直した9問の検証内容を確認できます。[改訂13問の検証と得点](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/revised-thirteen-astra-2026-11-21.md)
+
 各課題は共通の非公開保管先を使用します。採点資材を更新した課題はそのコミットを個別に固定します。
 
 同じモデルと推論強度で旧版を実行した `ASK-031`（共有コンソールのリリースレビュー）は97/100点でした。初回レビューと追加資料を受けた再判断を合わせて1試行です。今回の素点は目標の40〜60点を上回りました。[採点内訳と実行条件](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/release-review-astra-2026-11-21.md)
