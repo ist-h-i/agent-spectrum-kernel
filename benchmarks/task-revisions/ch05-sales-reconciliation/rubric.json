@@ -3,7 +3,7 @@
     {
       "id": "reserved-balance",
       "points": 2,
-      "observation": "未解決中も承認額が拘束され、残高を超える別件の承認を拒否する（S02・S05）。",
+      "observation": "未解決の承認額を拘束し、別件は残高内なら承認でき、残高を超える場合は拒否する（S02・S05）。",
       "skills": [
         "controlled-implementation"
       ],

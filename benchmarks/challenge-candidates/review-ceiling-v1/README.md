@@ -15,7 +15,7 @@ Model inputs must contain only the manifest-listed workspace, without Git metada
 
 ## Construction verification
 
-The frozen input contains 151 files: 19,647 implementation lines and 6,768 test lines, plus 172 stylesheet and 35 markup lines. Text documentation and lockfiles are excluded from those source counts. The implementation itself is below 20,000 lines; implementation plus tests is 26,415 lines. Size is not evidence of difficulty.
+The previous review-public-v3 input contained 151 files: 19,647 implementation lines and 6,768 test lines, plus 172 stylesheet and 35 markup lines. Text documentation and lockfiles are excluded from those source counts. The implementation itself is below 20,000 lines; implementation plus tests is 26,415 lines. Size is not evidence of difficulty.
 
 Construction checks covered 15 public portal tests (also on separately materialized input), 15 private backend checks, 13 scoring-calculator checks, 9 UI DOM-double checks, core differential checks and scoped core/provider TypeScript checks. The independent reviewer assessed the rubric and reference/negative review controls. Broader browser accessibility, the full legacy Vitest/extension build, whole-repository CI for the fixture and standard runner admission remain outside that evidence.
 

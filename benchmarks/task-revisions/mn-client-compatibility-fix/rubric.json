@@ -19,7 +19,7 @@
     {
       "id": "new-regression",
       "points": 2,
-      "observation": "The submitted tests detect an independently checked regression not covered by the starting suite.",
+      "observation": "An additional test detects a documented behavior regression missed by the distributed suite and accepts conforming readers. Identify the difference the test observes and the environment used.",
       "skills": [
         "test-first-verification"
       ],

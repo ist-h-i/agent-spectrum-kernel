@@ -39,7 +39,7 @@
     {
       "id": "decision-owners",
       "points": 2,
-      "observation": "提出者が過去の承認・受理と現時点の判断の読み書き箇所を示し、本文送信・監査表示の観測と一致する（A01・A04・A07）。",
+      "observation": "提出者は自分の実装で承認・受理・現時点の判断を読み書きする箇所を示し、配信と監査の実際の結果を説明する。観測した不具合について正しく原因を説明した場合も評価する（A01・A04・A07）。",
       "skills": [
         "application-boundary-architecture"
       ],

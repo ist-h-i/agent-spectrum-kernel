@@ -11,7 +11,7 @@
     {
       "id": "journey",
       "points": 2,
-      "observation": "Reproduces a material keyboard interaction and compares the result with the documented behavior.",
+      "observation": "Reproduces a material keyboard interaction in the editor and compares the submitter’s observed result with its documented behavior.",
       "skills": [
         "ui-ux-design"
       ]
@@ -19,7 +19,7 @@
     {
       "id": "continuation",
       "points": 2,
-      "observation": "Explains how the observed interaction affects the editor’s work.",
+      "observation": "Explains a concrete consequence for the editor’s work, with a reasoned distinction between an observed result and a consequence inferred from the code.",
       "skills": [
         "ui-ux-design"
       ]
@@ -35,7 +35,7 @@
     {
       "id": "decision",
       "points": 1,
-      "observation": "Supports the priority and merge recommendation with observed impact.",
+      "observation": "Supports the priority and merge recommendation with evidence of user impact.",
       "skills": [
         "review-ai-quality"
       ]

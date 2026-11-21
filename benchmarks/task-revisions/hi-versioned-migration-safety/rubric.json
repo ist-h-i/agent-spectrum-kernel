@@ -35,7 +35,7 @@
     {
       "id": "recovery-proof",
       "points": 2,
-      "observation": "The submitted trace grounds the decisions and identifies remaining evidence and authority.",
+      "observation": "The submitted reader observations, checkpoint evidence, limits of write coverage and execution authority support the stated recovery decisions.",
       "skills": [
         "risk-gate"
       ],

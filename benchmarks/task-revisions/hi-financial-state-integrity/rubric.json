@@ -35,7 +35,7 @@
     {
       "id": "submitted-check",
       "points": 2,
-      "observation": "The reported input sequence, before-values and actual observations reproduce and distinguish a change that corrupts an earlier state despite matching final balances. A missing execution record is unobserved.",
+      "observation": "The submitted sequence and recorded outcomes can be independently replayed, including balances, request registry, audit and earlier input state after later operations. A missing execution record is unobserved.",
       "skills": [
         "test-first-verification"
       ],

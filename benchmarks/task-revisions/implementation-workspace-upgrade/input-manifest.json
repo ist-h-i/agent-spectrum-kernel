@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "implementation-workspace-upgrade",
-  "version": "task-revision-1",
+  "version": "task-revision-2",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,18 +9,18 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1442,
-          "sha256": "d257131b1aa174120987d851be7d7d2012f3174021eca0f4935b4fa9917fe46b"
+          "bytes": 2293,
+          "sha256": "cd6aa6731f2300b6a23b64afebd88ae237e549ee9946834a200cd2b10db90aed"
         },
         {
           "path": "workspace/docs/dispatch.md",
-          "bytes": 2928,
-          "sha256": "3a17cec5d29acfd00dc8b9bff380914abefe153e9bba451906fdadce932e719d"
+          "bytes": 3988,
+          "sha256": "380c53edcf87a567b4f374d5bb29b3d727471f50e4cf7aa245d94d5cca368078"
         },
         {
           "path": "workspace/docs/installed-clients.md",
-          "bytes": 2507,
-          "sha256": "6acb42c1b7545d1f157e4c04bc031bd9f6eac6505db29f1f912beeb0b34d14df"
+          "bytes": 5526,
+          "sha256": "8b7e13bc91db7c260a9debb596b208cba58904fb0607212770eb27690d0752bb"
         },
         {
           "path": "workspace/docs/returned-sheets.md",
@@ -44,8 +44,8 @@
         },
         {
           "path": "workspace/release/desk.mjs",
-          "bytes": 830,
-          "sha256": "11e4ac79ad084f7d097081522e4945c5a84880b61c5410d8a74172b69934a08e"
+          "bytes": 936,
+          "sha256": "4d00fbc98a188961dee70f4d05dc7128e7781492f0499d0e5b3e3c8709c9f945"
         },
         {
           "path": "workspace/release/kiosk.mjs",
@@ -85,7 +85,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:8f5f6d933f5d2a5c72bdbd6e49d1b1d8723ab04ddaa8c62c46de5ab57412bfc5",
+  "rubric_digest": "sha256:2f727a6659de8592c72b1e8684ecdb73c03b3b5cef6bcba6db9dc686a618a861",
   "editable": [
     "workspace/src/delivery.mjs",
     "workspace/src/reconcile.mjs",

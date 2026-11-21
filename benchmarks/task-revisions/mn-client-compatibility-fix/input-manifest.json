@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "mn-client-compatibility-fix",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 842,
-          "sha256": "d0494bc5b02deb0386bccb7166a95073c55e68c488f5a8102bf3c8a950a94192"
+          "bytes": 936,
+          "sha256": "01b4d99c7b21e75c3db2bd0a32a937244d6f5e2f4faf5cea54d13a2283683a8f"
         },
         {
           "path": "workspace/docs/client-support.md",
@@ -40,7 +40,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:7dfaf7418f1655c6076416a8d35166d2b41d21bd0722acc7b5822f51d349d774",
+  "rubric_digest": "sha256:f32d076893dcc42ffcd580c126c16f484428f25246faf1a15437d3baf6a41431",
   "editable": [
     "workspace/src/preferences.mjs",
     "workspace/test/preferences.test.mjs"

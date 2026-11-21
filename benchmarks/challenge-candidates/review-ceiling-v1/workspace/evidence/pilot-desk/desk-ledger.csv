@@ -1,0 +1,13 @@
+desk,local_ticket,revision,logical,attempt,code,replaces
+A,27,1,k74,1,opened,
+A,27,2,k74,1,delivered,
+B,27,1,k81,1,opened,
+B,27,2,k81,1,dispatched,
+B,28,1,k81,2,opened,
+B,28,2,k81,2,returned,
+C,18,1,k56,1,opened,
+C,18,2,k56,1,delivered,
+A,28,1,k90,1,opened,
+A,28,2,k90,1,delivered,
+B,29,1,k95,1,dispatched,
+B,29,2,k95,1,corrected,B/27/2

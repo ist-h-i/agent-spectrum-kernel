@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "ch04-document-access",
-  "version": "business-five-20261120-outcomes2",
+  "version": "business-five-20261120-outcomes3",
   "modes": {
     "one_shot": {
       "working_directory": "public/tasks/ch04-document-access",

@@ -49,7 +49,8 @@ test('one selection entry lists the current primary, business and staged tasks',
     assert.equal(task.primary_type, task.task_types[0]);
     assert.ok(task.labels.length && task.labels.every(label => registration.labels.includes(label)));
     assert.equal(task.assessment.calibration.github_repository_id, registration.assets.github_repository_id);
-    assert.equal(task.assessment.calibration.revision, registration.assets.revision);
+    const row = registration.tasks.find(row => row.id === task.id);
+    assert.equal(task.assessment.calibration.revision, row.protected_revision ?? registration.assets.revision);
     if (task.input.kind === 'private') continue;
     assert.equal(task.input.manifest, `benchmarks/task-revisions/${task.id}/input-manifest.json`);
     const manifest = JSON.parse(readFileSync(join(source, task.input.manifest)));
@@ -152,6 +153,11 @@ test('measured scores stay bound to the tested input, scoring definition and pro
   result.conditions[0].scores = [0, null, 6];
   registration.assets.revision = '1'.repeat(40);
   assert.equal(observe().edition, 'previous_protected_revision');
+  row.protected_revision = registration.model_studies[0].protected_revision;
+  assert.equal(observe().edition, 'current');
+  row.protected_revision = 'invalid';
+  assert.throws(observe, /invalid protected revision/u);
+  delete row.protected_revision;
   result.score_group = 'product';
   assert.throws(observe, /maximum must match the registered rubric group/u);
   delete result.score_group;

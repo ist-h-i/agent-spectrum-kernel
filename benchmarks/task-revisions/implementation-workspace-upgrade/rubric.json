@@ -1,9 +1,84 @@
 {
   "criteria": [
-    {"id":"mixed-installation","points":2,"observation":"Keeps released clients working on populated card files across both generations, site boundaries and slot reuse.","skills":["controlled-implementation"]},
-    {"id":"offline-reconciliation","points":2,"observation":"Reconciles compatible field and route changes and preserves disputed edits for later resolution.","skills":["controlled-implementation"]},
-    {"id":"interrupted-import","points":2,"observation":"Keeps sheet identity, per-member outcomes and partial work consistent across overlap and restart.","skills":["test-first-verification"]},
-    {"id":"dispatch-publication","points":2,"observation":"Publishes the accepted card revision to the printer and the installed monitor through overlapping activity.","skills":["controlled-implementation"]},
-    {"id":"uncertain-dispatch","points":2,"observation":"Recovers interrupted dispatches through the supplier’s outcome protocol, preserving physical slips and their identities.","skills":["doubt-driven-development"]}
+    {
+      "id": "mixed-installation",
+      "points": 1,
+      "observation": "Keeps released clients working on populated card files across both generations, site boundaries and slot reuse.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "offline-reconciliation",
+      "points": 1,
+      "observation": "Reconciles compatible field and route changes and preserves disputed edits for later resolution.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "interrupted-import",
+      "points": 1,
+      "observation": "Keeps sheet identity, per-member outcomes and partial work consistent across overlap and restart.",
+      "skills": [
+        "test-first-verification"
+      ]
+    },
+    {
+      "id": "dispatch-publication",
+      "points": 1,
+      "observation": "Publishes the accepted card revision to the printer and the installed monitor through overlapping activity.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "uncertain-dispatch",
+      "points": 1,
+      "observation": "Recovers interrupted dispatches through the supplier\u2019s outcome protocol, preserving physical slips and their identities.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "receipt-publication",
+      "points": 1,
+      "observation": "Issues a historical receipt from the original sheet through revision changes and restart.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "installed-evidence",
+      "points": 1,
+      "observation": "Uses retained evidence in populated offices and preserves job bindings when evidence is incomplete.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "load-exchange",
+      "points": 1,
+      "observation": "Leaves all vehicle records in their installed formats with the accepted quantities, sequence and local annotations.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "printed-allowance",
+      "points": 1,
+      "observation": "Accounts for cumulative signed-waybill quantities and waits for the actual print outcome.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "handover-settlement",
+      "points": 1,
+      "observation": "Settles overlapping exchanges and retries without partially changing vehicles, allowances or receipts.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    }
   ]
 }

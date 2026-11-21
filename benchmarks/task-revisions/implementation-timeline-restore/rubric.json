@@ -11,7 +11,7 @@
     {
       "id": "historical-changes",
       "points": 2,
-      "observation": "Reproduces the requested revisions after corrections, including repeated deliveries and pagination.",
+      "observation": "Reproduces the requested revisions as printed after journal reissues, including repeated deliveries and pagination.",
       "skills": [
         "controlled-implementation"
       ]
@@ -27,7 +27,7 @@
     {
       "id": "batch-efficiency",
       "points": 2,
-      "observation": "Shares paid work across requests and serves the specified multi-zone workload.",
+      "observation": "Shares pack and route charges across offices at national directory scale.",
       "skills": [
         "doubt-driven-development"
       ]

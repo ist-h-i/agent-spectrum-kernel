@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "hi-versioned-migration-safety",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1268,
-          "sha256": "20bce6c8c4e4bcebead9f35375d85037a0ca2fc80daa189c1e93d75d7d0903d4"
+          "bytes": 1321,
+          "sha256": "be809a543b4bf6ad2f4304eece1850a173606d182c4106215205062c9fba0049"
         },
         {
           "path": "workspace/data/mixed-state.json",
@@ -80,7 +80,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:511645ea971c5093ec58612498a55d8ece79811b6204e6b60890ff26e3ddb99e",
+  "rubric_digest": "sha256:5b74af05a29c7737c8b3c6277c078f7d02feca39fa8f2e151827556437cbc665",
   "editable": [
     "workspace/migration-plan.json"
   ]

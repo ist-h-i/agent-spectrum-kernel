@@ -26,7 +26,7 @@
     },
     {
       "id": "impact-evidence",
-      "points": 2,
+      "points": 1,
       "observation": "Source evidence, actor and use, before/after result, severity and correction condition justify the reported effects.",
       "skills": [
         "review-ai-quality"
@@ -38,6 +38,14 @@
       "observation": "The merge decision is supported by the evidenced policy consequences and distinct causes.",
       "skills": [
         "review-ai-quality"
+      ]
+    },
+    {
+      "id": "submitted-checks",
+      "points": 1,
+      "observation": "The submitted verification declaration agrees with the recorded outcome of the prescribed local checks on this review.",
+      "skills": [
+        "test-first-verification"
       ]
     }
   ]

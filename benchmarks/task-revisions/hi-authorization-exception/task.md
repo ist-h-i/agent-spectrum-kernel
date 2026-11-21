@@ -12,6 +12,6 @@ Run the final checks from `workspace/`:
 npm test && npm run trace && npm run validate:review
 ```
 
-The tests and trace provide observations; review shape validation does not establish that the decision or findings are correct.
+The tests and trace cover ordinary caller uses. Compare the supplied code and case data for the other proposed decisions. These checks provide observations; review shape validation does not establish that the decision or findings are correct.
 
 Record the affected legitimate or disallowed use and the corrective condition for each finding. The `preserved_cases` array names supplied normal uses and what a correction must preserve. Explain the overall decision in `decision_basis`. Distinguish a missed contract violation from a false alarm on an allowed route. Equivalent wording and repeated descriptions of the same cause receive the same finding credit.

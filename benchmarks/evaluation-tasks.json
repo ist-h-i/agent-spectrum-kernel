@@ -239,7 +239,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-authorization-exception",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/review.json"
         ],
@@ -269,7 +269,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-external-action-approval",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/operation-plan.json"
         ],
@@ -298,7 +298,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-financial-state-integrity",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/src/ledger.mjs"
         ],
@@ -327,7 +327,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-versioned-migration-safety",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/migration-plan.json"
         ],
@@ -384,7 +384,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/mn-client-compatibility-fix",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/src/preferences.mjs",
           "workspace/test/preferences.test.mjs"
@@ -525,7 +525,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/mp-accessibility-interaction-review",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/review.json"
         ],
@@ -864,7 +864,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/pf-observability-redaction",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/config/projection-policy.json",
           "workspace/review.json"
@@ -1082,7 +1082,7 @@
       "input": {
         "kind": "business",
         "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
-        "version": "business-five-20261120-outcomes2",
+        "version": "business-five-20261120-outcomes3",
         "modes": {
           "one_shot": {
             "working_directory": "public/tasks/ch04-document-access",
@@ -1124,7 +1124,7 @@
       "input": {
         "kind": "business",
         "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
-        "version": "business-five-20261120-outcomes2",
+        "version": "business-five-20261120-outcomes3",
         "modes": {
           "one_shot": {
             "working_directory": "public/tasks/ch05-sales-reconciliation",
@@ -1209,7 +1209,7 @@
       "input": {
         "kind": "staged",
         "root": "benchmarks/challenge-candidates/review-ceiling-v1/workspace",
-        "version": "review-public-v3",
+        "version": "review-public-v4",
         "modes": {
           "default": {
             "working_directory": ".",
@@ -1227,7 +1227,7 @@
               "INITIAL.md",
               "REVIEW.md"
             ],
-            "prompt": "Read and follow task.md. Complete steps 1 and 2 only: save INITIAL.md before investigation, then REVIEW.md. Do not invent the optional operational update. Keep original application, tests, contracts and evidence unchanged. Use only local workspace and localhost endpoints, never external network services. Work only in this workspace and system toolchains; do not inspect unrelated directories, user repositories or host history. Use only synthetic data and localhost services. Save reproducible probes and observations. If UI access or dependencies are unavailable, preserve explicit missing evidence. Stop after the initial review."
+            "prompt": "Read task.md. Save INITIAL.md before investigation, then REVIEW.md. Assess the release decision from the supplied synthetic operating records, offline aggregate calculations, ordinary UI use and static source inspection in the stated scope. No security testing. Keep the delivered application, tests, contracts and evidence unchanged. Work only in this workspace and system toolchains; no external services or unrelated repositories. Stop after the initial review."
           },
           {
             "id": "reassessment",
@@ -1236,7 +1236,7 @@
             ],
             "update": {
               "target": "OPERATIONAL-UPDATE.md",
-              "digest": "sha256:026e524c131082931172d6ef5cb039bb7829c22c7124a649629828e6101360af",
+              "digest": "sha256:84e95f35273bab29a66086c23649a84aa73c6634271f28fe16065eb91aab7c34",
               "path": "task-revisions/rc01-shared-review-platform/stage-2.md",
               "scope": "protected"
             },
@@ -1250,7 +1250,7 @@
           "files": [
             {
               "path": "rubric.json",
-              "digest": "sha256:e2601a827eb1d9897e83c8de8618ddbc6a07f80a2ec3e1816ffcb1e2fbfb0fab"
+              "digest": "sha256:1fa873789657569899a956a8bcd29799cf46100a5e31c475574ba4f8b17bb125"
             },
             {
               "path": "score.mjs",
@@ -1258,7 +1258,7 @@
             },
             {
               "path": "README.md",
-              "digest": "sha256:afe0ec19c82a5e99cfc1343fb2fcdb1ed2c760ad420b97d53e0baf44f05ebccb"
+              "digest": "sha256:07642202ebe7d7c1b5e56523ce7acb9353b7c5f5d910b114611acd803283d5eb"
             }
           ]
         },
@@ -1273,7 +1273,8 @@
       },
       "acceptance_files": [
         "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
-      ]
+      ],
+      "protected_revision": "f0f6145dc2a3b465967037b33c6ee0b00673c6b6"
     },
     {
       "id": "ch08-growth-workspace",
@@ -1387,7 +1388,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/implementation-timeline-restore",
-        "version": "task-revision-1",
+        "version": "task-revision-2",
         "editable": [
           "workspace/src/event-lookup.mjs"
         ],
@@ -1397,7 +1398,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "ea406e0ce68604bb65f757ff80b786047353f0de"
     },
     {
       "id": "implementation-workspace-upgrade",
@@ -1420,7 +1422,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/implementation-workspace-upgrade",
-        "version": "task-revision-1",
+        "version": "task-revision-2",
         "editable": [
           "workspace/src/delivery.mjs",
           "workspace/src/reconcile.mjs",
@@ -1455,7 +1457,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/implementation-clearing-cutover",
-        "version": "task-revision-1",
+        "version": "task-revision-2",
         "editable": [
           "workspace/src/archive.mjs",
           "workspace/src/clearing.mjs",
