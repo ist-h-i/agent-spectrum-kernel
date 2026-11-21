@@ -111,6 +111,83 @@
           ]
         }
       ]
+    },
+    {
+      "id": "astra-max-20261121",
+      "report": "benchmarks/results/upper-model-calibration-2026-11-21.md",
+      "report_digest": "sha256:4293dc30d26fda64dc34ff8668945681e2473118e2749ad7c9fbb4728a4c35a5",
+      "source_revision": "cfc9d09d531379f7e60210869b2aefd9fb769eaa",
+      "protected_revision": "a00f5f0ff2783247de7db2db31f85b67d90b53fd",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small samples from isolated respondent workspaces. The host supplied general instructions and the model used same-model helpers. No named ASK skill was requested.",
+        "The archive and clearing prototypes were rescored under distinct catalog IDs with byte-identical solver inputs. The migration handoff was independently assessed; the field desk grader was independently corrected before checking those model scores."
+      ],
+      "results": [
+        {
+          "task_id": "mp-data-migration-handoff",
+          "input_version": "task-revision-3",
+          "input_digest": "sha256:65185e85b7621a8658544de4cfe9fa0c5756246c066c57ab39fb73a22003f90b",
+          "assessment_digest": "sha256:7bc2fe703b8f4b1123e3351b1c560f46675231b54c2045b8b271a1c2d8ab721e",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "implementation-timeline-restore",
+          "input_version": "task-revision-1",
+          "input_digest": "sha256:6e20b74ac399be5bf321a40f4f4d0d2a56a77f2c1596c4bc8fa14ff9881dbe45",
+          "assessment_digest": "sha256:65f8b7c1a6faba8b7bbd8a8193b1cb24ee77ace788b54298575476e636bd6cee",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "implementation-workspace-upgrade",
+          "input_version": "task-revision-1",
+          "input_digest": "sha256:668cf090ea713b3d495d71cea376063bcb56f739a80d9e019ab7bd4490b95b2b",
+          "assessment_digest": "sha256:9655276f80503c5eee91870c410245ddfe7752de19b61bfef59f876a79839c13",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10,
+                10
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "implementation-clearing-cutover",
+          "input_version": "task-revision-1",
+          "input_digest": "sha256:74ff7aaaa44d90e06da0bcca09a36a4041d38a62767f9d8cfca0500ca94e392d",
+          "assessment_digest": "sha256:2802a13b1f3028239257980af1e89d1732a2806141b25b3dc3765f732977780c",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "tasks": [
