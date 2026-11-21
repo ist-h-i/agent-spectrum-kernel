@@ -1471,7 +1471,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "ef5206094cb21a97e2b7ad6614d1e9199ec3975e"
     }
   ]
 }

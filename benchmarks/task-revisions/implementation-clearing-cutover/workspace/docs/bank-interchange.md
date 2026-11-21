@@ -27,3 +27,11 @@ The service returns the durable `through` position of this feed and one status s
 | `rejected` | The new ticket advice would put the cumulative amount outside its face. |
 
 A conflict at a previously recorded feed position is settled by that position's record, including when the incoming row names another ticket. The close desk describes the receipt boundaries for signed archives and kiosk saves. At a fresh position, the bank accepts an equivalent already-booked advice without posting it again. On a new tape advice the preceding ticket revision must be known to interpret its movement. A stopped row has no accounting or receipt effect and can be presented again after other activity. Both codecs can carry one page with multiple orders.
+
+## Regional offset advice
+
+A page with `codec: "bundle"` has rows of the form `{legs: [{codec, row}, ...]}`. Each leg is an ordinary tape or JSON advice as above. One nonempty bundle occupies **one** feed position. Its list order is the order of daybook entries and the order in which a ticket's advice numbers are interpreted. A later leg may correct an earlier leg of the same bundle.
+
+The bank promises all the legs, or none. Check ordinary advice validity in list order. Funding is checked once on the final combined cash and reservations of the affected accounts. The bank permits intermediate positions that could not settle individually. A stopped row leaves none of its legs booked and retains no receipt for that row; an earlier accepted row in the same page remains durable. When the bundle succeeds, retain each newly booked revision's ordinary daybook effects, including movements offset by another leg. An already booked equivalent leg produces no new entries.
+
+The receipt certifies the ordered sequence of ticket advice terms, independently of codec. A one-leg bundle and the same ordinary row at a feed position agree. A different length, order, ticket or revision at a live recorded position conflicts. On redelivery the amounts are interpreted against their own historical predecessors. The signed and kiosk position boundaries in the close instructions still apply.

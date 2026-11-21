@@ -38,3 +38,13 @@ test('teller can read and continue work from a deployed kiosk save', () => {
   const ticket = {office: 'mill', day: '2025-05-08', serial: '23'};
   assert.equal(book.place({ticket, from: 'reserve', to: 'merchant', limit: '300'}), 'opened');
 });
+
+test('the regional desk can acknowledge one mixed-format position', () => {
+  const book = openBook(archive);
+  assert.equal(book.place(order), 'opened');
+  const bundled = {legs: [{codec: 'json', row: advice}]};
+  assert.deepEqual(book.receive({feed: 'regional', codec: 'bundle', after: 0, rows: [bundled]}),
+    {status: 'ok', through: 1});
+  assert.deepEqual(book.receive({feed: 'regional', codec: 'json', after: 0, rows: [advice]}),
+    {status: 'ok', through: 1});
+});
