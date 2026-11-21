@@ -32,6 +32,8 @@ ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
 
 2026年11月21日の `gpt-6.2-astra`／`max` の試行では、`ASK-013`・`ASK-033`・`ASK-035` が各1回、`ASK-034` が2回とも10/10でした。この4問では中央値が40〜60点に入る課題を確認できませんでした。[試行条件と得点](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/upper-model-calibration-2026-11-21.md)
 
+同じモデルと推論強度で実行した `ASK-031`（共有コンソールのリリースレビュー）は97/100点でした。初回レビューと追加資料を受けた再判断を合わせて1試行です。今回の素点は目標の40〜60点を上回りました。[採点内訳と実行条件](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/release-review-astra-2026-11-21.md)
+
 `--score-range 40-60` は、現行版の実測得点の中央値が40〜60%の課題を抽出します。両端を含み、小数も指定できます。`--model`、`--effort`、`--condition` は登録されたモデル名、推論強度、実行条件名の完全一致で絞り込みます。たとえば `--condition ask_none` はその条件だけを対象にします。いずれかの実測フィルターを使うと、該当する試行系列だけを表示します。一致する観測がなければ結果は0問です。
 
 各系列は同じ研究・モデル・推論強度・実行条件・採点グループに属します。採点できた素点から中央値を求め、そのグループの満点で割って100を掛けます。偶数件では中央2件の平均を使います。`null` は試行数に残し、中央値の計算からは除きます。1件だけでも表示されるため、実用上の難易度を判断するときは分布と試行数を確認してください。

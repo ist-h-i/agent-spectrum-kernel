@@ -188,6 +188,38 @@
           ]
         }
       ]
+    },
+    {
+      "id": "astra-max-staged-review-20261121",
+      "report": "benchmarks/results/release-review-astra-2026-11-21.md",
+      "report_digest": "sha256:409e09f3b7c041c9599c6034f15359209de6c5d71fb1b9b13e96160c76962201",
+      "source_revision": "5bc556a77d489ce41e383d52b058ae3b48f0a828",
+      "protected_revision": "a00f5f0ff2783247de7db2db31f85b67d90b53fd",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "One observed run with two stages in the same session, optional helpers, and no named ASK skill or instruction overlay.",
+        "An independent assessor applied the registered 100-point rubric. Execution and network settings differ from the primary-task study."
+      ],
+      "results": [
+        {
+          "task_id": "rc01-shared-review-platform",
+          "input_version": "review-public-v3",
+          "input_digest": "sha256:38038a35d778610b6b2b329895737530c55ef5ce85308e057dfb2ed66f778415",
+          "assessment_digest": "sha256:a6f86f9435b6c2856909802b38a06de1a7b9889932f136932fa5271f9e9803b5",
+          "score_group": "challenge",
+          "maximum_points": 100,
+          "conditions": [
+            {
+              "condition": "staged_codex_no_overlay",
+              "scores": [
+                97
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "tasks": [

@@ -125,12 +125,13 @@ weight and a null complete total; they are not zero or reweighted. Release
 blockers remain separate from numerical quality. Do not publish the private
 packet or its referenced assets with the public problem.
 
-The existing reporting-policy-v3 grader remains unchanged: its supported three
-binary 10-point review contracts cannot substitute for RC01's 100-point partial
-semantic rubric. No keyword matcher, new rubric or second scoring model is
-introduced here. The current `review-public-v3` registration has no measured
-solver trials. The per-item review and reassessment comparisons are described
-in the [evaluation task guide](evaluation-task-catalog.md).
+RC01 uses a 100-point rubric with partial credit. The reporting-policy-v3
+grader supports three binary 10-point review contracts. The catalog keeps
+those scales separate. [Evaluation task guide](evaluation-task-catalog.md)
+
+An observed run of `review-public-v3` on November 21, 2026 completed the
+initial review and the update in one Codex session. The study records the fixed
+inputs, independent assessment and observed usage. [Staged release review](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/release-review-astra-2026-11-21.md)
 
 ## Verification contract
 
@@ -144,9 +145,9 @@ in the [evaluation task guide](evaluation-task-catalog.md).
 - Local evidence: 13 challenge tests and 42 existing adapter tests passed with
   synthetic sessions only. Exact external three-file binding and handoff were
   also exercised locally with injected sessions, zero actual model calls.
-- Remaining evidence: real Codex CLI option/sandbox behavior and actual staged
-  model execution have not been validated through this new entry point. Registry
-  availability and synthetic checks do not establish measurement readiness.
+- The November 21 study also exercised the real CLI with the recorded configuration.
+  Its network policy allowed localhost and relied on the task contract for
+  external access. Its observations apply to that configuration.
 
 ## Standard comparison-loop connection
 
