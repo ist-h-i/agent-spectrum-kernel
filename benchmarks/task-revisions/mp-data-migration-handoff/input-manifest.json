@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "mp-data-migration-handoff",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,33 +9,58 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1252,
-          "sha256": "d4efd8c667427a5c9cb91f83261c34a39271bb64d84d08259ac29da924fb530d"
+          "bytes": 1394,
+          "sha256": "6cac1f657874e00b8f0ec1a26edde59bbc31b3f6b68199d99f08f9cb32ee551a"
         },
         {
           "path": "workspace/docs/migration-plan.md",
-          "bytes": 775,
-          "sha256": "0b23607d92c19e2be53aaf7d84e42325dce337bafb2fc1e67150a5ac103d3600"
+          "bytes": 3280,
+          "sha256": "729f7e376defa1819e87662b9e1a0fd9c8196b3c42beb052e787d7dc3f7c6925"
         },
         {
           "path": "workspace/docs/rollback-runbook.md",
-          "bytes": 730,
-          "sha256": "4cb069492547eed44e905718a3ff16c4e551fe08d6cc2e9cb9b9e06c930bd868"
+          "bytes": 500,
+          "sha256": "f86030d1c1b79191a9a72a48c142340925257175b53d7d9450bf27abc558e412"
         },
         {
-          "path": "workspace/evidence/batch-42-verification.json",
-          "bytes": 783,
-          "sha256": "3e72bfd2e6b0b1eec95c694d52789b2fae567bc84d4d215611f8ee8ec75558f5"
+          "path": "workspace/evidence/checkpoint-journal.ndjson",
+          "bytes": 1383,
+          "sha256": "a1d71b654ffbbc8089407e25f3e613f88823574792a302c8dd3b8f021b3b41a1"
+        },
+        {
+          "path": "workspace/evidence/comparisons.ndjson",
+          "bytes": 780,
+          "sha256": "61b0884fa9a7dd1b2befde63bc22f887caa375272422c4d51747976ddc41de47"
+        },
+        {
+          "path": "workspace/evidence/compatibility.json",
+          "bytes": 396,
+          "sha256": "0a38f7141b5efed8168525207d0917e6028540c573d16aab0817359c028d9d30"
+        },
+        {
+          "path": "workspace/evidence/outbox.ndjson",
+          "bytes": 508,
+          "sha256": "6703882f704abadf5f930e5984e557e7756cca4bcaef89ba781f2f486402b14f"
         },
         {
           "path": "workspace/handoff.schema.json",
-          "bytes": 3453,
-          "sha256": "825e54ee33c822564fc0888d6357f183c89d7c39cc36f972c175a584e04554a5"
+          "bytes": 5293,
+          "sha256": "58dcd480998d7d54f112016709b76c828ef35cf9649139c60ef3b3f0e38b6e0f"
         },
         {
           "path": "workspace/operations/commands.json",
-          "bytes": 590,
-          "sha256": "33c43ca1ec45f8c5f18e11e0e53ea30e1e95c1187e73275a641145e674a39af8"
+          "bytes": 1941,
+          "sha256": "07e269fdfeb95c652a55eabafb4bde17eca3e76b156509ef1d4850ae5a57ee6e"
+        },
+        {
+          "path": "workspace/operations/pages.json",
+          "bytes": 3014,
+          "sha256": "fc6a70fe4a4ae1a86b49487f8f31a8c961189ee929578c9207688e7e5ae8cc7f"
+        },
+        {
+          "path": "workspace/operations/work-orders.json",
+          "bytes": 772,
+          "sha256": "01d17587c0b4dae36b32e2f73c83762e99c0360d07d9d40552adc9b3027a77ab"
         },
         {
           "path": "workspace/package-lock.json",
@@ -49,33 +74,23 @@
         },
         {
           "path": "workspace/scripts/validate-handoff.mjs",
-          "bytes": 6777,
-          "sha256": "93889cefd1c52c51aa092cb79da8e671eb03e6f8ba99cb57b16da5bf3aafcd0d"
+          "bytes": 3684,
+          "sha256": "de581e637814fe93384483b71bb4c3f7b64d7a46f61a5c0f719cb356ed7a2ea1"
         },
         {
-          "path": "workspace/state/approval-state.json",
-          "bytes": 325,
-          "sha256": "5e12d5a62c2bb5ccaa61da5b39e277e6c74588e3907fc19644ae3117d3908707"
+          "path": "workspace/state/grants.ndjson",
+          "bytes": 1193,
+          "sha256": "cb88104ee21b9d88cc74dd93474ff474583de067b547c442bb3578fb7c898054"
         },
         {
-          "path": "workspace/state/compatibility-matrix.json",
-          "bytes": 694,
-          "sha256": "e8dbdc3c1677e0713d8a1203e25ab61e9bc25d8e09454075f882410ddedeebde"
-        },
-        {
-          "path": "workspace/state/handoff-policy.json",
-          "bytes": 151,
-          "sha256": "2af601848e25d17308c948184620b3d2a168bf14d9a4253e881e8639d63f1cbe"
-        },
-        {
-          "path": "workspace/state/operation-state.json",
-          "bytes": 388,
-          "sha256": "b14cae8b9327736e01f7f34557656fdb922d45eaf66379bbc4e71e47439cee6d"
+          "path": "workspace/state/routing.json",
+          "bytes": 345,
+          "sha256": "78284eabdb4d74e35d3239a98f16c1fa8a19b21b9fb4974de3e646f76237946a"
         }
       ]
     }
   },
-  "rubric_digest": "sha256:c5bae1f7bef35cc50ff104ce266887a04b7b4b8c50762c64889f8a6a125407dd",
+  "rubric_digest": "sha256:e2c1078760f1e80e4ee452dd7aaa37c39b7af4fc44cd8989e3c56e5d02165ec5",
   "editable": [
     "workspace/handoff.json"
   ]

@@ -1,7 +1,7 @@
-# Prepare a resumable data-migration handoff
+# Take over the profile backfill
 
-An on-call operator is taking over a paused profile backfill while old and new clients continue using the service. The operator needs to know what has finished and how to carry the work forward safely.
+The day shift is taking over three partitions of a live profile migration. Its dashboard has been rebuilt from several generations of operational records. Operators need one dispatch decision per assigned partition and an instruction for each incoming page in the shift exercise.
 
-Create only `handoff.json` using `handoff.schema.json`. Use the supplied plan, records, catalog and runbook. Include every verification ID specified by `state/handoff-policy.json` exactly once. Give the operator a grounded next action and explain the conditions for proceeding, stopping or obtaining more evidence. Identify unresolved questions and cite the supplied sources.
+Prepare only `handoff.json` using the shift report schema in the workspace. Cite record IDs supporting each decision. Give the next operator enough information to act on the current scope and contain an incident. The pages are independent changes to the shift snapshot. Do not carry a page's records into another page.
 
-Do not perform migration, reconciliation or rollback operations. Run `npm run validate:handoff` and report its result.
+Run `npm run validate:handoff` and report the result. Do not perform any migration or release operations.

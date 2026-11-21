@@ -1,0 +1,9 @@
+{
+  "criteria": [
+    {"id":"mixed-installation","points":2,"observation":"Keeps released clients working on populated card files across both generations, site boundaries and slot reuse.","skills":["controlled-implementation"]},
+    {"id":"offline-reconciliation","points":2,"observation":"Reconciles compatible field and route changes and preserves disputed edits for later resolution.","skills":["controlled-implementation"]},
+    {"id":"interrupted-import","points":2,"observation":"Keeps sheet identity, per-member outcomes and partial work consistent across overlap and restart.","skills":["test-first-verification"]},
+    {"id":"dispatch-publication","points":2,"observation":"Publishes the accepted card revision to the printer and the installed monitor through overlapping activity.","skills":["controlled-implementation"]},
+    {"id":"uncertain-dispatch","points":2,"observation":"Recovers interrupted dispatches through the supplier’s outcome protocol, preserving physical slips and their identities.","skills":["doubt-driven-development"]}
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "criteria": [
+    {
+      "id": "statements",
+      "points": 2,
+      "observation": "Reconstructs the records and amounts of issued statements across supported archive generations.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "historical-changes",
+      "points": 2,
+      "observation": "Reproduces the requested revisions after corrections, including repeated deliveries and pagination.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "read-plan",
+      "points": 2,
+      "observation": "Determines the attainable cost of complete historical evidence and enforces the caller’s allowance.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "batch-efficiency",
+      "points": 2,
+      "observation": "Shares paid work across requests and serves the specified multi-zone workload.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "interrupted-restore",
+      "points": 2,
+      "observation": "Handles supplier failures and subsequent calls within the statement and charging contracts.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    }
+  ]
+}

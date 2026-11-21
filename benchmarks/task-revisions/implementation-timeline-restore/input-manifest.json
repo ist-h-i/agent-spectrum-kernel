@@ -1,0 +1,52 @@
+{
+  "kind": "evaluation_input_manifest_v2",
+  "id": "implementation-timeline-restore",
+  "version": "task-revision-1",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1346,
+          "sha256": "9d70ce3f6ded16cb301b763150916eaad8acfda64062f1ebe5b4e1202372feeb"
+        },
+        {
+          "path": "workspace/docs/archive-operations.md",
+          "bytes": 2227,
+          "sha256": "7a324308715f29a3e84792e710552c2ab0ae6b9abd266800f3fc95cb54e51dd4"
+        },
+        {
+          "path": "workspace/docs/interchange.md",
+          "bytes": 1364,
+          "sha256": "8dd10b96fe5528bf983de19423a8f2fb0b02a24d712a6d6d7bad1fbf079bd82a"
+        },
+        {
+          "path": "workspace/docs/statement-interface.md",
+          "bytes": 1704,
+          "sha256": "8d564809e66d93e6b4626cec5dc8a821abd327afba0f76453a7e83277a882520"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 145,
+          "sha256": "587b6e9835d66c034ed12d4dda452af3eea618be0fc529d7e0d9e7be6212dcdf"
+        },
+        {
+          "path": "workspace/src/event-lookup.mjs",
+          "bytes": 1998,
+          "sha256": "2e8d27bead25636ea8285936f890fa8916a7eb59b416cd5b59a3e09fce9b9423"
+        },
+        {
+          "path": "workspace/test/client.test.mjs",
+          "bytes": 1962,
+          "sha256": "1b81be289394b677bd749a9aadf4e7ce8f62de5da786b6aee13d385053146cd8"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:15156a44005ab0578d69e44b97e0a93c16e372a5d67e9f6dfb0df018a28cf315",
+  "editable": [
+    "workspace/src/event-lookup.mjs"
+  ]
+}

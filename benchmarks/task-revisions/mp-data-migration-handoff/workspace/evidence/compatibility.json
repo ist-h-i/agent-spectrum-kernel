@@ -1,0 +1,25 @@
+{
+  "certifications": [
+    {
+      "id": "CC-8",
+      "map": "p4",
+      "legacy": "2.8",
+      "current": "4.1",
+      "result": "pass"
+    },
+    {
+      "id": "CC-9",
+      "map": "p5",
+      "legacy": "2.8",
+      "current": "4.1",
+      "result": "fail"
+    },
+    {
+      "id": "CC-12",
+      "map": "p5",
+      "legacy": "2.9",
+      "current": "4.1",
+      "result": "pass"
+    }
+  ]
+}

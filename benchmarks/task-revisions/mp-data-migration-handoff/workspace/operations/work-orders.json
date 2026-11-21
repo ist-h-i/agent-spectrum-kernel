@@ -1,0 +1,39 @@
+{
+  "shift_at": "2026-08-15T11:20:00Z",
+  "change_owner": "profile-change-owner",
+  "assignments": [
+    {
+      "id": "W-681",
+      "partition": "grove",
+      "stream": "prod-e1",
+      "batch": 92,
+      "lower": 12450,
+      "upper": 12800,
+      "map": "p4",
+      "fence": 811,
+      "delivery_key": "g-92-b"
+    },
+    {
+      "id": "W-682",
+      "partition": "inlet",
+      "stream": "prod-w3",
+      "batch": 24,
+      "lower": 19240,
+      "upper": 19680,
+      "map": "p4",
+      "fence": 905,
+      "delivery_key": "i-24-c"
+    },
+    {
+      "id": "W-683",
+      "partition": "mesa",
+      "stream": "prod-c2",
+      "batch": 14,
+      "lower": 70410,
+      "upper": 70890,
+      "map": "p5",
+      "fence": 1120,
+      "delivery_key": "m-14-b"
+    }
+  ]
+}
