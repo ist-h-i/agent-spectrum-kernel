@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "implementation-timeline-restore",
-  "version": "task-revision-1",
+  "version": "task-revision-2",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,18 +9,18 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1346,
-          "sha256": "9d70ce3f6ded16cb301b763150916eaad8acfda64062f1ebe5b4e1202372feeb"
+          "bytes": 1385,
+          "sha256": "b7b6b97a28d5fd30fa89ab3a87287f4901438972cc6462aede05e950d64b03f6"
         },
         {
           "path": "workspace/docs/archive-operations.md",
-          "bytes": 2227,
-          "sha256": "7a324308715f29a3e84792e710552c2ab0ae6b9abd266800f3fc95cb54e51dd4"
+          "bytes": 3491,
+          "sha256": "cd85073e27eca970185b062af1535a0ef78419734b8303c595bd09aa898708ec"
         },
         {
           "path": "workspace/docs/interchange.md",
-          "bytes": 1364,
-          "sha256": "8dd10b96fe5528bf983de19423a8f2fb0b02a24d712a6d6d7bad1fbf079bd82a"
+          "bytes": 2040,
+          "sha256": "c107510d1974c9a2a3f1069d1e3ba3bc177184f0d397661274c61e10479ff12b"
         },
         {
           "path": "workspace/docs/statement-interface.md",
@@ -45,7 +45,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:15156a44005ab0578d69e44b97e0a93c16e372a5d67e9f6dfb0df018a28cf315",
+  "rubric_digest": "sha256:f8b83d794406d906d6cf854a9f090c8f0141fc2bdac2f12dddb525c7a5bedc84",
   "editable": [
     "workspace/src/event-lookup.mjs"
   ]

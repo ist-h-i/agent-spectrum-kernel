@@ -2,7 +2,7 @@
   "criteria": [
     {
       "id": "proposal-findings",
-      "points": 3,
+      "points": 2,
       "observation": "The review groups evidenced changes in the original proposal by concrete impact and gives a supported severity and decision.",
       "skills": [
         "review-adversarial-risk"
@@ -19,15 +19,15 @@
     {
       "id": "data-minimization",
       "points": 2,
-      "observation": "The repaired output excludes every raw sensitive field on the supplied and comparable synthetic events. Full masking and omission are equivalent.",
+      "observation": "The repair provides a usable failure record for support while excluding raw sensitive fields. Complete masking and omission of those fields are equivalent.",
       "skills": [
         "controlled-implementation"
       ]
     },
     {
       "id": "diagnostics",
-      "points": 2,
-      "observation": "The repaired output retains valid diagnostic/correlation fields, order and the malformed-signal list on the same events.",
+      "points": 3,
+      "observation": "Support can locate the failed request and its outcome using the repaired output, determine its error and latency, and retain the remaining valid diagnostics in order. The output also satisfies the published privacy contract.",
       "skills": [
         "controlled-implementation"
       ]

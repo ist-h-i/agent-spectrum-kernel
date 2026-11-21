@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "mp-accessibility-interaction-review",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1237,
-          "sha256": "234018610453607d0ba5d16d342ca369a3f87436d7be38da8879e352f7bb5258"
+          "bytes": 1369,
+          "sha256": "68db4d2faf298e903929bfe7ee779e55013491c6d70786768f9ff8b95888a30f"
         },
         {
           "path": "workspace/docs/interaction-notes.md",
@@ -75,7 +75,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:c0c677ff18e5ae9315d1d93e8db48cf80539662fe52e06687aa04eabd0a1c8c0",
+  "rubric_digest": "sha256:7f209b003cb05822633a106e67835fa6f31a53e54a3206a861e1083a9d7bd611",
   "editable": [
     "workspace/review.json"
   ]

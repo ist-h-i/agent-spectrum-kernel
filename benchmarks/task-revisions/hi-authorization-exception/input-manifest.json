@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "hi-authorization-exception",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 2461,
-          "sha256": "2878da9e52aaf83366fb1caf2d1880dafa6cf506a211c1e98515f476f8f897fb"
+          "bytes": 2781,
+          "sha256": "c958cde1ba249952754bd7c281b35e72042379508501df498b15ee37e4f3c880"
         },
         {
           "path": "workspace/base/authorization.mjs",
@@ -39,13 +39,13 @@
         },
         {
           "path": "workspace/review.schema.json",
-          "bytes": 3146,
-          "sha256": "08e45d19bb95646f521b029ace942a4f5257f78a96c9265e14b4c327c54cf71b"
+          "bytes": 3884,
+          "sha256": "fc0ddd225b831d95fa1d4d0bb6854f251631a2e486d0857590d156842c563636"
         },
         {
           "path": "workspace/scripts/trace-access.mjs",
-          "bytes": 586,
-          "sha256": "613d2d77bed0831a111f4d5a6c4f519d06b2c39b7d23987aca2259388c1ee3ae"
+          "bytes": 803,
+          "sha256": "d06ed1f2c25c5fe45b3b1b2a5528d4b737627e95c06026cb1235b4753d6f2487"
         },
         {
           "path": "workspace/scripts/validate-review.mjs",
@@ -65,7 +65,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:fd1464d72a75a2ba703ae24ea86afc23efec67a82803863507fd17b2e08b8b05",
+  "rubric_digest": "sha256:a7549b9462969417fa2e7fd25976601066ff321bf97d8a679f83039b29268487",
   "editable": [
     "workspace/review.json"
   ]

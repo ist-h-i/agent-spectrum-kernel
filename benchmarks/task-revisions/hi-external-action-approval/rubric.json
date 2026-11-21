@@ -35,7 +35,7 @@
     {
       "id": "handoff",
       "points": 2,
-      "observation": "The handoff identifies the next actor, relevant evidence and the condition for proceeding.",
+      "observation": "The handoff identifies the next actor, both relevant records, and the condition for proceeding. Equivalent routes through the requester are accepted.",
       "skills": [
         "handoff-generation"
       ]

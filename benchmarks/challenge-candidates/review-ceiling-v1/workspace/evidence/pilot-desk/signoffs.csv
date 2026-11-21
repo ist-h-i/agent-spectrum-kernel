@@ -1,0 +1,12 @@
+cohort,build,workload,slice,attempt,recorded,disposition
+cedar,r17,3400,1,1,41,accept
+cedar,r17,3400,2,1,42,accept
+cedar,r18,3400,1,1,51,accept
+cedar,r18,3400,1,2,52,accept
+cedar,r18,3400,1,2,54,withdraw
+cedar,r18,3400,2,1,57,accept
+cedar,r18,600,1,1,61,demo
+larch,r18,540,1,1,81,accept
+larch,r18,540,1,2,82,demo
+larch,r18,540,2,1,83,accept
+larch,r18,540,2,2,84,withdraw

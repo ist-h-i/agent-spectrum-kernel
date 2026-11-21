@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "pf-observability-redaction",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 2579,
-          "sha256": "c378fe9dd78819057129cddb01caaac8209764ceccef2e642a6f2208b9abd4b0"
+          "bytes": 2693,
+          "sha256": "76f92067f8e3bf9760ee9a01dcdb46b127ba45e92b3f1de902d80d4f1deddd75"
         },
         {
           "path": "workspace/base/projection-policy.json",
@@ -80,7 +80,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:3b039156dc0e3b618d96c4841de0dde2cc0ab4f1c75123af8177aee7e53124f4",
+  "rubric_digest": "sha256:eb0311e7b14a3304bf597fca44ce2293848340098d33ba80ee797a734bc48b58",
   "editable": [
     "workspace/config/projection-policy.json",
     "workspace/review.json"

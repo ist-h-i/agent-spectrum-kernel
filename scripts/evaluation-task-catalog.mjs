@@ -28,6 +28,7 @@ export function readEvaluationTaskRegistrations() {
   assert.ok(data.labels.length && new Set(data.labels).size === data.labels.length
     && data.labels.every(label => /^[a-z]+(?:-[a-z]+)*$/u.test(label)), 'invalid catalog label vocabulary');
   for (const row of data.tasks) {
+    if (row.protected_revision !== undefined) assert.match(row.protected_revision, revisionPattern, `invalid protected revision for ${row.id}`);
     assert.match(row.catalog_id, /^ASK-(?!000$)(?:[0-9]{3}|[1-9][0-9]{3,})$/u);
     assert.ok(row.labels?.length && new Set(row.labels).size === row.labels.length
       && row.labels.every(label => data.labels.includes(label)), `invalid labels for ${row.id}`);
@@ -220,7 +221,8 @@ export function listEvaluationTasks({ id: selection, difficulty, type, labels = 
       && (difficulty === 'unassessed' ? difficulty_basis === 'no_difficulty_estimate' : ['portfolio_estimate', 'author_estimate'].includes(difficulty_basis)),
     `invalid metadata for ${id}`);
     const runner = row.runner && describePracticalChallenge(row);
-    const input = describeInput(row, assets, runner);
+    const taskAssets = row.protected_revision ? { ...assets, revision: row.protected_revision } : assets;
+    const input = describeInput(row, taskAssets, runner);
     const title = row.title ?? /^# (.+)$/mu.exec(read(join(input.root, input.task_path)).toString('utf8'))?.[1].trim();
     assert.ok(title, `task title required: ${id}`);
     const { criteria } = json(join(directory(id), 'rubric.json'));
@@ -242,7 +244,7 @@ export function listEvaluationTasks({ id: selection, difficulty, type, labels = 
       `invalid rubric criterion in ${id}`);
       return { criterion_id, ...item };
     });
-    const assessment = assessmentDefinition(row, assets, input, observations, runner);
+    const assessment = assessmentDefinition(row, taskAssets, input, observations, runner);
     const studies = measured.get(id).map(observation => {
       const edition = observationEdition(observation, input, assessment);
       const score_group = observation.score_group ?? 'task';

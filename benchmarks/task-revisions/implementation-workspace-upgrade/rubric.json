@@ -1,9 +1,84 @@
 {
   "criteria": [
-    {"id":"mixed-installation","points":2,"observation":"Keeps released clients working on populated card files across both generations, site boundaries and slot reuse.","skills":["controlled-implementation"]},
-    {"id":"offline-reconciliation","points":2,"observation":"Reconciles compatible field and route changes and preserves disputed edits for later resolution.","skills":["controlled-implementation"]},
-    {"id":"interrupted-import","points":2,"observation":"Keeps sheet identity, per-member outcomes and partial work consistent across overlap and restart.","skills":["test-first-verification"]},
-    {"id":"dispatch-publication","points":2,"observation":"Publishes the accepted card revision to the printer and the installed monitor through overlapping activity.","skills":["controlled-implementation"]},
-    {"id":"uncertain-dispatch","points":2,"observation":"Recovers interrupted dispatches through the supplier’s outcome protocol, preserving physical slips and their identities.","skills":["doubt-driven-development"]}
+    {
+      "id": "card-reconciliation",
+      "points": 1,
+      "observation": "Keeps both installed card formats writable and reconciles offline fields, membership and route ordering across independent offices.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "sheet-continuity",
+      "points": 1,
+      "observation": "Records and resumes partially completed sheets across storage failure, interference and process loss.",
+      "skills": [
+        "test-first-verification"
+      ]
+    },
+    {
+      "id": "print-continuity",
+      "points": 1,
+      "observation": "Publishes the accepted revision once through concurrent dispatch, interrupted acknowledgements and recovery.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "receipt-evidence",
+      "points": 1,
+      "observation": "Reissues historical sheet receipts using preserved or transferred evidence and keeps existing job bindings.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "relief-settlement",
+      "points": 1,
+      "observation": "Settles local freight, annotations, signed allowances and retries consistently across competing forms.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "paper-coverage",
+      "points": 1,
+      "observation": "Distinguishes compulsory, possible and unused waybills and detects incompatible flight books.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "depot-capacity",
+      "points": 1,
+      "observation": "Accounts for shared receiving limits and resolves a regional docket within ordinary desk operation.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    },
+    {
+      "id": "book-correction",
+      "points": 1,
+      "observation": "Reads original and corrected editions in installed archives and preserves both evidence and job state when auditing.",
+      "skills": [
+        "test-first-verification"
+      ]
+    },
+    {
+      "id": "paper-recovery",
+      "points": 1,
+      "observation": "Recovers exactly the retired attempt justified by the paper without duplicating, suppressing or rebinding a physical dispatch.",
+      "skills": [
+        "doubt-driven-development"
+      ]
+    },
+    {
+      "id": "regional-handover",
+      "points": 1,
+      "observation": "Moves freight between offices using the original issuing offices, signed balances and retrievable filing receipts.",
+      "skills": [
+        "controlled-implementation"
+      ]
+    }
   ]
 }

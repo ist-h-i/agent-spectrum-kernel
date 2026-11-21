@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "hi-financial-state-integrity",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 2618,
-          "sha256": "7505b7c595118d5721357b024fcd039f10cb4858a32d8c4bc21dbeeeda8c0398"
+          "bytes": 2620,
+          "sha256": "858b8c8bed158399d4bbfa0acdd53b4e0833cd3e8e7cea7ee3961dd1951eede2"
         },
         {
           "path": "workspace/data/incident.json",
@@ -45,7 +45,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:9b0df40bffbdef98adcdc475f50105f8da0adb759d4365e252c45619ffa0508f",
+  "rubric_digest": "sha256:54d16d0ffcf57eb1f9ecab521106211111c6b9580beecfcde480f062dc553f76",
   "editable": [
     "workspace/src/ledger.mjs"
   ]

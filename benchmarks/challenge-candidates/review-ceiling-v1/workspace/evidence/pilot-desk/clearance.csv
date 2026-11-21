@@ -1,0 +1,6 @@
+team,provider_ref,review,rev,attempt,effect
+larch,provider/447,L8,4,1,applied
+cedar,provider/447,C6,2,1,applied
+cedar,provider/452,C9,7,1,applied
+larch,provider/455,L9,1,1,accepted
+cedar,provider/459,C19,3,1,not_applied

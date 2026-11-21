@@ -220,6 +220,164 @@
           ]
         }
       ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-034-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:e5a646f5639257a28fc40156c3e57af196a7e3af10b27ce05fd1684d968fabb1",
+      "source_revision": "dc63664de1bbda5f9a60cb5f93cdbf9c874418ee",
+      "protected_revision": "603a4ba8c312697a0b55d4aa901ea6803260202f",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-3",
+          "input_digest": "sha256:01724e8f95612c1b8a1794f02aaf6bd3e7dde6af3f4110ee780418bf4e0c3956",
+          "assessment_digest": "sha256:ad8d21906147c5660a21a866732c5adc1f3bc4a347e0e41d4028f33925fc7676",
+          "task_id": "implementation-workspace-upgrade",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                null
+              ]
+            },
+            {
+              "condition": "codex_default_helpers_75m",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-031-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:e5a646f5639257a28fc40156c3e57af196a7e3af10b27ce05fd1684d968fabb1",
+      "source_revision": "133c1da47989105e4880f3f99f188448fb0bf3fd",
+      "protected_revision": "46167de33055faccc51b14cada35ee6b7c526467",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "review-public-v4",
+          "input_digest": "sha256:c2a351a5859fc61fe905c5184403a28ab21456d742c7c8a658f59b95ee5eed54",
+          "assessment_digest": "sha256:86e928e5fb98350c8cddc8be1dffae064e0e8e287d5633934a1489cf8a234eb2",
+          "task_id": "rc01-shared-review-platform",
+          "maximum_points": 100,
+          "conditions": [
+            {
+              "condition": "staged_codex_no_overlay",
+              "scores": [
+                97
+              ]
+            }
+          ],
+          "score_group": "challenge"
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-033-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:e5a646f5639257a28fc40156c3e57af196a7e3af10b27ce05fd1684d968fabb1",
+      "source_revision": "1cb0c6b151a2cb4b70d09b6d9e72863dd9e1c692",
+      "protected_revision": "93c8952edaf3163d6075c18f26f8389c0416810a",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:658e53dcfae1f06e7704bcbe89047f9f8fcecdcda7cb06a980542a7cc419cb91",
+          "assessment_digest": "sha256:b3eade03884a709cc8e4e08464f77392d1ed5d8bff8412086051c1ae0b93191f",
+          "task_id": "implementation-timeline-restore",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10,
+                null
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-035-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:e5a646f5639257a28fc40156c3e57af196a7e3af10b27ce05fd1684d968fabb1",
+      "source_revision": "8eec165948ba060f4bba0eaef6c35af72476e046",
+      "protected_revision": "a24007f4c5fd31efa3a31f0b8843ea284713ef55",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:55b01a7853c573c740f5688c3570f4a8adc84aadef5352c26cfc9cbd32476c43",
+          "assessment_digest": "sha256:6c1f8a92a70034c6869ef11d27bdcb76c49cc7e5671dc59f53d82066448f32f4",
+          "task_id": "implementation-clearing-cutover",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "astra-max-revised-thirteen-034-v2-20261121",
+      "report": "benchmarks/results/revised-thirteen-astra-2026-11-21.md",
+      "report_digest": "sha256:e5a646f5639257a28fc40156c3e57af196a7e3af10b27ce05fd1684d968fabb1",
+      "source_revision": "c47c023c5306f7f3f847ba80f09eb5e281bb57e3",
+      "protected_revision": "c8242a7dd83ba55c37194ca7394aaadbe49fc976",
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "max",
+      "runtime": "codex-cli 0.170.0",
+      "limitations": [
+        "Small sample. No named skill was requested. The staged review and implementation tasks used different execution environments."
+      ],
+      "results": [
+        {
+          "input_version": "task-revision-2",
+          "input_digest": "sha256:0fc0ec593628904c0232cdab3990632208a70f6d6f3411c1eef4e1b822f39dc2",
+          "assessment_digest": "sha256:bf35ba10a7d312b81a45464f03f044bb9874eef2a9cd6786f6caffbbe449b07b",
+          "task_id": "implementation-workspace-upgrade",
+          "maximum_points": 10,
+          "conditions": [
+            {
+              "condition": "codex_default_helpers",
+              "scores": [
+                10
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "tasks": [
@@ -239,7 +397,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-authorization-exception",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/review.json"
         ],
@@ -249,7 +407,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "hi-external-action-approval",
@@ -269,7 +428,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-external-action-approval",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/operation-plan.json"
         ],
@@ -279,7 +438,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "hi-financial-state-integrity",
@@ -298,7 +458,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-financial-state-integrity",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/src/ledger.mjs"
         ],
@@ -308,7 +468,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "hi-versioned-migration-safety",
@@ -327,7 +488,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-versioned-migration-safety",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/migration-plan.json"
         ],
@@ -337,7 +498,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "mn-build-option-update",
@@ -384,7 +546,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/mn-client-compatibility-fix",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/src/preferences.mjs",
           "workspace/test/preferences.test.mjs"
@@ -395,7 +557,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "mn-doc-config-correction",
@@ -525,7 +688,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/mp-accessibility-interaction-review",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/review.json"
         ],
@@ -535,7 +698,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "cbb7cd0addb71acc74a74d28a1d3bbfd1b627dd2"
     },
     {
       "id": "mp-ci-evidence-gap",
@@ -864,7 +1028,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/pf-observability-redaction",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/config/projection-policy.json",
           "workspace/review.json"
@@ -875,7 +1039,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "79268ff32b916ffb69b6827013efbaecfbb7e062"
     },
     {
       "id": "pf-performance-regression",
@@ -1082,7 +1247,7 @@
       "input": {
         "kind": "business",
         "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
-        "version": "business-five-20261120-outcomes2",
+        "version": "business-five-20261120-outcomes3",
         "modes": {
           "one_shot": {
             "working_directory": "public/tasks/ch04-document-access",
@@ -1102,7 +1267,8 @@
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/nonfunctional.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/business-decisions.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
-      ]
+      ],
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "ch05-sales-reconciliation",
@@ -1124,7 +1290,7 @@
       "input": {
         "kind": "business",
         "root": "benchmarks/challenge-candidates/business-five-v3-decisions",
-        "version": "business-five-20261120-outcomes2",
+        "version": "business-five-20261120-outcomes3",
         "modes": {
           "one_shot": {
             "working_directory": "public/tasks/ch05-sales-reconciliation",
@@ -1144,7 +1310,8 @@
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/nonfunctional.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/business-decisions.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
-      ]
+      ],
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "ch06-build-operations",
@@ -1209,7 +1376,7 @@
       "input": {
         "kind": "staged",
         "root": "benchmarks/challenge-candidates/review-ceiling-v1/workspace",
-        "version": "review-public-v3",
+        "version": "review-public-v4",
         "modes": {
           "default": {
             "working_directory": ".",
@@ -1227,7 +1394,7 @@
               "INITIAL.md",
               "REVIEW.md"
             ],
-            "prompt": "Read and follow task.md. Complete steps 1 and 2 only: save INITIAL.md before investigation, then REVIEW.md. Do not invent the optional operational update. Keep original application, tests, contracts and evidence unchanged. Use only local workspace and localhost endpoints, never external network services. Work only in this workspace and system toolchains; do not inspect unrelated directories, user repositories or host history. Use only synthetic data and localhost services. Save reproducible probes and observations. If UI access or dependencies are unavailable, preserve explicit missing evidence. Stop after the initial review."
+            "prompt": "Read task.md. Save INITIAL.md before investigation, then REVIEW.md. Assess the release decision from the supplied synthetic operating records, offline aggregate calculations, ordinary UI use and static source inspection in the stated scope. No security testing. Keep the delivered application, tests, contracts and evidence unchanged. Work only in this workspace and system toolchains; no external services or unrelated repositories. Stop after the initial review."
           },
           {
             "id": "reassessment",
@@ -1236,7 +1403,7 @@
             ],
             "update": {
               "target": "OPERATIONAL-UPDATE.md",
-              "digest": "sha256:026e524c131082931172d6ef5cb039bb7829c22c7124a649629828e6101360af",
+              "digest": "sha256:84e95f35273bab29a66086c23649a84aa73c6634271f28fe16065eb91aab7c34",
               "path": "task-revisions/rc01-shared-review-platform/stage-2.md",
               "scope": "protected"
             },
@@ -1250,7 +1417,7 @@
           "files": [
             {
               "path": "rubric.json",
-              "digest": "sha256:e2601a827eb1d9897e83c8de8618ddbc6a07f80a2ec3e1816ffcb1e2fbfb0fab"
+              "digest": "sha256:e158f58ea5d0356940ba41eb6c21995e9457ec8a59f0570e76566b42ea2a5853"
             },
             {
               "path": "score.mjs",
@@ -1258,7 +1425,7 @@
             },
             {
               "path": "README.md",
-              "digest": "sha256:afe0ec19c82a5e99cfc1343fb2fcdb1ed2c760ad420b97d53e0baf44f05ebccb"
+              "digest": "sha256:621752f4f8f0b4462c8b98167ebe411b4b2016e56edb9f2a4483c44024dc31bc"
             }
           ]
         },
@@ -1273,7 +1440,8 @@
       },
       "acceptance_files": [
         "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
-      ]
+      ],
+      "protected_revision": "46167de33055faccc51b14cada35ee6b7c526467"
     },
     {
       "id": "ch08-growth-workspace",
@@ -1387,7 +1555,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/implementation-timeline-restore",
-        "version": "task-revision-1",
+        "version": "task-revision-2",
         "editable": [
           "workspace/src/event-lookup.mjs"
         ],
@@ -1397,7 +1565,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "93c8952edaf3163d6075c18f26f8389c0416810a"
     },
     {
       "id": "implementation-workspace-upgrade",
@@ -1420,7 +1589,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/implementation-workspace-upgrade",
-        "version": "task-revision-1",
+        "version": "task-revision-3",
         "editable": [
           "workspace/src/delivery.mjs",
           "workspace/src/reconcile.mjs",
@@ -1432,7 +1601,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "603a4ba8c312697a0b55d4aa901ea6803260202f"
     },
     {
       "id": "implementation-clearing-cutover",
@@ -1455,7 +1625,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/implementation-clearing-cutover",
-        "version": "task-revision-1",
+        "version": "task-revision-2",
         "editable": [
           "workspace/src/archive.mjs",
           "workspace/src/clearing.mjs",
@@ -1468,7 +1638,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "a24007f4c5fd31efa3a31f0b8843ea284713ef55"
     }
   ]
 }

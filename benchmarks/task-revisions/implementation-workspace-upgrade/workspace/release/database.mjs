@@ -19,6 +19,13 @@ export function openWorkspace(directory) {
       site TEXT NOT NULL, id TEXT NOT NULL, slot TEXT NOT NULL, issue TEXT NOT NULL,
       version INTEGER NOT NULL, packet TEXT NOT NULL, stage TEXT NOT NULL, attempt INTEGER NOT NULL,
       PRIMARY KEY(site,id));
+    CREATE TABLE IF NOT EXISTS flight_tickets(
+      district TEXT NOT NULL, book TEXT NOT NULL, pos INTEGER NOT NULL, site TEXT NOT NULL,
+      id TEXT NOT NULL, attempt INTEGER NOT NULL, flight TEXT NOT NULL, depot TEXT NOT NULL,
+      PRIMARY KEY(district,book,pos), UNIQUE(site,id,attempt));
+    CREATE TABLE IF NOT EXISTS flight_editions(
+      district TEXT NOT NULL, book TEXT NOT NULL, edition INTEGER NOT NULL, leaves TEXT NOT NULL,
+      limits TEXT NOT NULL, PRIMARY KEY(district,book,edition));
     CREATE TABLE IF NOT EXISTS sheets(
       site TEXT NOT NULL, id TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(site,id));
     CREATE TABLE IF NOT EXISTS members(

@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "rc01-shared-review-platform",
-  "version": "review-public-v3",
+  "version": "review-public-v4",
   "modes": {
     "default": {
       "working_directory": ".",
@@ -96,6 +96,41 @@
           "path": "evidence/operational-observations.md",
           "bytes": 1322,
           "sha256": "831ed694bf80637212e82a8783bdfb7b97bc20c5ffba453b1345ab53a6ca7611"
+        },
+        {
+          "path": "evidence/pilot-desk/approval-history.csv",
+          "bytes": 155,
+          "sha256": "940932b1869e6a911343122569b9dce8344c7ca46513abc9f04008abbb81b21a"
+        },
+        {
+          "path": "evidence/pilot-desk/batches.csv",
+          "bytes": 720,
+          "sha256": "0db4fcee8b90f2cbf47a5c75d605948dcd1e5c806e637fc8250106e2fc6490cd"
+        },
+        {
+          "path": "evidence/pilot-desk/bookings.csv",
+          "bytes": 194,
+          "sha256": "4240849de4c95426a68cba42132462af6c330e6eb88c3ba499260a91664ef759"
+        },
+        {
+          "path": "evidence/pilot-desk/clearance.csv",
+          "bytes": 220,
+          "sha256": "5538d5c208c0d9ac1eaefd7a997cde7e88f95a755239bea0d710e1ba250e5220"
+        },
+        {
+          "path": "evidence/pilot-desk/desk-ledger.csv",
+          "bytes": 337,
+          "sha256": "bce8e1fd7d83f173e8939b3b73414827e4296307da22bf63c04c16f47955a4b2"
+        },
+        {
+          "path": "evidence/pilot-desk/service-agreement.md",
+          "bytes": 2429,
+          "sha256": "cd83071576ccc8292fcbae241ea6dfff6f54f70f07c2c5e9469062432647d28a"
+        },
+        {
+          "path": "evidence/pilot-desk/signoffs.csv",
+          "bytes": 371,
+          "sha256": "77d42cb24c5c65c79d84981b1cc2294549197e35e95cfefa62b24a1b263628fc"
         },
         {
           "path": "evidence/previous-readiness-note.md",
@@ -713,6 +748,11 @@
           "sha256": "21685f81996e34ef305b33deb9adae9f7cb16c18fd8be8bb1a0ee2247094f736"
         },
         {
+          "path": "scripts/pilot-board.mjs",
+          "bytes": 1160,
+          "sha256": "5418711707ebaf7c0a098ccaecab259e1e4142609b3ba1e248355d0c503e9a04"
+        },
+        {
           "path": "scripts/policy-checker.mjs",
           "bytes": 4228,
           "sha256": "d7e07867748af1ba08943874dc9f6f4e31e04177407ed41ad554b80a1115c5b3"
@@ -724,8 +764,8 @@
         },
         {
           "path": "task.md",
-          "bytes": 5969,
-          "sha256": "aa82e3e367c8e38d0d7de4fe6e59afa5c7e7917c96b321eaeaa2fb1cb167e239"
+          "bytes": 1957,
+          "sha256": "3f1b36347592362822d109221f7635f4f717017a56a9f80616ffb0c94d9dd708"
         },
         {
           "path": "tests/policy/ai-network-guard.test.ts",

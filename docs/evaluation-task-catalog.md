@@ -30,9 +30,13 @@ ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
 
 ほかの `expert` 課題には、共有アーカイブからの明細復元（`ASK-033`）と、新旧の業務端末が稼働する営業所の更新（`ASK-034`）があります。`ASK-023` は、疎な入力と密な入力でイベント取得の実行時間を測る `hard` の課題です。
 
-2026年11月21日の `gpt-6.2-astra`／`max` の試行では、`ASK-013`・`ASK-033`・`ASK-035` が各1回、`ASK-034` が2回とも10/10でした。この4問では中央値が40〜60点に入る課題を確認できませんでした。[試行条件と得点](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/upper-model-calibration-2026-11-21.md)
+改訂前（ASK-033〜035の入力版 `task-revision-1`）に行った2026年11月21日の `gpt-6.2-astra`／`max` の試行では、`ASK-013`・`ASK-033`・`ASK-035` が各1回、`ASK-034` が2回とも10/10でした。この4問では中央値が40〜60点に入る課題を確認できませんでした。[試行条件と得点](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/upper-model-calibration-2026-11-21.md)
 
-同じモデルと推論強度で実行した `ASK-031`（共有コンソールのリリースレビュー）は97/100点でした。初回レビューと追加資料を受けた再判断を合わせて1試行です。今回の素点は目標の40〜60点を上回りました。[採点内訳と実行条件](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/release-review-astra-2026-11-21.md)
+改訂後の4問は、同じモデル・推論強度で改めて測定しました。版ごとの得点、試行数、採点を見直した9問の検証内容を確認できます。[改訂13問の検証と得点](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/revised-thirteen-astra-2026-11-21.md)
+
+各課題は共通の非公開保管先を使用します。採点資材を更新した課題はそのコミットを個別に固定します。
+
+同じモデルと推論強度で旧版を実行した `ASK-031`（共有コンソールのリリースレビュー）は97/100点でした。初回レビューと追加資料を受けた再判断を合わせて1試行です。今回の素点は目標の40〜60点を上回りました。[採点内訳と実行条件](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/benchmarks/results/release-review-astra-2026-11-21.md)
 
 `--score-range 40-60` は、現行版の実測得点の中央値が40〜60%の課題を抽出します。両端を含み、小数も指定できます。`--model`、`--effort`、`--condition` は登録されたモデル名、推論強度、実行条件名の完全一致で絞り込みます。たとえば `--condition ask_none` はその条件だけを対象にします。いずれかの実測フィルターを使うと、該当する試行系列だけを表示します。一致する観測がなければ結果は0問です。
 
@@ -59,15 +63,16 @@ ask evaluate task-prepare --id ASK-012 --root /absolute/fresh-run
 
 ## 非公開資材を使う準備
 
-カタログ出力の `assessment.calibration` が、全問に共通する非公開リポジトリと固定コミットを示します。認証済みの運用者が、アクセスを制限した作業領域にその版を展開します。以下のコマンドは絶対パスで指定する既存の親ディレクトリを使います。`assets_dir` は回答者の作業領域とソースチェックアウトの外に置きます。
+各課題の `assessment.calibration` に、共通の非公開リポジトリのIDと、その課題に対応する固定コミットがあります。対象の課題番号を選んで両方を取得します。認証済みの運用者が、アクセスを制限した作業領域にその版を展開します。以下のコマンドは絶対パスで指定する既存の親ディレクトリを使います。`assets_dir` は回答者の作業領域とソースチェックアウトの外に置きます。
 
 ```sh
-ref=$(ask evaluate task-list | jq -er '.[] | select(.input.kind == "private") | .input.archive_api_path')
+task_id=ASK-025
+ref=$(ask evaluate task-list --id "$task_id" | jq -er '.[0].assessment.calibration | "repositories/\(.github_repository_id)/tarball/\(.revision)"')
 assets_dir=$(mktemp -d)
 assets_dir=$(cd "$assets_dir" && pwd -P)
 (umask 077; gh api "$ref" | tar -xzf - --strip-components 1 -C "$assets_dir")
 
-ask evaluate task-prepare --id ch01-inventory-reservation-logistics \
+ask evaluate task-prepare --id "$task_id" \
   --root /absolute/fresh-logistics-run --assets-root "$assets_dir"
 ```
 

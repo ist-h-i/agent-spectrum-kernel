@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "hi-external-action-approval",
-  "version": "task-revision-2",
+  "version": "task-revision-3",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1259,
-          "sha256": "f0791c179b02251fd8dc8bbe7005a6b7abf1bbdccef9527e80acfda88b7d46c0"
+          "bytes": 1318,
+          "sha256": "278773bdac144de1060addfb0071998874d6ec4bf9a329b5f7a1c1b67c5183b3"
         },
         {
           "path": "workspace/data/approval-receipts.json",
@@ -80,7 +80,7 @@
       ]
     }
   },
-  "rubric_digest": "sha256:4bf6eeebba83dd39732ec2d303cc07e2bb7baafcb2f1faae118c98fe6e486b88",
+  "rubric_digest": "sha256:fd5424b8c3682b6ea8f71fa5edb3c3c700141b6c6e9a0bab7d7f316f0a0cf9e2",
   "editable": [
     "workspace/operation-plan.json"
   ]

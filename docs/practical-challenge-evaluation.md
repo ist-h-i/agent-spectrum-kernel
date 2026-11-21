@@ -2,8 +2,7 @@
 
 Find RC01 and CH08 through the [evaluation task catalog](evaluation-task-catalog.md).
 Their common catalog records bind the initial input inventory and the protected
-reassessment and semantic assessment files. The operator-only assets are in the
-same pinned checkout used for the inventory and logistics problem.
+reassessment and semantic assessment files. Use the protected repository and revision in the selected task’s `assessment.calibration`. The catalog guide shows how to retrieve that task’s archive.
 
 ## Standard entry point
 

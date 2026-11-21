@@ -11,6 +11,7 @@ The four desks call these methods:
 | `balance(account)` | Object with `posted` and `available` minor-unit strings |
 | `turn(firstOpen)` | Advances the first open posting date. Callers pass the current date or a later one. Return value is unused. |
 | `statement(account, postingDay)` | That account's daybook lines in entry order, defined in the close instructions |
+| `attest({ticket, first, rows})` | Registers a certified fragment for a deployed kiosk ticket as defined by the close desk |
 | `dump()` | Independent JSON snapshot. Opening a JSON round trip of this value must continue the same book. |
 
 A teller ticket has three fields, `office`, `day` (ISO issue date) and `serial` (an unpadded positive decimal string). Serial numbering restarts on each office's business day. The face limit, source and destination constitute the order. A matching order presented again gets its original ticket without another reservation. A different order on that ticket conflicts. A refused new order leaves the ticket free.

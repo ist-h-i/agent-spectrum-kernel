@@ -3,13 +3,13 @@
     {
       "id": "teller",
       "points": 2,
-      "observation": "Teller decisions and available balances remain correct for independently funded orders.",
+      "observation": "Teller decisions and available balances remain correct after independent and linked orders.",
       "skills": ["controlled-implementation"]
     },
     {
       "id": "settlement",
       "points": 2,
-      "observation": "Posted amounts and account charges agree with the branch terms throughout settlement.",
+      "observation": "Posted amounts and account charges agree with the branch terms throughout individual and regional settlement.",
       "skills": ["controlled-implementation"]
     },
     {
@@ -21,13 +21,13 @@
     {
       "id": "statements",
       "points": 2,
-      "observation": "Customers and the close desk receive accurate statements as the business day advances.",
+      "observation": "Customers and the close desk receive accurate statements across closes and linked corrections.",
       "skills": ["test-first-verification"]
     },
     {
       "id": "continuity",
       "points": 2,
-      "observation": "Signed archives, deployed kiosk saves and subsequent saves preserve the records and decisions they can support.",
+      "observation": "Signed archives, deployed kiosk saves and subsequent saves preserve the historical evidence and decisions they can support as the bank supplies more records.",
       "skills": ["controlled-implementation"]
     }
   ]

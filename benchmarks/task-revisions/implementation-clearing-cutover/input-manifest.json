@@ -1,7 +1,7 @@
 {
   "kind": "evaluation_input_manifest_v2",
   "id": "implementation-clearing-cutover",
-  "version": "task-revision-1",
+  "version": "task-revision-2",
   "modes": {
     "default": {
       "working_directory": "workspace",
@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 1317,
-          "sha256": "7f1db3610159051d05831cd8ced92a615e596bdfd61b0cf2b28b41b25b7b7e26"
+          "bytes": 1517,
+          "sha256": "1b401410b96475bf4e4b566cf423b475fc9750b8a5caf9bbcb09468bba0ed1db"
         },
         {
           "path": "workspace/data/incident.json",
@@ -29,18 +29,18 @@
         },
         {
           "path": "workspace/docs/bank-interchange.md",
-          "bytes": 3285,
-          "sha256": "75958d012f13fa36a13d956a7eb7fa5eb494b9ba42381a7d8d0ef4db4247f832"
+          "bytes": 4671,
+          "sha256": "461a0e779bae5005c34657bb0c3c35bcb42a73670ca410ead55539dd7fc42fdf"
         },
         {
           "path": "workspace/docs/close-instructions.md",
-          "bytes": 4389,
-          "sha256": "ea727317b963a58ff5bd28ac20b0419c142642db63c5684c9b525dc3b3f5c6cd"
+          "bytes": 6036,
+          "sha256": "3f12f7f07bb2911ef869256be6192a8ef03cd8be38d9a58a69d790845eda558a"
         },
         {
           "path": "workspace/docs/ledger-contract.md",
-          "bytes": 2543,
-          "sha256": "d1e791a382063312871a0041e8d72889625d578be3bd009b879698e96252b509"
+          "bytes": 2669,
+          "sha256": "dad614ef9a02f0f146059dabe9bd3d9d606e0e54a84511069907963282fe6a19"
         },
         {
           "path": "workspace/package.json",
@@ -69,13 +69,13 @@
         },
         {
           "path": "workspace/test/ledger.test.mjs",
-          "bytes": 2162,
-          "sha256": "a9d1d36bfd876c71f196175ebd44e63c0787d6daed32ecf767b100c4695a8ac9"
+          "bytes": 2637,
+          "sha256": "c636fa4227c5a48ada2aa8dc0b96b1b59aa7fa22ad9cd66b515e756ca94c2c3d"
         }
       ]
     }
   },
-  "rubric_digest": "sha256:7fcb303e4664cc49d123086a8cbe6d213d9d1bf6f349507f2269b60a3617f664",
+  "rubric_digest": "sha256:78baf82c5e5e44db1cb3ecd403ac9cabf89d4b8b6b207295f1e926b4c68579ad",
   "editable": [
     "workspace/src/archive.mjs",
     "workspace/src/clearing.mjs",

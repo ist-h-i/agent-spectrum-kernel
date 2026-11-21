@@ -110,6 +110,35 @@
               "npm run validate:review"
             ]
           }
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "command",
+              "exit",
+              "observation"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "enum": [
+                  "npm test",
+                  "npm run trace",
+                  "npm run validate:review"
+                ]
+              },
+              "exit": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "observation": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },

@@ -60,9 +60,11 @@ test('unified task preparation can bind a staged run without a model call', t =>
  assert.equal(existsSync(join(root,'workspace','OPERATIONAL-UPDATE.md')),false);
  assert.equal(existsSync(join(root,'evaluation-preparation.json')),true);
 });
-test('prepare freezes 151 public files; update and evaluator are not solver inputs',t=>{
+test('prepare freezes the review workspace including the initial pilot desk records',t=>{
  const f=setup(t);assert.equal(f.ready.status,'prepared');assert.equal(f.calls.length,0);
- const manifest=JSON.parse(readFileSync(join(f.root,'manifest.json')));assert.equal(manifest.files.length,151);
+ const manifest=JSON.parse(readFileSync(join(f.root,'manifest.json')));assert.equal(manifest.files.length,159);
+ for(const path of ['evidence/pilot-desk/batches.csv','evidence/pilot-desk/signoffs.csv','scripts/pilot-board.mjs'])
+  assert.ok(manifest.files.some(file => file.path === path),path);
  assert.equal(existsSync(join(f.root,'workspace','OPERATIONAL-UPDATE.md')),false);
  assert.equal(existsSync(join(f.root,'workspace','rubric.json')),false);
  assert.throws(()=>preparePracticalChallenge(f.config),/fresh run/);
