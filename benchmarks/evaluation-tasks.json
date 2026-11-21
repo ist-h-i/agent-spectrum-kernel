@@ -1434,7 +1434,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "c8242a7dd83ba55c37194ca7394aaadbe49fc976"
     },
     {
       "id": "implementation-clearing-cutover",
