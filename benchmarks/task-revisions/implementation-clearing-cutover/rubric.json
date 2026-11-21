@@ -1,0 +1,34 @@
+{
+  "criteria": [
+    {
+      "id": "teller",
+      "points": 2,
+      "observation": "Teller decisions and available balances remain correct for independently funded orders.",
+      "skills": ["controlled-implementation"]
+    },
+    {
+      "id": "settlement",
+      "points": 2,
+      "observation": "Posted amounts and account charges agree with the branch terms throughout settlement.",
+      "skills": ["controlled-implementation"]
+    },
+    {
+      "id": "delivery",
+      "points": 2,
+      "observation": "Feed responses and subsequent work agree with the bank delivery contract.",
+      "skills": ["controlled-implementation"]
+    },
+    {
+      "id": "statements",
+      "points": 2,
+      "observation": "Customers and the close desk receive accurate statements as the business day advances.",
+      "skills": ["test-first-verification"]
+    },
+    {
+      "id": "continuity",
+      "points": 2,
+      "observation": "Signed archives, deployed kiosk saves and subsequent saves preserve the records and decisions they can support.",
+      "skills": ["controlled-implementation"]
+    }
+  ]
+}

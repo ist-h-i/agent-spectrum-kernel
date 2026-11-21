@@ -1,0 +1,85 @@
+{
+  "kind": "evaluation_input_manifest_v2",
+  "id": "implementation-clearing-cutover",
+  "version": "task-revision-1",
+  "modes": {
+    "default": {
+      "working_directory": "workspace",
+      "task_path": "task.md",
+      "files": [
+        {
+          "path": "task.md",
+          "bytes": 1317,
+          "sha256": "7f1db3610159051d05831cd8ced92a615e596bdfd61b0cf2b28b41b25b7b7e26"
+        },
+        {
+          "path": "workspace/data/incident.json",
+          "bytes": 436,
+          "sha256": "a03062732f2408e285d0f62b6cb0524ba09d3e950ea04ad8ccb2520b5a63237d"
+        },
+        {
+          "path": "workspace/data/initial-state.json",
+          "bytes": 1232,
+          "sha256": "097d53fb1b80a7ee570292c9f19b8d3631b1331eddad7f7cefa0e40bc2691947"
+        },
+        {
+          "path": "workspace/data/service-save.json",
+          "bytes": 3075,
+          "sha256": "d69e34e48deba8c5b2555fb5916d211e6f25aa4f5f38b2160701f6091e9cdd2d"
+        },
+        {
+          "path": "workspace/docs/bank-interchange.md",
+          "bytes": 3285,
+          "sha256": "75958d012f13fa36a13d956a7eb7fa5eb494b9ba42381a7d8d0ef4db4247f832"
+        },
+        {
+          "path": "workspace/docs/close-instructions.md",
+          "bytes": 4389,
+          "sha256": "ea727317b963a58ff5bd28ac20b0419c142642db63c5684c9b525dc3b3f5c6cd"
+        },
+        {
+          "path": "workspace/docs/ledger-contract.md",
+          "bytes": 2543,
+          "sha256": "d1e791a382063312871a0041e8d72889625d578be3bd009b879698e96252b509"
+        },
+        {
+          "path": "workspace/package.json",
+          "bytes": 182,
+          "sha256": "94fcbb8eafdca97376b4cb987d196f018d1ecc61cf8201421a8830d09a00bc86"
+        },
+        {
+          "path": "workspace/src/archive.mjs",
+          "bytes": 1570,
+          "sha256": "b9963a54212c537ebe8241724d153c3bd1f27b5f1909457624317221d2ae38e0"
+        },
+        {
+          "path": "workspace/src/clearing.mjs",
+          "bytes": 2001,
+          "sha256": "d7521a593cc0178c96dc26599cfce6ea03ca4593d3a72bff6b621a476dc7acd4"
+        },
+        {
+          "path": "workspace/src/ledger.mjs",
+          "bytes": 1400,
+          "sha256": "52bf7efe42dec2648238a4e8ac20603fb35e1e0d30ee4cb05b0184b7b5d102eb"
+        },
+        {
+          "path": "workspace/src/money.mjs",
+          "bytes": 378,
+          "sha256": "1a156288f844ad6c1148778099fe98831ef09cad35307381743d67b474b9ef58"
+        },
+        {
+          "path": "workspace/test/ledger.test.mjs",
+          "bytes": 2162,
+          "sha256": "a9d1d36bfd876c71f196175ebd44e63c0787d6daed32ecf767b100c4695a8ac9"
+        }
+      ]
+    }
+  },
+  "rubric_digest": "sha256:7fcb303e4664cc49d123086a8cbe6d213d9d1bf6f349507f2269b60a3617f664",
+  "editable": [
+    "workspace/src/archive.mjs",
+    "workspace/src/clearing.mjs",
+    "workspace/src/ledger.mjs",
+    "workspace/src/money.mjs"
+  ]
+}

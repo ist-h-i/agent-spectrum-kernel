@@ -1,21 +1,9 @@
 {
-  "format": 1,
-  "firstOpen": "2025-05-01",
-  "tariffs": [
-    {"code":"A","from":"2019-01-01","collector":"clearing","bands":[{"through":null,"bps":100}],"ceiling":"90"},
-    {"code":"B","from":"2025-01-01","collector":"clearing","bands":[{"through":"1000","bps":150},{"through":null,"bps":50}],"ceiling":"175"}
-  ],
-  "balances": {"float":"994.00","merchant":"5.94","clearing":"0.06","reserve":"100.00"},
-  "cards": [
-    {"branch":"north","issueDate":"20250408","slip":"000014","source":"float","destination":"merchant","face":"25.00","plan":"A"}
-  ],
-  "advice": [
-    {"branch":"north","issueDate":"20250408","slip":"000014","edition":1,"movement":"6.00","release":"N","valueDate":"20250410"}
-  ],
-  "lines": [
-    {"branch":"north","issueDate":"20250408","slip":"000014","edition":1,"account":"float","postingDate":"20250410","valueDate":"20250410","movement":"-6.00"},
-    {"branch":"north","issueDate":"20250408","slip":"000014","edition":1,"account":"merchant","postingDate":"20250410","valueDate":"20250410","movement":"5.94"},
-    {"branch":"north","issueDate":"20250408","slip":"000014","edition":1,"account":"clearing","postingDate":"20250410","valueDate":"20250410","movement":"0.06"}
-  ],
-  "feeds": {"night":27}
+  "balances": {
+    "account-a": "9007199254740993000",
+    "account-b": "300",
+    "account-c": "0"
+  },
+  "requests": {},
+  "audit": []
 }

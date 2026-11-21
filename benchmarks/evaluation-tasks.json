@@ -177,27 +177,21 @@
       "catalog_id": "ASK-003",
       "labels": [
         "financial-records",
-        "data-integrity",
-        "compatibility",
-        "persistence",
-        "technical-debt"
+        "data-integrity"
       ],
       "domain": "backend_financial",
-      "difficulty": "expert",
-      "difficulty_basis": "author_estimate",
+      "difficulty": "hard",
+      "difficulty_basis": "portfolio_estimate",
       "task_types": [
-        "implementation",
-        "investigation"
+        "investigation",
+        "implementation"
       ],
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/hi-financial-state-integrity",
-        "version": "task-revision-4",
+        "version": "task-revision-2",
         "editable": [
-          "workspace/src/archive.mjs",
-          "workspace/src/clearing.mjs",
-          "workspace/src/ledger.mjs",
-          "workspace/src/money.mjs"
+          "workspace/src/ledger.mjs"
         ],
         "modes": {
           "default": {
@@ -1322,6 +1316,42 @@
           "workspace/src/delivery.mjs",
           "workspace/src/reconcile.mjs",
           "workspace/src/workspace.mjs"
+        ],
+        "modes": {
+          "default": {
+            "working_directory": "workspace",
+            "task_path": "task.md"
+          }
+        }
+      }
+    },
+    {
+      "id": "implementation-clearing-cutover",
+      "catalog_id": "ASK-035",
+      "labels": [
+        "financial-records",
+        "data-integrity",
+        "compatibility",
+        "persistence",
+        "technical-debt",
+        "recovery"
+      ],
+      "domain": "backend_financial",
+      "difficulty": "expert",
+      "difficulty_basis": "author_estimate",
+      "task_types": [
+        "implementation",
+        "investigation"
+      ],
+      "input": {
+        "kind": "primary",
+        "root": "benchmarks/task-revisions/implementation-clearing-cutover",
+        "version": "task-revision-1",
+        "editable": [
+          "workspace/src/archive.mjs",
+          "workspace/src/clearing.mjs",
+          "workspace/src/ledger.mjs",
+          "workspace/src/money.mjs"
         ],
         "modes": {
           "default": {

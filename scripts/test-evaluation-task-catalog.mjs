@@ -18,9 +18,9 @@ test('one selection entry lists the current primary, business and staged tasks',
   const ids = tasks.map(task => task.id);
   const registration = readEvaluationTaskRegistrations();
   assert.equal(new Set(ids).size, ids.length);
-  assert.ok(ids.length >= 34);
+  assert.ok(ids.length >= 35);
   assert.deepEqual(ids, registration.tasks.map(task => task.id));
-  assert.ok(tasks.filter(task => task.input.kind === 'primary').length >= 26);
+  assert.ok(tasks.filter(task => task.input.kind === 'primary').length >= 27);
   assert.deepEqual(tasks.filter(task => task.input.kind !== 'primary').map(task => task.id), ['ch01-inventory-reservation-logistics',
     'ch02-report-operations', 'ch03-price-rollout', 'ch04-document-access',
     'ch05-sales-reconciliation', 'ch06-build-operations', 'rc01-shared-review-platform', 'ch08-growth-workspace']);
@@ -28,14 +28,22 @@ test('one selection entry lists the current primary, business and staged tasks',
   assert.equal(new Set(tasks.map(task => task.catalog_id)).size, tasks.length);
   const byNumber = new Map(tasks.map(task => [task.catalog_id, task]));
   for (const [number, slug, estimate] of [
-    ['ASK-003', 'hi-financial-state-integrity', 'expert'],
+    ['ASK-003', 'hi-financial-state-integrity', 'hard'],
     ['ASK-023', 'pf-performance-regression', 'hard'],
     ['ASK-033', 'implementation-timeline-restore', 'expert'],
     ['ASK-034', 'implementation-workspace-upgrade', 'expert'],
+    ['ASK-035', 'implementation-clearing-cutover', 'expert'],
   ]) {
     assert.equal(byNumber.get(number)?.id, slug);
     assert.equal(byNumber.get(number)?.difficulty, estimate);
   }
+  const transfer = byNumber.get('ASK-003');
+  assert.equal(transfer.primary_type, 'investigation');
+  assert.ok(transfer.observations.some(item => item.criterion_id === 'previous-inputs' && item.points === 2));
+  assert.ok(transfer.observations.some(item => item.criterion_id === 'submitted-check' && item.points === 2 && item.requires_delivery));
+  const clearing = byNumber.get('ASK-035');
+  assert.equal(clearing.primary_type, 'implementation');
+  assert.deepEqual(clearing.observations.map(item => item.criterion_id), ['teller', 'settlement', 'delivery', 'statements', 'continuity']);
   for (const task of tasks) {
     assert.match(task.catalog_id, /^ASK-\d{3,}$/u);
     assert.equal(task.primary_type, task.task_types[0]);

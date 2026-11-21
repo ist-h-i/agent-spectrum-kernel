@@ -1,40 +1,15 @@
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
-import { openBook } from '../src/ledger.mjs';
-
-const archive = JSON.parse(readFileSync(new URL('../data/initial-state.json', import.meta.url)));
-const order = {ticket: {office: 'bay', day: '2025-05-01', serial: '31'}, from: 'float', to: 'merchant', limit: '400'};
-const advice = {ticket: order.ticket, revision: 1, gross: '200', final: false, valueDay: order.ticket.day};
-
-test('teller export still reconciles at handover', () => {
-  const book = openBook(archive);
-  assert.deepEqual(book.balance('float'), {posted: '99400', available: '97500'});
-  assert.deepEqual(book.statement('merchant', '2025-04-10'), [{
-    ticket: {office: 'north', day: '2025-04-08', serial: '14'}, revision: 1, valueDay: '2025-04-10', movement: '594'
-  }]);
-});
-
-test('normal teller order arrives from the branch gateway', () => {
-  const book = openBook(archive);
-  assert.equal(book.place(order), 'opened');
-  assert.deepEqual(book.receive({feed: 'local', codec: 'json', after: 0, rows: [advice]}), {status: 'ok', through: 1});
-  assert.deepEqual(book.balance('merchant'), {posted: '791', available: '791'});
-  const saved = openBook(JSON.parse(JSON.stringify(book.dump())));
-  assert.equal(saved.place(order), 'replayed');
-  assert.deepEqual(saved.balance('float'), {posted: '99200', available: '97100'});
-});
-
-test('the bank can check its archived delivery position', () => {
-  const book = openBook(archive);
-  assert.deepEqual(book.receive({feed: 'night', codec: 'json', after: 28, rows: []}), {status: 'gap', through: 27});
-});
-
-test('teller can read and continue work from a deployed kiosk save', () => {
-  const saved = JSON.parse(readFileSync(new URL('../data/service-save.json', import.meta.url)));
-  const book = openBook(saved);
-  assert.deepEqual(book.balance('float'), {posted: '99300', available: '96250'});
-  assert.equal(book.statement('reserve', '2025-05-02')[0].ticket.office, 'quay');
-  const ticket = {office: 'mill', day: '2025-05-08', serial: '23'};
-  assert.equal(book.place({ticket, from: 'reserve', to: 'merchant', limit: '300'}), 'opened');
-});
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {applyTransfer} from '../src/ledger.mjs';
+const initial=()=>JSON.parse(readFileSync(new URL('../data/initial-state.json',import.meta.url))),request=(extra={})=>({id:'txn-one',from:'account-a',to:'account-b',amount:'7',...extra}),sum=s=>Object.values(s.balances).reduce((a,n)=>a+BigInt(n),0n);
+function checkReject(s,q,reason){const before=JSON.stringify(s),qb=JSON.stringify(q);const x=applyTransfer(s,q);assert.deepEqual(Object.keys(x).sort(),['reason','state','status']);assert.equal(x.status,'rejected');assert.equal(x.reason,reason);assert.equal(x.state,s);assert.equal(JSON.stringify(s),before);assert.equal(JSON.stringify(q),qb);return x;}
+test('exact large-unit transfer and input immutability',()=>{const s=initial(),q=request(),sb=JSON.stringify(s),qb=JSON.stringify(q),x=applyTransfer(s,q);assert.equal(x.status,'applied');assert.deepEqual(Object.keys(x).sort(),['state','status']);assert.notEqual(x.state,s);assert.equal(JSON.stringify(s),sb);assert.equal(JSON.stringify(q),qb);assert.equal(x.state.balances['account-a'],'9007199254740992993');assert.equal(x.state.balances['account-b'],'307');assert.equal(x.state.balances['account-c'],'0');assert.equal(sum(x.state),sum(s));});
+test('exact committed receipt and audit before/after',()=>{const x=applyTransfer(initial(),request());assert.deepEqual(x.state.requests,{'txn-one':{from:'account-a',to:'account-b',amount:'7'}});assert.deepEqual(x.state.audit,[{sequence:1,request_id:'txn-one',from:'account-a',to:'account-b',amount:'7',before:{from:'9007199254740993000',to:'300'},after:{from:'9007199254740992993',to:'307'}}]);});
+test('identical retry is replayed without charge or audit',()=>{const s=applyTransfer(initial(),request()).state,before=JSON.stringify(s),x=applyTransfer(s,request());assert.equal(x.status,'replayed');assert.deepEqual(Object.keys(x).sort(),['state','status']);assert.equal(x.state,s);assert.equal(JSON.stringify(s),before);});
+test('same payload in different property order replays',()=>{const s=applyTransfer(initial(),request()).state;assert.equal(applyTransfer(s,{amount:'7',to:'account-b',from:'account-a',id:'txn-one'}).status,'replayed');});
+for(const change of [{amount:'8'},{to:'account-c'},{from:'account-b',to:'account-c'}])test('conflicting retry '+JSON.stringify(change),()=>{const s=applyTransfer(initial(),request()).state;checkReject(s,request(change),'request_conflict');});
+test('new id commits again and older exact id still replays',()=>{const a=applyTransfer(initial(),request()).state,b=applyTransfer(a,request({id:'txn-two'})).state;assert.equal(b.audit.length,2);assert.deepEqual(b.audit[0],a.audit[0]);assert.deepEqual(b.requests['txn-one'],a.requests['txn-one']);assert.equal(b.balances['account-a'],'9007199254740992986');assert.equal(applyTransfer(b,request()).status,'replayed');assert.equal(applyTransfer(b,request()).state,b);});
+test('insufficient balance is atomic',()=>checkReject(initial(),request({from:'account-b',to:'account-c',amount:'301'}),'insufficient_funds'));
+for(const amount of [0,7,'0','-1','01','1e3','0.5'])test('invalid amount '+JSON.stringify(amount),()=>checkReject(initial(),request({amount}),'invalid_amount'));
+for(const extra of [{from:'account-missing'},{to:'account-missing'},{to:'account-a'}])test('invalid accounts '+JSON.stringify(extra),()=>checkReject(initial(),request(extra),'invalid_accounts'));
+for(const extra of [{id:'constructor'},{unknown:true}])test('invalid request '+JSON.stringify(extra),()=>checkReject(initial(),request(extra),'invalid_request'));
+test('malformed committed-id retry still fails validation',()=>{const s=applyTransfer(initial(),request()).state;checkReject(s,request({amount:'0'}),'invalid_amount');});
+test('a rejected id can be corrected and committed',()=>{const s=initial();checkReject(s,request({from:'account-b',to:'account-c',amount:'301'}),'insufficient_funds');assert.equal(applyTransfer(s,request({from:'account-b',to:'account-c',amount:'300'})).status,'applied');});
