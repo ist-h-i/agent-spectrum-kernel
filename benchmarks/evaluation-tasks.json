@@ -249,7 +249,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "hi-external-action-approval",
@@ -279,7 +280,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "hi-financial-state-integrity",
@@ -308,7 +310,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "hi-versioned-migration-safety",
@@ -337,7 +340,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "mn-build-option-update",
@@ -395,7 +399,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "mn-doc-config-correction",
@@ -535,7 +540,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "mp-ci-evidence-gap",
@@ -875,7 +881,8 @@
             "task_path": "task.md"
           }
         }
-      }
+      },
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "pf-performance-regression",
@@ -1102,7 +1109,8 @@
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/nonfunctional.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch04-document-access/business-decisions.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
-      ]
+      ],
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "ch05-sales-reconciliation",
@@ -1144,7 +1152,8 @@
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/nonfunctional.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/tasks/ch05-sales-reconciliation/business-decisions.md",
         "benchmarks/challenge-candidates/business-five-v3-decisions/public/common/operation-and-observation.md"
-      ]
+      ],
+      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
     },
     {
       "id": "ch06-build-operations",

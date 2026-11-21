@@ -9,8 +9,8 @@
       "files": [
         {
           "path": "task.md",
-          "bytes": 2726,
-          "sha256": "e0fcef544dcd601a2df6a23ee070b89abce9741ba91ddcc59ce189f02e7b7d7e"
+          "bytes": 2781,
+          "sha256": "c958cde1ba249952754bd7c281b35e72042379508501df498b15ee37e4f3c880"
         },
         {
           "path": "workspace/base/authorization.mjs",
@@ -39,8 +39,8 @@
         },
         {
           "path": "workspace/review.schema.json",
-          "bytes": 3146,
-          "sha256": "08e45d19bb95646f521b029ace942a4f5257f78a96c9265e14b4c327c54cf71b"
+          "bytes": 3884,
+          "sha256": "fc0ddd225b831d95fa1d4d0bb6854f251631a2e486d0857590d156842c563636"
         },
         {
           "path": "workspace/scripts/trace-access.mjs",
