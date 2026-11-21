@@ -541,7 +541,7 @@
           }
         }
       },
-      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
+      "protected_revision": "79268ff32b916ffb69b6827013efbaecfbb7e062"
     },
     {
       "id": "mp-ci-evidence-gap",
@@ -882,7 +882,7 @@
           }
         }
       },
-      "protected_revision": "2f1e7b2b296ee8089bbdc552f95fa3729dda3d6f"
+      "protected_revision": "79268ff32b916ffb69b6827013efbaecfbb7e062"
     },
     {
       "id": "pf-performance-regression",
