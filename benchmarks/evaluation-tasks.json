@@ -1250,7 +1250,7 @@
           "files": [
             {
               "path": "rubric.json",
-              "digest": "sha256:1fa873789657569899a956a8bcd29799cf46100a5e31c475574ba4f8b17bb125"
+              "digest": "sha256:a816beab26f1991e867ca573b811ad39e09cdc73eb77785201863f1bfb671563"
             },
             {
               "path": "score.mjs",
@@ -1258,7 +1258,7 @@
             },
             {
               "path": "README.md",
-              "digest": "sha256:07642202ebe7d7c1b5e56523ce7acb9353b7c5f5d910b114611acd803283d5eb"
+              "digest": "sha256:621752f4f8f0b4462c8b98167ebe411b4b2016e56edb9f2a4483c44024dc31bc"
             }
           ]
         },
@@ -1274,7 +1274,7 @@
       "acceptance_files": [
         "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
       ],
-      "protected_revision": "f0f6145dc2a3b465967037b33c6ee0b00673c6b6"
+      "protected_revision": "c2fede5e29a62708720da7236ba64347271fc378"
     },
     {
       "id": "ch08-growth-workspace",
