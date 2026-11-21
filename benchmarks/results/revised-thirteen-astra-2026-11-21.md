@@ -50,4 +50,4 @@ ASK-033では採点器のケース単位の中断処理を改めた。回答者�
 
 ## 照合に使う記録
 
-実際に渡した問題の版・入力ハッシュ・採点定義は共通カタログに記録した。採点権限のある運用者は、保管先のコミット `c9c364fcbd719cb6ed192c16923a296210f193a0` の `studies/2026-11-21-revised-thirteen/` から各試行の証拠を確認できる。 [問題の選び方](../../docs/evaluation-task-catalog.md) · [旧版の実装課題の得点](upper-model-calibration-2026-11-21.md) · [旧版のレビュー課題の得点](release-review-astra-2026-11-21.md)
+実際に渡した問題の版・入力ハッシュ・採点定義は共通カタログに記録した。採点権限のある運用者は、保管先のコミット `c8e656e9dc1f4825b1b4b97a41a62c7e7f1b3531` の `studies/2026-11-21-revised-thirteen/` から各試行の証拠を確認できる。 [問題の選び方](../../docs/evaluation-task-catalog.md) · [旧版の実装課題の得点](upper-model-calibration-2026-11-21.md) · [旧版のレビュー課題の得点](release-review-astra-2026-11-21.md)
