@@ -6,6 +6,29 @@ const result = transaction(db, () => {
   if (q.op === 'monitor') {
     return db.prepare('SELECT stage,attempt FROM jobs WHERE site=? AND id=?').get(q.site,q.id) ?? null;
   }
+  if (q.op === 'fileBook' || q.op === 'amendBook' || q.op === 'inspectBook') {
+    const {district,book}=q;
+    const latest=db.prepare('SELECT MAX(edition) AS value FROM flight_editions WHERE district=? AND book=?')
+      .get(district,book).value;
+    if (q.op === 'inspectBook') {
+      const edition=q.edition ?? latest;
+      const page=db.prepare('SELECT leaves,limits FROM flight_editions WHERE district=? AND book=? AND edition=?')
+        .get(district,book,edition);
+      if (!page) return null;
+      const tickets=db.prepare('SELECT site,id,attempt,flight,depot FROM flight_tickets WHERE district=? AND book=? ORDER BY pos')
+        .all(district,book);
+      return {district,book,edition,tickets,leaves:JSON.parse(page.leaves),limits:JSON.parse(page.limits)};
+    }
+    if (q.op === 'fileBook') {
+      if (latest !== null) return {status:'stale'};
+      const insert=db.prepare('INSERT INTO flight_tickets VALUES(?,?,?,?,?,?,?,?)');
+      for (const [pos,t] of q.tickets.entries()) insert.run(district,book,pos,t.site,t.id,t.attempt,t.flight,t.depot);
+    } else if (latest === null || q.edition !== latest) return {status:'stale'};
+    const edition=(latest ?? 0)+1;
+    db.prepare('INSERT INTO flight_editions VALUES(?,?,?,?,?)')
+      .run(district,book,edition,JSON.stringify(q.leaves),JSON.stringify(q.limits));
+    return {district,book,edition};
+  }
   const row = current(db,q.site,q.slot);
   if (q.op === 'install') {
     if (row && row.issue === q.issue) throw new Error('occupied by this issue');

@@ -1431,7 +1431,7 @@
       "input": {
         "kind": "primary",
         "root": "benchmarks/task-revisions/implementation-workspace-upgrade",
-        "version": "task-revision-2",
+        "version": "task-revision-3",
         "editable": [
           "workspace/src/delivery.mjs",
           "workspace/src/reconcile.mjs",
@@ -1444,7 +1444,7 @@
           }
         }
       },
-      "protected_revision": "c8242a7dd83ba55c37194ca7394aaadbe49fc976"
+      "protected_revision": "603a4ba8c312697a0b55d4aa901ea6803260202f"
     },
     {
       "id": "implementation-clearing-cutover",

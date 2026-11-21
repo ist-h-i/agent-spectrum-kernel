@@ -15,7 +15,7 @@ const context = {
   lookup: (...args) => lookup(directory, ...args),
 };
 try {
-  const op = {read:readCard,import:importSheet,recheck,sheet,queue,dispatch,recover,job,queueReceipt:relief.queueReceipt,handover:relief.handover}[q.op];
+  const op = {read:readCard,import:importSheet,recheck,sheet,queue,dispatch,recover,job,queueReceipt:relief.queueReceipt,handover:relief.handover,auditBook:relief.auditBook}[q.op];
   if (!op) throw new Error('unknown desk operation');
   const result = await op(context,q);
   console.log(JSON.stringify(result));
