@@ -1259,7 +1259,7 @@
           "files": [
             {
               "path": "rubric.json",
-              "digest": "sha256:a816beab26f1991e867ca573b811ad39e09cdc73eb77785201863f1bfb671563"
+              "digest": "sha256:e158f58ea5d0356940ba41eb6c21995e9457ec8a59f0570e76566b42ea2a5853"
             },
             {
               "path": "score.mjs",
@@ -1283,7 +1283,7 @@
       "acceptance_files": [
         "benchmarks/challenge-candidates/review-ceiling-v1/evaluation-protocol.md"
       ],
-      "protected_revision": "c2fede5e29a62708720da7236ba64347271fc378"
+      "protected_revision": "46167de33055faccc51b14cada35ee6b7c526467"
     },
     {
       "id": "ch08-growth-workspace",
