@@ -6,6 +6,7 @@
 
 | 調べたいこと | 資料 |
 | --- | --- |
+| npm公開版のインストール・初期化・スキル配置 | [npm導入手順（日本語）](npm-distribution-ja.md)、[English guide](npm-distribution.md) |
 | Mac / Codexの導入・復旧、最初の作業 | [導入・復旧](quickstart-mac-codex-ja.md)、[初回開発受入の準備](first-workflow-mac-codex-ja.md) |
 | ツール別の導入・自然文の依頼 | [共通導入](quickstart-ja.md)、[依頼レシピ](prompt-recipes-ja.md)、[利用ガイド](usage-ja.md)、[用語集](glossary-ja.md) |
 | setupの計画・適用・診断 | [導入計画](adoption-setup.md)、[計画の適用・復旧](adoption-apply.md) |
