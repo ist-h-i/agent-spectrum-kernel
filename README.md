@@ -1,10 +1,10 @@
 # Agent Spectrum Kernel
 
-Your coding agent misses a stale loading state in review. You catch it this time. How do you know a better review prompt would catch it next time?
+**Agent Spectrum Kernel (ASK) is a self-improvement platform for AI-driven development environments.** It helps you turn problems you encounter during development into evals for the skills and prompts your coding agents use.
 
-Agent Spectrum Kernel (ASK) gives you a foundation for improving coding skills and prompts through evals. Enable finding intake to save the missed issue while its context is fresh. Use that finding to draft a revised prompt and choose a task that tests it.
+Suppose your agent reviews a change and misses a loading indicator that never clears. With finding intake enabled, you can save that observation, revise the review prompt, and choose a frontend state review from ASK’s **35 simulated engineering tasks**. The [eval catalog](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/docs/evaluation-task-catalog.md) also covers work such as diagnosing flaky CI and planning data migrations.
 
-**ASK includes 35 simulated engineering tasks**, from frontend state reviews to flaky CI investigations and data migration planning. Run the original and revised prompts on the same task with the same scoring criteria. Inspect what each one caught or missed, then decide which version your agent should use on its next review. [Browse the eval catalog](https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/docs/evaluation-task-catalog.md)
+Run the current and revised prompts on the same task with the same scoring criteria. Inspect what each review caught or missed, then decide which version to carry into the next real task.
 
 ## Get started
 
