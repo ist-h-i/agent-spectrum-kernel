@@ -1,7 +1,7 @@
-# npm 1.0.0 release preparation
+# npm 1.0.0 release
 
 Approved metadata: `@hiroshi.inoue/agent-spectrum-kernel@1.0.0`, MIT.
-This document records preparation, not publication or registry availability.
+Published to the public npm registry on 2026-11-22 from commit `a0e83a3129c162ca887522675e164452364c42df`. The registry served version 1.0.0 under `latest`. A clean project installed the named package, matched the tarball integrity, ran `ask --version` and initialized a workspace. The preparation notes below record the checks leading up to release.
 
 ## Distribution and rights review
 

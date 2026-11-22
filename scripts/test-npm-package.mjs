@@ -32,7 +32,7 @@ test('actual npm archive: linked CLI, Gitless persistent workspace and adoption'
     const metadata=JSON.parse(readFileSync(join(app,'node_modules','@hiroshi.inoue','agent-spectrum-kernel','package.json'),'utf8'));
     assert.equal(metadata.license,'MIT');assert.equal(metadata.private,undefined);assert.equal(metadata.publishConfig.access,'public');
     assert.match(readFileSync(join(app,'node_modules','@hiroshi.inoue','agent-spectrum-kernel','LICENSE'),'utf8'),/MIT License/);
-    const version=okay(run(process.execPath,[linked,'--version'],{cwd:app})).trim();assert.equal(version,'1.0.0');
+    const version=okay(run(process.execPath,[linked,'--version'],{cwd:app})).trim();assert.equal(version,metadata.version);
     assert.match(okay(run(process.execPath,[linked,'--help'])),/ask init/);
     assert.notEqual(run(process.execPath,[linked,'does-not-exist']).status,0);
     // No git executable is reachable by the application command. Node uses its

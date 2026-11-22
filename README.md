@@ -1,12 +1,15 @@
 # ASK npm distribution
 
 Gitless installation, portable instruction assets and a human-supervised improvement loop.
-Release preparation: **@hiroshi.inoue/agent-spectrum-kernel 1.0.0**, **MIT**.
-This preparation does not claim that the package has been published.
+ASK is available on [npm](https://www.npmjs.com/package/@hiroshi.inoue/agent-spectrum-kernel) under the MIT license.
 
 [English installation guide](docs/npm-distribution.md) · [日本語の導入手順](docs/npm-distribution-ja.md) · [License](LICENSE)
 
-After publication: `npm install @hiroshi.inoue/agent-spectrum-kernel@1.0.0`.
+```sh
+npm install @hiroshi.inoue/agent-spectrum-kernel@1.0.1
+npx --no-install ask init --workspace ./my-ask
+```
+
 Requires Node.js 24 and POSIX tools for the Full workflow; model CLI authentication is separate.
 
 ---
@@ -19,9 +22,9 @@ Requires Node.js 24 and POSIX tools for the Full workflow; model CLI authenticat
 
 初めて使う場合は [はじめ方](#はじめ方) へ。Mac / Codexでは [導入・復旧ガイド](docs/quickstart-mac-codex-ja.md) から始められます。実装やテストが存在することと、実務成果が改善したことは区別します。
 
-## npm配布プレビュー
+## npmから導入する
 
-Gitなしで導入し、ファイル版管理で自己改善ループを使うためのnpmパッケージを用意しています。現時点はローカルtarballでの検証版で、npmレジストリには未公開です。[導入手順（日本語）](docs/npm-distribution-ja.md) / [English guide](docs/npm-distribution.md) を参照してください。通常利用はnpmの永続ワークスペース、ASK本体の開発・全面カスタマイズは従来のclone/forkで行えます。
+Node.js 24.x の環境で上の2行を実行すると、自己改善ループの候補・評価結果・採用版を保存するワークスペースができます。次に、利用先プロジェクトへのスキル配置を計画し、内容を確認して適用します。[導入手順（日本語）](docs/npm-distribution-ja.md) / [English guide](docs/npm-distribution.md) を参照してください。通常利用はnpmの永続ワークスペース、ASK本体の開発・全面カスタマイズは従来のclone/forkで行えます。
 
 ## 何を解決したいか
 

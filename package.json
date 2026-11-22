@@ -1,6 +1,6 @@
 {
   "name": "@hiroshi.inoue/agent-spectrum-kernel",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A supervised improvement loop and portable instruction assets for coding agents.",
   "type": "module",
   "license": "MIT",
